@@ -8,10 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { UserPlus, MessageCircle, MapPin, Clock, Users, Edit3, Save, X } from "lucide-react"
+import { UserPlus, MessageCircle, MapPin, Clock, Users, Edit3, Save, X, Check, Loader2 } from "lucide-react"
 import { getUsersByProfession } from "@/lib/api"
 
-// Define the types for the data we'll get from the backend
 interface UserProfile {
     id: string;
     name: string;
@@ -19,8 +18,6 @@ interface UserProfile {
     email: string;
 }
 
-// Define the types for the user data required by the Header component.
-// This is to match the props expected by the Header component.
 interface CurrentUser {
     name: string;
     avatar: string;
@@ -28,12 +25,16 @@ interface CurrentUser {
     pendingRequests?: number;
 }
 
+interface ConnectionStatus {
+    [key: string]: 'idle' | 'loading' | 'sent' | 'error';
+}
+
 export default function HomePage() {
     const [members, setMembers] = useState<UserProfile[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({})
 
-    // State for the current logged-in user's profile
     const [currentUser, setCurrentUser] = useState<CurrentUser>({
         name: "",
         community: "Loading...",
@@ -41,14 +42,13 @@ export default function HomePage() {
         pendingRequests: 0,
     })
 
-    // State for the main profile card display
     const [profileData, setProfileData] = useState({
         name: "Loading...",
         email: "Loading...",
         profession: "Loading...",
         location: "Loading...",
         connections: 0,
-        bio: "Loading...",
+        bio: "Tell us about yourself, your interests, and what you're looking to achieve in this community.",
     })
 
     const searchParams = useSearchParams()
@@ -58,30 +58,42 @@ export default function HomePage() {
         const name = searchParams.get('name') || '';
         const email = searchParams.get('email') || '';
 
-        // Update the state for the main profile card
         if (profession && name && email) {
-            setProfileData({
-                ...profileData,
-                name: name,
-                email: email,
-                profession: profession,
-            });
+            setProfileData((prev) => ({
+                ...prev,
+                name,
+                email,
+                profession,
+                location: "Your Location", // You might want to get this from user data or geolocation
+            }))
 
-            // Update the state for the Header component to match its required props
-            setCurrentUser({
-                name: name,
+            setCurrentUser((prev) => ({
+                ...prev,
+                name,
                 community: profession,
                 avatar: "/placeholder.svg?height=40&width=40",
-                pendingRequests: 0, // Assuming 0 for now
-            });
+                pendingRequests: 0,
+            }))
         }
 
         const fetchMembers = async () => {
+            if (!profession) {
+                setLoading(false);
+                return;
+            }
+
             setLoading(true)
             setError(null)
             try {
                 const data = await getUsersByProfession(profession)
                 setMembers(data)
+
+                // Initialize connection status for all members
+                const initialStatus: ConnectionStatus = {};
+                data.forEach((member: UserProfile) => {
+                    initialStatus[member.id] = 'idle';
+                });
+                setConnectionStatus(initialStatus);
             } catch (err: unknown) {
                 if (err instanceof Error) {
                     setError(err.message);
@@ -93,24 +105,81 @@ export default function HomePage() {
             }
         }
 
-        if (profession) {
-            fetchMembers()
-        }
+        fetchMembers()
     }, [searchParams])
 
-
-    // State and handlers for the Bio section
     const [isEditingBio, setIsEditingBio] = useState(false)
     const [bioText, setBioText] = useState(profileData.bio)
     const [tempBioText, setTempBioText] = useState(profileData.bio)
 
-    const handleSendRequest = (memberId: string) => {
-        console.log(`Sending connection request to user with ID: ${memberId}`);
+    // Update bioText when profileData.bio changes
+    useEffect(() => {
+        setBioText(profileData.bio);
+        setTempBioText(profileData.bio);
+    }, [profileData.bio]);
+
+    const handleSendRequest = async (memberId: string, memberName: string) => {
+        // Prevent default behavior and event bubbling
+        event?.preventDefault();
+        event?.stopPropagation();
+
+        // Set loading state
+        setConnectionStatus(prev => ({
+            ...prev,
+            [memberId]: 'loading'
+        }));
+
+        try {
+            // Simulate API call - replace with your actual API call
+            // const response = await sendConnectionRequest(memberId);
+
+            // For now, we'll simulate a successful request with a timeout
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Update status to sent
+            setConnectionStatus(prev => ({
+                ...prev,
+                [memberId]: 'sent'
+            }));
+
+            // Update pending requests count
+            setCurrentUser(prev => ({
+                ...prev,
+                pendingRequests: (prev.pendingRequests || 0) + 1
+            }));
+
+            // Optional: Show a toast notification instead of alert
+            console.log(`Connection request sent to ${memberName}`);
+
+        } catch (err) {
+            console.error('Failed to send connection request:', err);
+            setConnectionStatus(prev => ({
+                ...prev,
+                [memberId]: 'error'
+            }));
+
+            // Reset to idle after 3 seconds on error
+            setTimeout(() => {
+                setConnectionStatus(prev => ({
+                    ...prev,
+                    [memberId]: 'idle'
+                }));
+            }, 3000);
+        }
     }
 
-    const handleSaveBio = () => {
-        setBioText(tempBioText)
-        setIsEditingBio(false)
+    const handleSaveBio = async () => {
+        try {
+            // Here you would typically save to your backend
+            // await updateUserBio(tempBioText);
+
+            setBioText(tempBioText)
+            setProfileData(prev => ({ ...prev, bio: tempBioText }))
+            setIsEditingBio(false)
+        } catch (err) {
+            console.error('Failed to save bio:', err);
+            // Handle error appropriately
+        }
     }
 
     const handleCancelBio = () => {
@@ -118,14 +187,53 @@ export default function HomePage() {
         setIsEditingBio(false)
     }
 
+    const getButtonContent = (memberId: string, memberName: string) => {
+        const status = connectionStatus[memberId] || 'idle';
+
+        switch (status) {
+            case 'loading':
+                return (
+                    <>
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Sending...
+                    </>
+                );
+            case 'sent':
+                return (
+                    <>
+                        <Check className="w-3 h-3 mr-1" />
+                        Sent
+                    </>
+                );
+            case 'error':
+                return (
+                    <>
+                        <X className="w-3 h-3 mr-1" />
+                        Failed
+                    </>
+                );
+            default:
+                return (
+                    <>
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Connect
+                    </>
+                );
+        }
+    };
+
+    const getButtonVariant = (memberId: string) => {
+        const status = connectionStatus[memberId] || 'idle';
+        return status === 'sent' ? 'secondary' : status === 'error' ? 'destructive' : 'default';
+    };
+
     return (
         <div className="min-h-screen bg-background">
-            {/* The Header now receives an object that matches its required props */}
             <Header user={currentUser} />
 
             <div className="container mx-auto px-4 py-8">
                 <div className="grid lg:grid-cols-12 gap-8">
-                    {/* Left Sidebar - User Profile Card */}
+                    {/* Left Sidebar */}
                     <div className="lg:col-span-3 space-y-6">
                         <Card className="sticky top-24">
                             <CardHeader className="text-center pb-4">
@@ -145,18 +253,24 @@ export default function HomePage() {
                                         <span>{profileData.location}</span>
                                     </div>
                                     <div className="font-medium">{profileData.profession}</div>
-                                    <div className="text-sm">
-                                        {profileData.email}
-                                    </div>
+                                    <div className="text-sm">{profileData.email}</div>
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {/* Bio Section */}
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <h4 className="font-medium text-sm">About Me</h4>
                                         {!isEditingBio && (
-                                            <Button variant="ghost" size="sm" onClick={() => setIsEditingBio(true)} className="h-6 w-6 p-0">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setIsEditingBio(true);
+                                                }}
+                                                className="h-6 w-6 p-0"
+                                                type="button"
+                                            >
                                                 <Edit3 className="w-3 h-3" />
                                             </Button>
                                         )}
@@ -170,11 +284,28 @@ export default function HomePage() {
                                                 className="min-h-[80px] text-sm"
                                             />
                                             <div className="flex space-x-2">
-                                                <Button size="sm" onClick={handleSaveBio} className="flex-1">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleSaveBio();
+                                                    }}
+                                                    className="flex-1"
+                                                    type="button"
+                                                >
                                                     <Save className="w-3 h-3 mr-1" />
                                                     Save
                                                 </Button>
-                                                <Button size="sm" variant="outline" onClick={handleCancelBio} className="flex-1 bg-transparent">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleCancelBio();
+                                                    }}
+                                                    className="flex-1 bg-transparent"
+                                                    type="button"
+                                                >
                                                     <X className="w-3 h-3 mr-1" />
                                                     Cancel
                                                 </Button>
@@ -185,7 +316,6 @@ export default function HomePage() {
                                     )}
                                 </div>
 
-                                {/* Stats */}
                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                                     <div className="text-center">
                                         <div className="font-semibold text-lg">{profileData.connections}</div>
@@ -200,7 +330,7 @@ export default function HomePage() {
                         </Card>
                     </div>
 
-                    {/* Middle Section - Blank for now */}
+                    {/* Middle Section */}
                     <div className="lg:col-span-6">
                         <Card className="h-96 flex items-center justify-center">
                             <div className="text-center space-y-4">
@@ -217,7 +347,7 @@ export default function HomePage() {
                         </Card>
                     </div>
 
-                    {/* Right Sidebar - Community Members */}
+                    {/* Right Sidebar */}
                     <div className="lg:col-span-3 space-y-6">
                         <Card className="sticky top-24">
                             <CardHeader>
@@ -225,36 +355,68 @@ export default function HomePage() {
                                     <Users className="w-5 h-5 mr-2" />
                                     Discover {profileData.profession.charAt(0).toUpperCase() + profileData.profession.slice(1)}s
                                 </CardTitle>
-                                <CardDescription>Connect with fellow {profileData.profession}s in your community</CardDescription>
+                                <CardDescription>
+                                    Connect with fellow {profileData.profession}s in your community
+                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
-                                {loading && <p>Loading members...</p>}
-                                {error && <p className="text-red-500">Error: {error}</p>}
-                                {!loading && members.length === 0 && !error && <p>No other members found in this community.</p>}
+                                {loading && (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                                        <span>Loading members...</span>
+                                    </div>
+                                )}
+                                {error && (
+                                    <div className="text-center py-8">
+                                        <p className="text-red-500 text-sm">Error: {error}</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => window.location.reload()}
+                                            className="mt-2"
+                                            type="button"
+                                        >
+                                            Retry
+                                        </Button>
+                                    </div>
+                                )}
+                                {!loading && members.length === 0 && !error && (
+                                    <div className="text-center py-8">
+                                        <Users className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                                        <p className="text-sm text-muted-foreground">
+                                            No other members found in this community yet.
+                                        </p>
+                                    </div>
+                                )}
                                 {members.map((member) => (
                                     <div key={member.id} className="space-y-3 pb-4 border-b border-border last:border-b-0 last:pb-0">
                                         <div className="flex items-start space-x-3">
                                             <Avatar className="w-12 h-12">
                                                 <AvatarImage src={"/placeholder.svg"} alt={member.name} />
                                                 <AvatarFallback className="text-sm">
-                                                    {member.name
-                                                        .split(" ")
-                                                        .map((n) => n[0])
-                                                        .join("")}
+                                                    {member.name.split(" ").map((n) => n[0]).join("")}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-medium text-sm truncate">{member.name}</h4>
                                                 <p className="text-xs text-muted-foreground truncate">{member.profession}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {member.email}
-                                                </p>
+                                                <p className="text-xs text-muted-foreground">{member.email}</p>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Button size="sm" onClick={() => handleSendRequest(member.id)} className="w-full h-8 text-xs">
-                                                <UserPlus className="w-3 h-3 mr-1" />
-                                                Connect
+                                            <Button
+                                                size="sm"
+                                                type="button"
+                                                variant={getButtonVariant(member.id)}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleSendRequest(member.id, member.name);
+                                                }}
+                                                disabled={connectionStatus[member.id] === 'loading' || connectionStatus[member.id] === 'sent'}
+                                                className="w-full h-8 text-xs"
+                                            >
+                                                {getButtonContent(member.id, member.name)}
                                             </Button>
                                         </div>
                                     </div>
