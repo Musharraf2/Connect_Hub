@@ -123,7 +123,8 @@ export const sendConnectionRequest = async (requesterId: number, receiverId: num
         });
 
         if (!response.ok) {
-            throw new Error('Failed to send connection request');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to send connection request: ${response.status} - ${errorText}`);
         }
 
         return await response.text();
@@ -140,7 +141,8 @@ export const acceptConnectionRequest = async (connectionId: number): Promise<str
         });
 
         if (!response.ok) {
-            throw new Error('Failed to accept connection request');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to accept connection request: ${response.status} - ${errorText}`);
         }
 
         return await response.text();
@@ -157,7 +159,8 @@ export const declineConnectionRequest = async (connectionId: number): Promise<st
         });
 
         if (!response.ok) {
-            throw new Error('Failed to decline connection request');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to decline connection request: ${response.status} - ${errorText}`);
         }
 
         return await response.text();
@@ -172,7 +175,8 @@ export const getPendingRequests = async (receiverId: number): Promise<Connection
         const response = await fetch(`http://localhost:8080/api/connections/pending/${receiverId}`);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch pending requests');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch pending requests: ${response.status} - ${errorText}`);
         }
 
         return await response.json();
@@ -187,7 +191,8 @@ export const getAcceptedConnections = async (userId: number): Promise<Connection
         const response = await fetch(`http://localhost:8080/api/connections/accepted/${userId}`);
 
         if (!response.ok) {
-            throw new Error('Failed to fetch accepted connections');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch accepted connections: ${response.status} - ${errorText}`);
         }
 
         return await response.json();
