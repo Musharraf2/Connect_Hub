@@ -16,6 +16,7 @@ export interface LoginRequestType {
 
 // Define the type for the login response data from the backend.
 export interface LoginResponse {
+    id: number;
     name: string;
     email: string;
     profession: string;
@@ -27,6 +28,24 @@ export interface UserProfileResponse {
     name: string;
     profession: string;
     email: string;
+}
+
+// Define the type for Connection from backend
+export interface Connection {
+    id: number;
+    requester: {
+        id: number;
+        name: string;
+        email: string;
+        profession: string;
+    };
+    receiver: {
+        id: number;
+        name: string;
+        email: string;
+        profession: string;
+    };
+    status: string;
 }
 
 
@@ -91,6 +110,89 @@ export const getUsersByProfession = async (profession: string): Promise<UserProf
         return await response.json(); // Now this will only run if there is content
     } catch (error) {
         console.error("Failed to fetch members:", error);
+        throw error;
+    }
+};
+
+// Connection API functions
+
+export const sendConnectionRequest = async (requesterId: number, receiverId: number): Promise<string> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/send?requesterId=${requesterId}&receiverId=${receiverId}`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send connection request');
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error("Failed to send connection request:", error);
+        throw error;
+    }
+};
+
+export const acceptConnectionRequest = async (connectionId: number): Promise<string> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/accept/${connectionId}`, {
+            method: 'PUT',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to accept connection request');
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error("Failed to accept connection request:", error);
+        throw error;
+    }
+};
+
+export const declineConnectionRequest = async (connectionId: number): Promise<string> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/decline/${connectionId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to decline connection request');
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error("Failed to decline connection request:", error);
+        throw error;
+    }
+};
+
+export const getPendingRequests = async (receiverId: number): Promise<Connection[]> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/pending/${receiverId}`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch pending requests');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch pending requests:", error);
+        throw error;
+    }
+};
+
+export const getAcceptedConnections = async (userId: number): Promise<Connection[]> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/accepted/${userId}`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch accepted connections');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch accepted connections:", error);
         throw error;
     }
 };

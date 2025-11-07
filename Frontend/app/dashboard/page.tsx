@@ -26,10 +26,18 @@ import {
   X,
 } from "lucide-react"
 import Link from "next/link"
-import { LoginResponse } from "@/app/login/page" // Re-use login interface
 import { Textarea } from "@/components/ui/textarea" // Import Textarea
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import { 
+  LoginResponse, 
+  Connection,
+  sendConnectionRequest,
+  acceptConnectionRequest,
+  declineConnectionRequest,
+  getPendingRequests,
+  getAcceptedConnections
+} from "@/lib/api"
 
 
 // --- Define User Types ---
@@ -101,27 +109,6 @@ const communityMembers = [
     status: "connected",
   },
 ]
-
-const pendingRequests = [
-  {
-    id: "6",
-    name: "Jessica Park",
-    community: "student",
-    avatar: "/placeholder.svg?height=50&width=50",
-    university: "UCLA",
-    major: "Art History",
-    mutualConnections: 4,
-  },
-  {
-    id: "7",
-    name: "Ryan Thompson",
-    community: "student",
-    avatar: "/placeholder.svg?height=50&width=50",
-    university: "NYU",
-    major: "Film Studies",
-    mutualConnections: 1,
-  },
-]
 // --- End Mock Data ---
 
 
@@ -144,6 +131,8 @@ const communityColors = {
 export default function DashboardPage() {
   const [members, setMembers] = useState(communityMembers)
   const [searchQuery, setSearchQuery] = useState("")
+  const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
+  const [connections, setConnections] = useState<Connection[]>([])
 
   // --- Auth & Profile State ---
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -174,10 +163,34 @@ export default function DashboardPage() {
         bio: "Passionate computer science student specializing in AI and machine learning. Eager to connect with fellow students!",
       });
 
+      // Fetch pending requests and accepted connections
+      fetchPendingRequests(user.id);
+      fetchAcceptedConnections(user.id);
+
       setAuthLoading(false);
     }
   }, [router]);
   // --- End Auth & Profile State ---
+
+  // Fetch pending requests
+  const fetchPendingRequests = async (userId: number) => {
+    try {
+      const requests = await getPendingRequests(userId);
+      setPendingRequests(requests);
+    } catch (error) {
+      console.error("Failed to fetch pending requests:", error);
+    }
+  };
+
+  // Fetch accepted connections
+  const fetchAcceptedConnections = async (userId: number) => {
+    try {
+      const conns = await getAcceptedConnections(userId);
+      setConnections(conns);
+    } catch (error) {
+      console.error("Failed to fetch accepted connections:", error);
+    }
+  };
 
 
   // --- Bio Edit State & Handlers ---
@@ -204,17 +217,46 @@ export default function DashboardPage() {
   // --- End Bio Edit State ---
 
 
-  // --- Mocked Handlers ---
-  const handleSendRequest = (memberId: string) => {
-    setMembers(members.map((member) => (member.id === memberId ? { ...member, status: "pending" } : member)))
+  // --- Connection Handlers ---
+  const handleSendRequest = async (memberId: string) => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return;
+    
+    const user: LoginResponse = JSON.parse(userDataString);
+    try {
+      await sendConnectionRequest(user.id, parseInt(memberId));
+      setMembers(members.map((member) => (member.id === memberId ? { ...member, status: "pending" } : member)))
+    } catch (error) {
+      console.error("Failed to send connection request:", error);
+    }
   }
-  const handleAcceptRequest = (memberId: string) => {
-    console.log(`Accepted request from ${memberId}`)
+  
+  const handleAcceptRequest = async (connectionId: number) => {
+    try {
+      await acceptConnectionRequest(connectionId);
+      // Remove from pending requests
+      setPendingRequests(pendingRequests.filter(req => req.id !== connectionId));
+      // Refetch connections
+      const userDataString = sessionStorage.getItem('user');
+      if (userDataString) {
+        const user: LoginResponse = JSON.parse(userDataString);
+        fetchAcceptedConnections(user.id);
+      }
+    } catch (error) {
+      console.error("Failed to accept connection request:", error);
+    }
   }
-  const handleDeclineRequest = (memberId: string) => {
-    console.log(`Declined request from ${memberId}`)
+  
+  const handleDeclineRequest = async (connectionId: number) => {
+    try {
+      await declineConnectionRequest(connectionId);
+      // Remove from pending requests
+      setPendingRequests(pendingRequests.filter(req => req.id !== connectionId));
+    } catch (error) {
+      console.error("Failed to decline connection request:", error);
+    }
   }
-  // --- End Mocked Handlers ---
+  // --- End Connection Handlers ---
 
   const filteredMembers = members.filter(
     (member) =>
@@ -431,21 +473,21 @@ export default function DashboardPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               <Avatar className="w-12 h-12">
-                                <AvatarImage src={request.avatar || "/placeholder.svg"} alt={request.name} />
+                                <AvatarImage src="/placeholder.svg" alt={request.requester.name} />
                                 <AvatarFallback>
-                                  {request.name
+                                  {request.requester.name
                                     .split(" ")
                                     .map((n) => n[0])
                                     .join("")}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <h3 className="font-serif font-semibold">{request.name}</h3>
+                                <h3 className="font-serif font-semibold">{request.requester.name}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  {request.university} • {request.major}
+                                  {request.requester.profession}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {request.mutualConnections} mutual connections
+                                  {request.requester.email}
                                 </p>
                               </div>
                             </div>
@@ -469,26 +511,34 @@ export default function DashboardPage() {
 
               <TabsContent value="connections" className="space-y-6">
                 <h2 className="text-2xl font-serif font-bold text-foreground">
-                  My Connections ({profileData.connections})
+                  My Connections ({connections.length})
                 </h2>
                 <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-4">
-                  {members
-                    .filter((member) => member.status === "connected")
-                    .map((connection) => (
+                  {connections.map((connection) => {
+                    const userDataString = sessionStorage.getItem('user');
+                    if (!userDataString) return null;
+                    const currentLoggedInUser: LoginResponse = JSON.parse(userDataString);
+                    
+                    // Determine which user to display (the other person in the connection)
+                    const otherUser = connection.requester.id === currentLoggedInUser.id 
+                      ? connection.receiver 
+                      : connection.requester;
+                    
+                    return (
                       <StaggerItem key={connection.id}>
                         <Card className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4 text-center">
                             <Avatar className="w-16 h-16 mx-auto mb-3">
-                              <AvatarImage src={connection.avatar || "/placeholder.svg"} alt={connection.name} />
+                              <AvatarImage src="/placeholder.svg" alt={otherUser.name} />
                               <AvatarFallback>
-                                {connection.name
+                                {otherUser.name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <h3 className="font-serif font-semibold mb-1">{connection.name}</h3>
-                            <p className="text-sm text-muted-foreground mb-3">{connection.university}</p>
+                            <h3 className="font-serif font-semibold mb-1">{otherUser.name}</h3>
+                            <p className="text-sm text-muted-foreground mb-3">{otherUser.profession}</p>
                             <Button size="sm" variant="outline" className="w-full bg-transparent">
                               <MessageCircle className="w-4 h-4 mr-2" />
                               Message
@@ -496,7 +546,8 @@ export default function DashboardPage() {
                           </CardContent>
                         </Card>
                       </StaggerItem>
-                    ))}
+                    );
+                  })}
                 </StaggerContainer>
               </TabsContent>
             </Tabs>
