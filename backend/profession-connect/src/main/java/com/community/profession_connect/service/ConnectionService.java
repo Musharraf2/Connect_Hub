@@ -1,5 +1,6 @@
 package com.community.profession_connect.service;
 
+import com.community.profession_connect.dto.ConnectionResponse;
 import com.community.profession_connect.model.Connection;
 import com.community.profession_connect.model.ConnectionStatus;
 import com.community.profession_connect.model.User;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ConnectionService {
@@ -80,7 +82,7 @@ public class ConnectionService {
         return "Connection request declined";
     }
 
-    public List<Connection> getPendingRequests(Long receiverId) {
+    public List<ConnectionResponse> getPendingRequests(Long receiverId) {
         Optional<User> receiverOpt = userRepository.findById(receiverId);
 
         if (receiverOpt.isEmpty()) {
@@ -88,10 +90,14 @@ public class ConnectionService {
         }
 
         User receiver = receiverOpt.get();
-        return connectionRepository.findByReceiverAndStatus(receiver, ConnectionStatus.PENDING);
+        List<Connection> connections = connectionRepository.findByReceiverAndStatus(receiver, ConnectionStatus.PENDING);
+        
+        return connections.stream()
+            .map(ConnectionResponse::fromConnection)
+            .collect(Collectors.toList());
     }
 
-    public List<Connection> getAcceptedConnections(Long userId) {
+    public List<ConnectionResponse> getAcceptedConnections(Long userId) {
         Optional<User> userOpt = userRepository.findById(userId);
 
         if (userOpt.isEmpty()) {
@@ -99,8 +105,12 @@ public class ConnectionService {
         }
 
         User user = userOpt.get();
-        return connectionRepository.findByReceiverAndStatusOrRequesterAndStatus(
+        List<Connection> connections = connectionRepository.findByReceiverAndStatusOrRequesterAndStatus(
             user, ConnectionStatus.ACCEPTED, user, ConnectionStatus.ACCEPTED
         );
+        
+        return connections.stream()
+            .map(ConnectionResponse::fromConnection)
+            .collect(Collectors.toList());
     }
 }

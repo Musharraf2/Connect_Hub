@@ -1,6 +1,6 @@
 package com.community.profession_connect.controller;
 
-import com.community.profession_connect.model.Connection;
+import com.community.profession_connect.dto.ConnectionResponse;
 import com.community.profession_connect.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -38,14 +38,14 @@ public class ConnectionController {
     }
 
     @GetMapping("/pending/{receiverId}")
-    public ResponseEntity<List<Connection>> getPendingRequests(@PathVariable Long receiverId) {
-        List<Connection> requests = connectionService.getPendingRequests(receiverId);
+    public ResponseEntity<List<ConnectionResponse>> getPendingRequests(@PathVariable Long receiverId) {
+        List<ConnectionResponse> requests = connectionService.getPendingRequests(receiverId);
         return ResponseEntity.ok(requests);
     }
 
     @GetMapping("/accepted/{userId}")
-    public ResponseEntity<List<Connection>> getAcceptedConnections(@PathVariable Long userId) {
-        List<Connection> connections = connectionService.getAcceptedConnections(userId);
+    public ResponseEntity<List<ConnectionResponse>> getAcceptedConnections(@PathVariable Long userId) {
+        List<ConnectionResponse> connections = connectionService.getAcceptedConnections(userId);
         return ResponseEntity.ok(connections);
     }
 }
