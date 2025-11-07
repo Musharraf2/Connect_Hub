@@ -24,7 +24,7 @@ export interface LoginResponse {
 
 // Define the type for the user profile response from the backend.
 export interface UserProfileResponse {
-    id: string;
+    id: number;
     name: string;
     profession: string;
     email: string;

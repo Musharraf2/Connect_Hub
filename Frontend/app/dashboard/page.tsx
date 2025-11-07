@@ -32,11 +32,13 @@ import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations
 import { 
   LoginResponse, 
   Connection,
+  UserProfileResponse,
   sendConnectionRequest,
   acceptConnectionRequest,
   declineConnectionRequest,
   getPendingRequests,
-  getAcceptedConnections
+  getAcceptedConnections,
+  getUsersByProfession
 } from "@/lib/api"
 
 
@@ -58,58 +60,7 @@ interface ProfileData {
     bio: string;
 }
 
-// --- Mock data for community members (REMAINS MOCKED FOR NOW) ---
-const communityMembers = [
-  {
-    id: "2",
-    name: "Sarah Chen",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Boston, MA",
-    university: "MIT",
-    major: "Computer Science",
-    year: "Junior",
-    mutualConnections: 5,
-    status: "none", // none, pending, connected
-  },
-  {
-    id: "3",
-    name: "Marcus Williams",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Stanford, CA",
-    university: "Stanford University",
-    major: "Business Administration",
-    year: "Senior",
-    mutualConnections: 3,
-    status: "none",
-  },
-  {
-    id: "4",
-    name: "Emily Rodriguez",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Austin, TX",
-    university: "UT Austin",
-    major: "Psychology",
-    year: "Sophomore",
-    mutualConnections: 8,
-    status: "pending",
-  },
-  {
-    id: "5",
-    name: "David Kim",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Seattle, WA",
-    university: "University of Washington",
-    major: "Engineering",
-    year: "Graduate",
-    mutualConnections: 2,
-    status: "connected",
-  },
-]
-// --- End Mock Data ---
+// --- End User Types ---
 
 
 const communityIcons = {
@@ -129,10 +80,11 @@ const communityColors = {
 }
 
 export default function DashboardPage() {
-  const [members, setMembers] = useState(communityMembers)
+  const [members, setMembers] = useState<UserProfileResponse[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
 
   // --- Auth & Profile State ---
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -151,7 +103,7 @@ export default function DashboardPage() {
         name: user.name,
         community: user.profession,
         avatar: "/placeholder.svg?height=40&width=40",
-        pendingRequests: 3, // Mocked
+        pendingRequests: 0, // Will be updated after fetching
       });
       
       setProfileData({
@@ -159,24 +111,49 @@ export default function DashboardPage() {
         email: user.email,
         profession: user.profession,
         location: "New York, NY", // Mocked
-        connections: 42, // Mocked
-        bio: "Passionate computer science student specializing in AI and machine learning. Eager to connect with fellow students!",
+        connections: 0, // Will be updated after fetching
+        bio: "Passionate about my field and eager to connect with fellow professionals!",
       });
 
       // Fetch pending requests and accepted connections
       fetchPendingRequests(user.id);
       fetchAcceptedConnections(user.id);
+      // Fetch users by profession
+      fetchUsersByProfession(user.profession);
 
       setAuthLoading(false);
     }
   }, [router]);
   // --- End Auth & Profile State ---
 
+  // Fetch users by profession
+  const fetchUsersByProfession = async (profession: string) => {
+    setIsLoadingMembers(true);
+    try {
+      const users = await getUsersByProfession(profession);
+      // Filter out the current user
+      const userDataString = sessionStorage.getItem('user');
+      if (userDataString) {
+        const currentUser: LoginResponse = JSON.parse(userDataString);
+        const filteredUsers = users.filter(user => user.id !== currentUser.id);
+        setMembers(filteredUsers);
+      } else {
+        setMembers(users);
+      }
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
   // Fetch pending requests
   const fetchPendingRequests = async (userId: number) => {
     try {
       const requests = await getPendingRequests(userId);
       setPendingRequests(requests);
+      // Update the pending requests count in currentUser
+      setCurrentUser((prev: CurrentUser | null) => prev ? { ...prev, pendingRequests: requests.length } : null);
     } catch (error) {
       console.error("Failed to fetch pending requests:", error);
     }
@@ -187,6 +164,8 @@ export default function DashboardPage() {
     try {
       const conns = await getAcceptedConnections(userId);
       setConnections(conns);
+      // Update the connections count in profileData
+      setProfileData((prev: ProfileData | null) => prev ? { ...prev, connections: conns.length } : null);
     } catch (error) {
       console.error("Failed to fetch accepted connections:", error);
     }
@@ -218,14 +197,16 @@ export default function DashboardPage() {
 
 
   // --- Connection Handlers ---
-  const handleSendRequest = async (memberId: string) => {
+  const handleSendRequest = async (memberId: number) => {
     const userDataString = sessionStorage.getItem('user');
     if (!userDataString) return;
     
     const user: LoginResponse = JSON.parse(userDataString);
     try {
-      await sendConnectionRequest(user.id, parseInt(memberId));
-      setMembers(members.map((member) => (member.id === memberId ? { ...member, status: "pending" } : member)))
+      await sendConnectionRequest(user.id, memberId);
+      // Optionally remove the member from the list after sending request
+      // Or you could add a status indicator
+      console.log("Connection request sent successfully");
     } catch (error) {
       console.error("Failed to send connection request:", error);
     }
@@ -261,8 +242,8 @@ export default function DashboardPage() {
   const filteredMembers = members.filter(
     (member) =>
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.university.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.major.toLowerCase().includes(searchQuery.toLowerCase()),
+      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.profession.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   if (authLoading || !currentUser || !profileData) {
@@ -395,72 +376,59 @@ export default function DashboardPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search students by name, university, or major..."
+                    placeholder="Search by name, email, or profession..."
                     className="pl-10 bg-input"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <h2 className="text-2xl font-serif font-bold text-foreground">Discover Fellow Students</h2>
-                <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-6">
-                  {filteredMembers.map((member) => (
-                    <StaggerItem key={member.id}>
-                      <Card className="hover:shadow-md transition-shadow">
-                        <CardHeader>
-                          <div className="flex items-start space-x-4">
-                            <Avatar className="w-16 h-16">
-                              <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
-                              <AvatarFallback>
-                                {member.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
-                              <CardDescription className="space-y-1">
-                                <div className="flex items-center space-x-1">
-                                  <MapPin className="w-3 h-3" />
-                                  <span>{member.location}</span>
-                                </div>
-                                <div>{member.university}</div>
-                                <div className="font-medium">
-                                  {member.major} • {member.year}
-                                </div>
-                              </CardDescription>
+                <h2 className="text-2xl font-serif font-bold text-foreground">Discover People in Your Field</h2>
+                {isLoadingMembers ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading...</p>
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No users found in your profession yet.</p>
+                  </div>
+                ) : (
+                  <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-6">
+                    {filteredMembers.map((member) => (
+                      <StaggerItem key={member.id}>
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start space-x-4">
+                              <Avatar className="w-16 h-16">
+                                <AvatarImage src="/placeholder.svg" alt={member.name} />
+                                <AvatarFallback>
+                                  {member.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
+                                <CardDescription className="space-y-1">
+                                  <div className="font-medium">{member.profession}</div>
+                                  <div className="text-sm">{member.email}</div>
+                                </CardDescription>
+                              </div>
                             </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              {member.mutualConnections} mutual connections
-                            </span>
-                            {member.status === "none" && (
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-center justify-end">
                               <Button size="sm" onClick={() => handleSendRequest(member.id)}>
                                 <UserPlus className="w-4 h-4 mr-2" />
                                 Connect
                               </Button>
-                            )}
-                            {member.status === "pending" && (
-                              <Button size="sm" variant="outline" disabled>
-                                <Clock className="w-4 h-4 mr-2" />
-                                Pending
-                              </Button>
-                            )}
-                            {member.status === "connected" && (
-                              <Button size="sm" variant="outline">
-                                <MessageCircle className="w-4 h-4 mr-2" />
-                                Message
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </StaggerItem>
-                  ))}
-                </StaggerContainer>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </StaggerItem>
+                    ))}
+                  </StaggerContainer>
+                )}
               </TabsContent>
 
               <TabsContent value="requests" className="space-y-6">
