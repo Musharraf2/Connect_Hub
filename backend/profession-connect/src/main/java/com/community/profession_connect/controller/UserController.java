@@ -3,7 +3,7 @@ package com.community.profession_connect.controller;
 import com.community.profession_connect.dto.LoginRequest;
 import com.community.profession_connect.dto.LoginResponse;
 import com.community.profession_connect.dto.RegistrationRequest;
-import com.community.profession_connect.dto.UserDashboardResponse;
+// import com.community.profession_connect.dto.UserDashboardResponse;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
