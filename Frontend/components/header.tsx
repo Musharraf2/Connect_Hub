@@ -105,7 +105,7 @@ export function Header({ user }: HeaderProps) {
                                     <Link href="/community" className="flex items-center space-x-2">
                                         {/* This will now show the default icon if needed */}
                                         <CommunityIcon className="w-4 h-4" />
-                                        <span>My Community</span>
+                                        <span>Groups</span>
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" asChild>
