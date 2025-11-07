@@ -31,15 +31,12 @@ public class ConnectionService {
         User requester = requesterOpt.get();
         User receiver = receiverOpt.get();
 
-        // Check if connection already exists
-        Optional<Connection> existingConnection = connectionRepository.findByRequesterAndReceiver(requester, receiver);
-        if (existingConnection.isPresent()) {
-            return "Request already sent";
-        }
-
-        // Check reverse direction as well
-        Optional<Connection> reverseConnection = connectionRepository.findByRequesterAndReceiver(receiver, requester);
-        if (reverseConnection.isPresent()) {
+        // Check if connection already exists in either direction
+        List<Connection> existingConnections = connectionRepository.findByRequesterAndReceiverOrReceiverAndRequester(
+            requester, receiver, requester, receiver
+        );
+        
+        if (!existingConnections.isEmpty()) {
             return "Request already sent";
         }
 
@@ -62,7 +59,7 @@ public class ConnectionService {
 
         Connection connection = connectionOpt.get();
 
-        if (connection.getStatus() != ConnectionStatus.PENDING) {
+        if (!connection.getStatus().equals(ConnectionStatus.PENDING)) {
             return "Connection is not pending";
         }
 

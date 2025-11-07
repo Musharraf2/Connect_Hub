@@ -19,4 +19,11 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         User requester, 
         ConnectionStatus status2
     );
+    
+    List<Connection> findByRequesterAndReceiverOrReceiverAndRequester(
+        User requester1,
+        User receiver1,
+        User requester2,
+        User receiver2
+    );
 }

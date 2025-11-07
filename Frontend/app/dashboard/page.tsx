@@ -466,46 +466,49 @@ export default function DashboardPage() {
               <TabsContent value="requests" className="space-y-6">
                 <h2 className="text-2xl font-serif font-bold text-foreground">Connection Requests</h2>
                 <StaggerContainer stagger={0.1} className="space-y-4">
-                  {pendingRequests.map((request) => (
-                    <StaggerItem key={request.id}>
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <Avatar className="w-12 h-12">
-                                <AvatarImage src="/placeholder.svg" alt={request.requester.name} />
-                                <AvatarFallback>
-                                  {request.requester.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <h3 className="font-serif font-semibold">{request.requester.name}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.requester.profession}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.requester.email}
-                                </p>
+                  {pendingRequests.map((request) => {
+                    const requesterName = request.requester?.name || "Unknown User";
+                    return (
+                      <StaggerItem key={request.id}>
+                        <Card>
+                          <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <Avatar className="w-12 h-12">
+                                  <AvatarImage src="/placeholder.svg" alt={requesterName} />
+                                  <AvatarFallback>
+                                    {requesterName
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h3 className="font-serif font-semibold">{requesterName}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.requester?.profession || "N/A"}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.requester?.email || "N/A"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex space-x-2">
+                                <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>
+                                  <UserCheck className="w-4 h-4 mr-2" />
+                                  Accept
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleDeclineRequest(request.id)}>
+                                  <UserX className="w-4 h-4 mr-2" />
+                                  Decline
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>
-                                <UserCheck className="w-4 h-4 mr-2" />
-                                Accept
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeclineRequest(request.id)}>
-                                <UserX className="w-4 h-4 mr-2" />
-                                Decline
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </StaggerItem>
-                  ))}
+                          </CardContent>
+                        </Card>
+                      </StaggerItem>
+                    );
+                  })}
                 </StaggerContainer>
               </TabsContent>
 
@@ -524,21 +527,23 @@ export default function DashboardPage() {
                       ? connection.receiver 
                       : connection.requester;
                     
+                    const otherUserName = otherUser?.name || "Unknown User";
+                    
                     return (
                       <StaggerItem key={connection.id}>
                         <Card className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4 text-center">
                             <Avatar className="w-16 h-16 mx-auto mb-3">
-                              <AvatarImage src="/placeholder.svg" alt={otherUser.name} />
+                              <AvatarImage src="/placeholder.svg" alt={otherUserName} />
                               <AvatarFallback>
-                                {otherUser.name
+                                {otherUserName
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <h3 className="font-serif font-semibold mb-1">{otherUser.name}</h3>
-                            <p className="text-sm text-muted-foreground mb-3">{otherUser.profession}</p>
+                            <h3 className="font-serif font-semibold mb-1">{otherUserName}</h3>
+                            <p className="text-sm text-muted-foreground mb-3">{otherUser?.profession || "N/A"}</p>
                             <Button size="sm" variant="outline" className="w-full bg-transparent">
                               <MessageCircle className="w-4 h-4 mr-2" />
                               Message
