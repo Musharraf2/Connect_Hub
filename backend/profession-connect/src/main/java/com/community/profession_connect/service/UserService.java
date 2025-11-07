@@ -46,11 +46,11 @@ public class UserService {
             User user = userOptional.get();
             if (user.getPassword().equals(request.getPassword())) {
                 // Return a full LoginResponse object with user data on success
-                return new LoginResponse(user.getName(), user.getEmail(), user.getProfession());
+                return new LoginResponse(user.getId(), user.getName(), user.getEmail(), user.getProfession());
             }
         }
         // Return a LoginResponse with null fields for a failed login
-        return new LoginResponse(null, null, null);
+        return new LoginResponse(null, null, null, null);
     }
 
     // This method is correctly implemented as per our previous conversation
