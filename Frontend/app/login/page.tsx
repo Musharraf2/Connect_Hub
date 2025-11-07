@@ -3,14 +3,13 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "react-hot-toast"
 import { loginUser } from "@/lib/api"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Users } from "lucide-react"
+import { motion } from "framer-motion"
 
 // Define the type for the login request data.
 export interface LoginRequestType {
@@ -28,13 +27,10 @@ export interface LoginResponse {
 export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [message, setMessage] = useState("");
-
     const router = useRouter();
 
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setMessage("");
 
         const loginData: LoginRequestType = {
             email,
@@ -45,104 +41,104 @@ export default function LoginPage() {
             const response: LoginResponse = await loginUser(loginData);
 
             if (response.profession) {
-                // Redirect to the home page, passing all user data in the query parameters
-                const params = new URLSearchParams();
-                params.set('profession', response.profession);
-                params.set('name', response.name);
-                params.set('email', response.email);
-
-                router.push(`/home?${params.toString()}`);
+                toast.success("Login successful! Redirecting...");
+                
+                sessionStorage.setItem('user', JSON.stringify(response));
+                router.push('/home');
             } else {
-                setMessage("Invalid email or password!");
+                toast.error("Invalid email or password!");
             }
         } catch (err: unknown) {
             console.error("Login failed:", err);
-            setMessage("Login failed: Check console for details.");
+            toast.error("Login failed. The server may be down.");
         }
     };
 
     return (
-        <div className="min-h-screen bg-background flex flex-col">
-            <Header />
-
-            <div className="flex-1 flex items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="text-center mb-8">
-                        <Link
-                            href="/"
-                            className="inline-flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            <span>Back to Home</span>
-                        </Link>
-                        <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Sign in to your account</h1>
-                        <p className="text-muted-foreground">Welcome back! Please enter your details</p>
-                    </div>
-
-                    <Card className="border-2">
-                        <CardHeader>
-                            <CardTitle className="text-2xl font-serif">Sign In</CardTitle>
-                            <CardDescription>Enter your email and password to access your dashboard.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="Enter your email"
-                                        className="bg-input"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">Password</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        placeholder="Enter your password"
-                                        className="bg-input"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                    />
-                                </div>
-                                <Button className="w-full" type="submit" size="lg">
-                                    Sign In
-                                </Button>
-                            </form>
-                            <div className="text-center text-sm text-muted-foreground">
-                                Don't have an account?{" "}
-                                <Link href="/signup" className="text-primary hover:text-primary/80 transition-colors font-medium">
-                                    Sign up here
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {message && (
-                        <div className="mt-4 text-center text-sm font-medium">
-                            <p>{message}</p>
+        <div className="min-h-screen flex">
+            {/* Left Panel (Visual) - Hidden on mobile */}
+            <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary/5 to-background p-12 flex-col justify-between">
+                <div>
+                    <Link href="/" className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <Users className="w-5 h-5 text-primary-foreground" />
                         </div>
-                    )}
-
-                    <div className="mt-8 text-center text-sm text-muted-foreground">
-                        <p>By signing in, you agree to our</p>
-                        <div className="space-x-4">
-                            <Link href="/terms" className="text-primary hover:text-primary/80 transition-colors">
-                                Terms of Service
-                            </Link>
-                            <span>•</span>
-                            <Link href="/privacy" className="text-primary hover:text-primary/80 transition-colors">
-                                Privacy Policy
-                            </Link>
-                        </div>
-                    </div>
+                        <span className="text-xl font-serif font-bold text-foreground">ConnectHub</span>
+                    </Link>
+                </div>
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="text-left"
+                >
+                    <h1 className="text-4xl font-serif font-bold text-foreground mb-4">Welcome Back.</h1>
+                    <p className="text-lg text-muted-foreground">Sign in to reconnect with your professional community.</p>
+                </motion.div>
+                <div className="text-sm text-muted-foreground">
+                    © 2024 ConnectHub. All rights reserved.
                 </div>
             </div>
 
-            <Footer />
+            {/* Right Panel (Form) */}
+            <div className="w-full md:w-1/2 flex flex-col justify-center p-8 md:p-12">
+                {/* Back to Home Link (FOR MOBILE ONLY) - Position fixed */}
+                <Link
+                    href="/"
+                    className="inline-flex md:hidden items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Home</span>
+                </Link>
+
+                <div className="w-full max-w-md mx-auto">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="w-full"
+                    >
+                        <div className="text-left mb-10">
+                            <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Sign in to your account</h1>
+                            <p className="text-muted-foreground">Welcome back! Please enter your details.</p>
+                        </div>
+                    
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    placeholder="Enter your email"
+                                    className="bg-input text-base py-6"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password">Password</Label>
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    placeholder="Enter your password"
+                                    className="bg-input text-base py-6"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                            </div>
+                            <Button className="w-full text-base" type="submit" size="lg">
+                                Sign In
+                            </Button>
+                        </form>
+                        <div className="text-center text-sm text-muted-foreground mt-6">
+                            Don't have an account?{" "}
+                            <Link href="/signup" className="text-primary hover:text-primary/80 transition-colors font-medium">
+                                Sign up here
+                            </Link>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
         </div>
     );
 }
