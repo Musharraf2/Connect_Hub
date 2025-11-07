@@ -27,9 +27,11 @@ import {
     Moon,
     Sun,
     ChevronDown,
+    Briefcase, // <-- Import a generic "briefcase" icon
 } from "lucide-react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
+import { useRouter } from "next/navigation"
 
 // The HeaderProps now accepts a more general 'string' for community.
 interface HeaderProps {
@@ -42,7 +44,8 @@ interface HeaderProps {
     }
 }
 
-const communityIcons = {
+// We keep the specific icons for our "main" communities
+const communityIcons: Record<string, any> = {
     student: BookOpen,
     teacher: Users,
     musician: Music,
@@ -50,7 +53,8 @@ const communityIcons = {
     dancer: Zap,
 }
 
-const communityColors = {
+// We keep the specific colors for our "main" communities
+const communityColors: Record<string, string> = {
     student: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-800",
     teacher: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800",
     musician:
@@ -62,22 +66,27 @@ const communityColors = {
 
 export function Header({ user }: HeaderProps) {
     const { theme, setTheme } = useTheme()
-    const [mounted, setMounted] = useState(false)
+    const router = useRouter()
 
-    // useEffect(() => setMounted(true), [])
+    // --- THIS LOGIC IS NOW UPDATED ---
+    const communityKey = user?.community.toLowerCase() || "";
+    // Get the specific icon, OR use the default Briefcase icon
+    const CommunityIcon = communityIcons[communityKey] || Briefcase;
+    // Get the specific color, OR use a default gray color
+    const communityColorClass = communityColors[communityKey] || "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800";
+    // --- END OF UPDATE ---
 
-    // Safely check if the user's community exists in our predefined lists.
-    // This prevents the TypeError.
-    const userCommunity = user?.community as keyof typeof communityIcons;
-    const CommunityIcon = userCommunity ? communityIcons[userCommunity] : null;
-    const communityColorClass = userCommunity ? communityColors[userCommunity] : "";
+    const handleSignOut = () => {
+        sessionStorage.removeItem('user');
+        router.push('/');
+    };
 
     return (
         <header className="border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 sticky top-0 z-50">
             <div className="container mx-auto px-4 py-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-6">
-                        <Link href="/" className="flex items-center space-x-2">
+                        <Link href={user ? "/home" : "/"} className="flex items-center space-x-2">
                             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                                 <Users className="w-5 h-5 text-primary-foreground" />
                             </div>
@@ -87,14 +96,15 @@ export function Header({ user }: HeaderProps) {
                         {user && (
                             <nav className="hidden md:flex items-center space-x-1">
                                 <Button variant="ghost" size="sm" asChild>
-                                    <Link href="/home" className="flex items-center space-x-2">
+                                    <Link href="/dashboard" className="flex items-center space-x-2">
                                         <Home className="w-4 h-4" />
-                                        <span>Home</span>
+                                        <span>Dashboard</span>
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" asChild>
                                     <Link href="/community" className="flex items-center space-x-2">
-                                        {CommunityIcon && <CommunityIcon className="w-4 h-4" />}
+                                        {/* This will now show the default icon if needed */}
+                                        <CommunityIcon className="w-4 h-4" />
                                         <span>My Community</span>
                                     </Link>
                                 </Button>
@@ -133,12 +143,12 @@ export function Header({ user }: HeaderProps) {
 
                         {user ? (
                             <div className="flex items-center space-x-3">
-                                {CommunityIcon && (
-                                    <Badge className={`${communityColorClass} font-medium hidden sm:flex`}>
-                                        <CommunityIcon className="w-4 h-4 mr-1" />
-                                        {user.community.charAt(0).toUpperCase() + user.community.slice(1)}
-                                    </Badge>
-                                )}
+                                <Badge className={`${communityColorClass} font-medium hidden sm:flex`}>
+                                    {/* This will now show the default icon if needed */}
+                                    <CommunityIcon className="w-4 h-4 mr-1" />
+                                    {/* This will show ANY string, e.g., "Painter" */}
+                                    {user.community.charAt(0).toUpperCase() + user.community.slice(1)}
+                                </Badge>
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -172,7 +182,7 @@ export function Header({ user }: HeaderProps) {
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem className="text-destructive">
+                                        <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                                             <LogOut className="w-4 h-4 mr-2" />
                                             Sign Out
                                         </DropdownMenuItem>

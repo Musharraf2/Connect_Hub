@@ -22,7 +22,6 @@ export interface LoginResponse {
 }
 
 // Define the type for the user profile response from the backend.
-// This is the interface that was missing.
 export interface UserProfileResponse {
     id: string;
     name: string;
@@ -42,7 +41,8 @@ export const signupUser = async (userData: RegistrationRequestType) => {
     });
 
     if (!response.ok) {
-        throw new Error('Network response was not ok');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Network response was not ok');
     }
 
     return response.text();
@@ -75,10 +75,20 @@ export const loginUser = async (loginData: LoginRequestType): Promise<LoginRespo
 export const getUsersByProfession = async (profession: string): Promise<UserProfileResponse[]> => {
     try {
         const response = await fetch(`http://localhost:8080/api/users/by-profession?profession=${profession}`);
+
+        // --- THIS IS THE FIX ---
+        // If status is 204 (No Content), it means the list is empty.
+        // Return an empty array instead of trying to parse JSON.
+        if (response.status === 204) {
+            return []; 
+        }
+        // --- END OF FIX ---
+
         if (!response.ok) {
             throw new Error('Failed to fetch members');
         }
-        return await response.json();
+        
+        return await response.json(); // Now this will only run if there is content
     } catch (error) {
         console.error("Failed to fetch members:", error);
         throw error;
