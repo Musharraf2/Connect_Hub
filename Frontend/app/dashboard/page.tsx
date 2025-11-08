@@ -204,8 +204,8 @@ export default function DashboardPage() {
     const user: LoginResponse = JSON.parse(userDataString);
     try {
       await sendConnectionRequest(user.id, memberId);
-      // Optionally remove the member from the list after sending request
-      // Or you could add a status indicator
+      // Refetch pending requests to update the UI
+      fetchPendingRequests(user.id);
       console.log("Connection request sent successfully");
     } catch (error) {
       console.error("Failed to send connection request:", error);
@@ -217,11 +217,13 @@ export default function DashboardPage() {
       await acceptConnectionRequest(connectionId);
       // Remove from pending requests
       setPendingRequests(pendingRequests.filter(req => req.id !== connectionId));
-      // Refetch connections
+      // Refetch connections and users to update the discover tab
       const userDataString = sessionStorage.getItem('user');
       if (userDataString) {
         const user: LoginResponse = JSON.parse(userDataString);
         fetchAcceptedConnections(user.id);
+        // Refetch users to update the discover list
+        fetchUsersByProfession(user.profession);
       }
     } catch (error) {
       console.error("Failed to accept connection request:", error);
@@ -239,12 +241,42 @@ export default function DashboardPage() {
   }
   // --- End Connection Handlers ---
 
-  const filteredMembers = members.filter(
-    (member) =>
+  // Helper function to get connection status for a user
+  const getConnectionStatus = (userId: number): 'none' | 'pending' | 'connected' => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return 'none';
+    const currentUser: LoginResponse = JSON.parse(userDataString);
+
+    // Check if there's a pending request (sent by me or received by me)
+    const hasPendingRequest = pendingRequests.some(
+      req => (req.requester.id === currentUser.id && req.receiver.id === userId) ||
+             (req.receiver.id === currentUser.id && req.requester.id === userId)
+    );
+    if (hasPendingRequest) return 'pending';
+
+    // Check if already connected
+    const isConnected = connections.some(
+      conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
+              (conn.receiver.id === currentUser.id && conn.requester.id === userId)
+    );
+    if (isConnected) return 'connected';
+
+    return 'none';
+  };
+
+  const filteredMembers = members.filter((member) => {
+    // First apply search filter
+    const matchesSearch = 
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.profession.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      member.profession.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    // Filter out users who are already connected
+    const status = getConnectionStatus(member.id);
+    return status !== 'connected';
+  });
 
   if (authLoading || !currentUser || !profileData) {
     return (
@@ -393,40 +425,51 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-6">
-                    {filteredMembers.map((member) => (
-                      <StaggerItem key={member.id}>
-                        <Card className="hover:shadow-md transition-shadow">
-                          <CardHeader>
-                            <div className="flex items-start space-x-4">
-                              <Avatar className="w-16 h-16">
-                                <AvatarImage src="/placeholder.svg" alt={member.name} />
-                                <AvatarFallback>
-                                  {member.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
-                                <CardDescription className="space-y-1">
-                                  <div className="font-medium">{member.profession}</div>
-                                  <div className="text-sm">{member.email}</div>
-                                </CardDescription>
+                    {filteredMembers.map((member) => {
+                      const connectionStatus = getConnectionStatus(member.id);
+                      return (
+                        <StaggerItem key={member.id}>
+                          <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                              <div className="flex items-start space-x-4">
+                                <Avatar className="w-16 h-16">
+                                  <AvatarImage src="/placeholder.svg" alt={member.name} />
+                                  <AvatarFallback>
+                                    {member.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
+                                  <CardDescription className="space-y-1">
+                                    <div className="font-medium">{member.profession}</div>
+                                    <div className="text-sm">{member.email}</div>
+                                  </CardDescription>
+                                </div>
                               </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex items-center justify-end">
-                              <Button size="sm" onClick={() => handleSendRequest(member.id)}>
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                Connect
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </StaggerItem>
-                    ))}
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex items-center justify-end">
+                                {connectionStatus === 'none' && (
+                                  <Button size="sm" onClick={() => handleSendRequest(member.id)}>
+                                    <UserPlus className="w-4 h-4 mr-2" />
+                                    Connect
+                                  </Button>
+                                )}
+                                {connectionStatus === 'pending' && (
+                                  <Button size="sm" variant="outline" disabled>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Requested
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </StaggerItem>
+                      );
+                    })}
                   </StaggerContainer>
                 )}
               </TabsContent>
