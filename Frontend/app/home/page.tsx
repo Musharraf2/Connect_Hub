@@ -203,12 +203,12 @@ export default function HomePage() {
         setIsSubmittingPost(true);
 
         try {
-            await createPost({ content: postContent, userId: user.id });
+            const newPost = await createPost({ content: postContent, userId: user.id });
             setPostContent("");
             setIsPostingDialogOpen(false);
             toast.success("Post created successfully!");
-            // Refresh posts
-            fetchPosts(user.profession, user.id);
+            // Add the new post to the beginning of the posts array
+            setPosts(prevPosts => [newPost, ...prevPosts]);
         } catch (error) {
             console.error("Failed to create post:", error);
             toast.error("Failed to create post");
