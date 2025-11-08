@@ -118,7 +118,8 @@ export default function HomePage() {
             fetchPosts(user.profession, user.id);
             setAuthLoading(false);
         }
-    }, [router])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
 
     const fetchMembers = async (profession: string) => {
