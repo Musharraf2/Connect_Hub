@@ -43,6 +43,12 @@ public class ConnectionController {
         return ResponseEntity.ok(requests);
     }
 
+    @GetMapping("/sent-pending/{requesterId}")
+    public ResponseEntity<List<ConnectionResponse>> getSentPendingRequests(@PathVariable Long requesterId) {
+        List<ConnectionResponse> requests = connectionService.getSentPendingRequests(requesterId);
+        return ResponseEntity.ok(requests);
+    }
+
     @GetMapping("/accepted/{userId}")
     public ResponseEntity<List<ConnectionResponse>> getAcceptedConnections(@PathVariable Long userId) {
         List<ConnectionResponse> connections = connectionService.getAcceptedConnections(userId);

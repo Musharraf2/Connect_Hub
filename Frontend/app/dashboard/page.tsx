@@ -37,6 +37,8 @@ import {
   acceptConnectionRequest,
   declineConnectionRequest,
   getPendingRequests,
+  getSentPendingRequests,
+  cancelConnectionRequest,
   getAcceptedConnections,
   getUsersByProfession
 } from "@/lib/api"
@@ -83,6 +85,7 @@ export default function DashboardPage() {
   const [members, setMembers] = useState<UserProfileResponse[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
+  const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
 
@@ -117,6 +120,7 @@ export default function DashboardPage() {
 
       // Fetch pending requests and accepted connections
       fetchPendingRequests(user.id);
+      fetchSentPendingRequests(user.id);
       fetchAcceptedConnections(user.id);
       // Fetch users by profession
       fetchUsersByProfession(user.profession);
@@ -156,6 +160,16 @@ export default function DashboardPage() {
       setCurrentUser((prev: CurrentUser | null) => prev ? { ...prev, pendingRequests: requests.length } : null);
     } catch (error) {
       console.error("Failed to fetch pending requests:", error);
+    }
+  };
+
+  // Fetch sent pending requests
+  const fetchSentPendingRequests = async (userId: number) => {
+    try {
+      const requests = await getSentPendingRequests(userId);
+      setSentPendingRequests(requests);
+    } catch (error) {
+      console.error("Failed to fetch sent pending requests:", error);
     }
   };
 
@@ -204,11 +218,26 @@ export default function DashboardPage() {
     const user: LoginResponse = JSON.parse(userDataString);
     try {
       await sendConnectionRequest(user.id, memberId);
-      // Refetch pending requests to update the UI
-      fetchPendingRequests(user.id);
+      // Refetch sent pending requests to update the UI
+      fetchSentPendingRequests(user.id);
       console.log("Connection request sent successfully");
     } catch (error) {
       console.error("Failed to send connection request:", error);
+    }
+  }
+  
+  const handleCancelRequest = async (connectionId: number) => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return;
+    
+    const user: LoginResponse = JSON.parse(userDataString);
+    try {
+      await cancelConnectionRequest(connectionId);
+      // Refetch sent pending requests to update the UI
+      fetchSentPendingRequests(user.id);
+      console.log("Connection request canceled successfully");
+    } catch (error) {
+      console.error("Failed to cancel connection request:", error);
     }
   }
   
@@ -242,26 +271,25 @@ export default function DashboardPage() {
   // --- End Connection Handlers ---
 
   // Helper function to get connection status for a user
-  const getConnectionStatus = (userId: number): 'none' | 'pending' | 'connected' => {
+  const getConnectionStatus = (userId: number): { status: 'none' | 'pending' | 'connected', connectionId?: number } => {
     const userDataString = sessionStorage.getItem('user');
-    if (!userDataString) return 'none';
+    if (!userDataString) return { status: 'none' };
     const currentUser: LoginResponse = JSON.parse(userDataString);
 
-    // Check if there's a pending request (sent by me or received by me)
-    const hasPendingRequest = pendingRequests.some(
-      req => (req.requester.id === currentUser.id && req.receiver.id === userId) ||
-             (req.receiver.id === currentUser.id && req.requester.id === userId)
+    // Check if I sent a pending request to this user
+    const sentRequest = sentPendingRequests.find(
+      req => req.requester.id === currentUser.id && req.receiver.id === userId
     );
-    if (hasPendingRequest) return 'pending';
+    if (sentRequest) return { status: 'pending', connectionId: sentRequest.id };
 
     // Check if already connected
     const isConnected = connections.some(
       conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
               (conn.receiver.id === currentUser.id && conn.requester.id === userId)
     );
-    if (isConnected) return 'connected';
+    if (isConnected) return { status: 'connected' };
 
-    return 'none';
+    return { status: 'none' };
   };
 
   const filteredMembers = members.filter((member) => {
@@ -274,7 +302,7 @@ export default function DashboardPage() {
     if (!matchesSearch) return false;
 
     // Filter out users who are already connected
-    const status = getConnectionStatus(member.id);
+    const { status } = getConnectionStatus(member.id);
     return status !== 'connected';
   });
 
@@ -452,16 +480,20 @@ export default function DashboardPage() {
                             </CardHeader>
                             <CardContent>
                               <div className="flex items-center justify-end">
-                                {connectionStatus === 'none' && (
+                                {connectionStatus.status === 'none' && (
                                   <Button size="sm" onClick={() => handleSendRequest(member.id)}>
                                     <UserPlus className="w-4 h-4 mr-2" />
                                     Connect
                                   </Button>
                                 )}
-                                {connectionStatus === 'pending' && (
-                                  <Button size="sm" variant="outline" disabled>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Requested
+                                {connectionStatus.status === 'pending' && connectionStatus.connectionId && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => handleCancelRequest(connectionStatus.connectionId!)}
+                                  >
+                                    <X className="w-4 h-4 mr-2" />
+                                    Cancel Request
                                   </Button>
                                 )}
                               </div>

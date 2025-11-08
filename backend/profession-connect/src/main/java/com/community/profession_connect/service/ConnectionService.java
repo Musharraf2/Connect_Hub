@@ -97,6 +97,21 @@ public class ConnectionService {
             .collect(Collectors.toList());
     }
 
+    public List<ConnectionResponse> getSentPendingRequests(Long requesterId) {
+        Optional<User> requesterOpt = userRepository.findById(requesterId);
+
+        if (requesterOpt.isEmpty()) {
+            return List.of();
+        }
+
+        User requester = requesterOpt.get();
+        List<Connection> connections = connectionRepository.findByRequesterAndStatus(requester, ConnectionStatus.PENDING);
+        
+        return connections.stream()
+            .map(ConnectionResponse::fromConnection)
+            .collect(Collectors.toList());
+    }
+
     public List<ConnectionResponse> getAcceptedConnections(Long userId) {
         Optional<User> userOpt = userRepository.findById(userId);
 

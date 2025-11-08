@@ -186,6 +186,40 @@ export const getPendingRequests = async (receiverId: number): Promise<Connection
     }
 };
 
+export const getSentPendingRequests = async (requesterId: number): Promise<Connection[]> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/sent-pending/${requesterId}`);
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch sent pending requests: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch sent pending requests:", error);
+        throw error;
+    }
+};
+
+export const cancelConnectionRequest = async (connectionId: number): Promise<string> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/connections/decline/${connectionId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to cancel connection request: ${response.status} - ${errorText}`);
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error("Failed to cancel connection request:", error);
+        throw error;
+    }
+};
+
 export const getAcceptedConnections = async (userId: number): Promise<Connection[]> => {
     try {
         const response = await fetch(`http://localhost:8080/api/connections/accepted/${userId}`);
