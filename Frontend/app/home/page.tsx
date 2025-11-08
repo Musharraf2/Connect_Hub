@@ -7,7 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Header } from "@/components/header"
-import { UserPlus, MapPin, Users, Edit3, Save, X, Image as ImageIcon, Heart, MessageSquare } from "lucide-react"
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogDescription, 
+    DialogFooter, 
+    DialogHeader, 
+    DialogTitle 
+} from "@/components/ui/dialog"
+import { UserPlus, MapPin, Users, Edit3, Save, X, Image as ImageIcon, Heart, MessageSquare, Trash2 } from "lucide-react"
 import { 
     getUsersByProfession,
     LoginResponse,
@@ -16,10 +24,18 @@ import {
     getSentPendingRequests,
     cancelConnectionRequest,
     getPendingRequests,
-    getAcceptedConnections
+    getAcceptedConnections,
+    PostResponse,
+    createPost,
+    getPostsByProfession,
+    deletePost,
+    toggleLike,
+    addComment,
+    CommentRequest
 } from "@/lib/api"
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import toast from "react-hot-toast"
 
 // Define the types for the data we'll get from the backend
 interface UserProfile {
@@ -47,15 +63,6 @@ interface ProfileData {
     bio: string;
 }
 
-// --- Mock Data for Infinite Scroll ---
-const mockFeed = [
-    { id: 1, name: "Sarah Chen", profession: "Student • MIT", time: "2h ago", post: "Just finished my capstone project on AI-driven data analysis! It's been a long journey, but so rewarding. Excited to see where this takes me. #AI #DataScience" },
-    { id: 2, name: "David Kim", profession: "Engineering • U. Washington", time: "5h ago", post: "Looking for recommendations for a good state management library for React. Besides Redux and Zustand, what's everyone using?" },
-    { id: 3, name: "Marcus Williams", profession: "Business • Stanford", time: "1d ago", post: "Great article on the future of decentralized finance. The potential for disruption is massive." },
-];
-// --- End Mock Data ---
-
-
 export default function HomePage() {
     const [members, setMembers] = useState<UserProfile[]>([])
     const [membersLoading, setMembersLoading] = useState(true)
@@ -68,6 +75,17 @@ export default function HomePage() {
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
     const [profileData, setProfileData] = useState<ProfileData | null>(null)
     const [authLoading, setAuthLoading] = useState(true);
+
+    // Post-related states
+    const [posts, setPosts] = useState<PostResponse[]>([])
+    const [postsLoading, setPostsLoading] = useState(true)
+    const [postContent, setPostContent] = useState("")
+    const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false)
+    const [isSubmittingPost, setIsSubmittingPost] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [postToDelete, setPostToDelete] = useState<number | null>(null)
+    const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null)
+    const [commentText, setCommentText] = useState("")
 
     useEffect(() => {
         const userDataString = sessionStorage.getItem('user');
@@ -97,6 +115,7 @@ export default function HomePage() {
             fetchPendingRequests(user.id);
             fetchSentPendingRequests(user.id);
             fetchAcceptedConnections(user.id);
+            fetchPosts(user.profession, user.id);
             setAuthLoading(false);
         }
     }, [router])
@@ -156,6 +175,116 @@ export default function HomePage() {
         } catch (error) {
             console.error("Failed to fetch accepted connections:", error);
         }
+    };
+
+    const fetchPosts = async (profession: string, userId: number) => {
+        setPostsLoading(true);
+        try {
+            const fetchedPosts = await getPostsByProfession(profession, userId);
+            setPosts(fetchedPosts);
+        } catch (error) {
+            console.error("Failed to fetch posts:", error);
+            toast.error("Failed to load posts");
+        } finally {
+            setPostsLoading(false);
+        }
+    };
+
+    const handleCreatePost = async () => {
+        if (!postContent.trim()) {
+            toast.error("Post content cannot be empty");
+            return;
+        }
+
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+        setIsSubmittingPost(true);
+
+        try {
+            await createPost({ content: postContent, userId: user.id });
+            setPostContent("");
+            setIsPostingDialogOpen(false);
+            toast.success("Post created successfully!");
+            // Refresh posts
+            fetchPosts(user.profession, user.id);
+        } catch (error) {
+            console.error("Failed to create post:", error);
+            toast.error("Failed to create post");
+        } finally {
+            setIsSubmittingPost(false);
+        }
+    };
+
+    const handleDeletePost = async () => {
+        if (!postToDelete) return;
+
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+
+        try {
+            await deletePost(postToDelete, user.id);
+            toast.success("Post deleted successfully!");
+            setDeleteDialogOpen(false);
+            setPostToDelete(null);
+            // Refresh posts
+            fetchPosts(user.profession, user.id);
+        } catch (error) {
+            console.error("Failed to delete post:", error);
+            toast.error("Failed to delete post");
+        }
+    };
+
+    const handleToggleLike = async (postId: number) => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+
+        try {
+            const updatedPost = await toggleLike(postId, user.id);
+            // Update the post in the list
+            setPosts(prevPosts => 
+                prevPosts.map(post => post.id === postId ? updatedPost : post)
+            );
+        } catch (error) {
+            console.error("Failed to toggle like:", error);
+            toast.error("Failed to update like");
+        }
+    };
+
+    const handleAddComment = async (postId: number) => {
+        if (!commentText.trim()) {
+            toast.error("Comment cannot be empty");
+            return;
+        }
+
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+
+        try {
+            const updatedPost = await addComment(postId, { content: commentText, userId: user.id });
+            // Update the post in the list
+            setPosts(prevPosts => 
+                prevPosts.map(post => post.id === postId ? updatedPost : post)
+            );
+            setCommentText("");
+            setCommentingOnPost(null);
+            toast.success("Comment added!");
+        } catch (error) {
+            console.error("Failed to add comment:", error);
+            toast.error("Failed to add comment");
+        }
+    };
+
+    const openDeleteDialog = (postId: number) => {
+        setPostToDelete(postId);
+        setDeleteDialogOpen(true);
     };
 
     // Helper function to get connection status for a user
@@ -328,19 +457,20 @@ export default function HomePage() {
                                     <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
                                     <AvatarFallback>{profileData.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
                                 </Avatar>
-                                <div className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors">
+                                <div 
+                                    onClick={() => setIsPostingDialogOpen(true)}
+                                    className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors"
+                                >
                                     What's on your mind, {profileData.name.split(" ")[0]}?
                                 </div>
                             </CardHeader>
                             <CardContent className="flex justify-around pt-0">
-                                <Button variant="ghost" className="flex-1">
-                                    <ImageIcon className="w-5 h-5 mr-2 text-blue-500" /> Image
-                                </Button>
-                                <Button variant="ghost" className="flex-1">
-                                    <Users className="w-5 h-5 mr-2 text-green-500" /> Mention
-                                </Button>
-                                <Button variant="ghost" className="flex-1">
-                                    <MessageSquare className="w-5 h-5 mr-2 text-yellow-500" /> Post
+                                <Button 
+                                    variant="ghost" 
+                                    className="flex-1"
+                                    onClick={() => setIsPostingDialogOpen(true)}
+                                >
+                                    <MessageSquare className="w-5 h-5 mr-2 text-blue-500" /> Create Post
                                 </Button>
                             </CardContent>
                         </Card>
@@ -348,42 +478,136 @@ export default function HomePage() {
 
                     <h3 className="font-serif text-xl font-semibold pt-4">Recent Activity</h3>
 
-                    {/* Mapped Feed for "Infinite" Scroll */}
+                    {/* Loading State */}
+                    {postsLoading && (
+                        <div className="text-center py-8">
+                            <p className="text-muted-foreground">Loading posts...</p>
+                        </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!postsLoading && posts.length === 0 && (
+                        <Card className="border">
+                            <CardContent className="py-8 text-center">
+                                <p className="text-muted-foreground">No posts yet. Be the first to share something!</p>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Posts Feed */}
                     <StaggerContainer stagger={0.1} className="space-y-6">
-                        {mockFeed.map((post) => (
-                            <StaggerItem key={post.id}>
-                                <Card className="border">
-                                    <CardHeader>
-                                        <div className="flex items-center space-x-3">
-                                            <Avatar>
-                                                <AvatarImage src={`/placeholder.svg?text=${post.name.split(" ").map(n => n[0]).join("")}`} alt={post.name} />
-                                                <AvatarFallback>{post.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <h4 className="font-semibold">{post.name}</h4>
-                                                <p className="text-xs text-muted-foreground">{post.profession} • {post.time}</p>
+                        {!postsLoading && posts.map((post) => {
+                            const userDataString = sessionStorage.getItem('user');
+                            const currentUserId = userDataString ? JSON.parse(userDataString).id : null;
+                            const isOwnPost = currentUserId === post.user.id;
+                            const timeAgo = new Date(post.createdAt).toLocaleString();
+
+                            return (
+                                <StaggerItem key={post.id}>
+                                    <Card className="border">
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-3">
+                                                    <Avatar>
+                                                        <AvatarImage src={`/placeholder.svg?text=${post.user.name.split(" ").map(n => n[0]).join("")}`} alt={post.user.name} />
+                                                        <AvatarFallback>{post.user.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <h4 className="font-semibold">{post.user.name}</h4>
+                                                        <p className="text-xs text-muted-foreground">{post.user.profession} • {timeAgo}</p>
+                                                    </div>
+                                                </div>
+                                                {isOwnPost && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm"
+                                                        onClick={() => openDeleteDialog(post.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                    </Button>
+                                                )}
                                             </div>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <p className="text-muted-foreground leading-relaxed">
-                                            {post.post}
-                                        </p>
-                                        <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
-                                            <Button variant="ghost" size="sm">
-                                                <Heart className="w-4 h-4 mr-2" /> 12 Likes
-                                            </Button>
-                                            <Button variant="ghost" size="sm">
-                                                <MessageSquare className="w-4 h-4 mr-2" /> 3 Comments
-                                            </Button>
-                                            <Button variant="ghost" size="sm">
-                                                <UserPlus className="w-4 h-4 mr-2" /> Connect
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </StaggerItem>
-                        ))}
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <p className="text-muted-foreground leading-relaxed">
+                                                {post.content}
+                                            </p>
+                                            <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm"
+                                                    onClick={() => handleToggleLike(post.id)}
+                                                    className={post.likedByCurrentUser ? "text-red-500" : ""}
+                                                >
+                                                    <Heart className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`} /> 
+                                                    {post.likesCount} {post.likesCount === 1 ? 'Like' : 'Likes'}
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm"
+                                                    onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
+                                                >
+                                                    <MessageSquare className="w-4 h-4 mr-2" /> 
+                                                    {post.commentsCount} {post.commentsCount === 1 ? 'Comment' : 'Comments'}
+                                                </Button>
+                                            </div>
+
+                                            {/* Comments Section */}
+                                            {post.comments.length > 0 && (
+                                                <div className="space-y-3 pt-4 border-t">
+                                                    {post.comments.map((comment) => (
+                                                        <div key={comment.id} className="flex space-x-3">
+                                                            <Avatar className="w-8 h-8">
+                                                                <AvatarFallback className="text-xs">
+                                                                    {comment.user.name.split(" ").map(n => n[0]).join("")}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex-1 bg-muted rounded-lg p-3">
+                                                                <p className="font-semibold text-sm">{comment.user.name}</p>
+                                                                <p className="text-sm text-muted-foreground">{comment.content}</p>
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    {new Date(comment.createdAt).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Add Comment Input */}
+                                            {commentingOnPost === post.id && (
+                                                <div className="flex space-x-2 pt-2">
+                                                    <Textarea
+                                                        value={commentText}
+                                                        onChange={(e) => setCommentText(e.target.value)}
+                                                        placeholder="Write a comment..."
+                                                        className="min-h-[60px]"
+                                                    />
+                                                    <div className="flex flex-col space-y-2">
+                                                        <Button 
+                                                            size="sm"
+                                                            onClick={() => handleAddComment(post.id)}
+                                                        >
+                                                            Post
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setCommentingOnPost(null);
+                                                                setCommentText("");
+                                                            }}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </StaggerItem>
+                            );
+                        })}
                     </StaggerContainer>
                 </section>
 
@@ -471,6 +695,70 @@ export default function HomePage() {
                     </div>
                 </aside>
             </main>
+
+            {/* Create Post Dialog */}
+            <Dialog open={isPostingDialogOpen} onOpenChange={setIsPostingDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create a Post</DialogTitle>
+                        <DialogDescription>
+                            Share your thoughts with your professional community.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                        value={postContent}
+                        onChange={(e) => setPostContent(e.target.value)}
+                        placeholder="What's on your mind?"
+                        className="min-h-[150px]"
+                    />
+                    <DialogFooter>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => {
+                                setIsPostingDialogOpen(false);
+                                setPostContent("");
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleCreatePost}
+                            disabled={isSubmittingPost || !postContent.trim()}
+                        >
+                            {isSubmittingPost ? "Posting..." : "Post"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Post</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this post? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => {
+                                setDeleteDialogOpen(false);
+                                setPostToDelete(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive"
+                            onClick={handleDeletePost}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

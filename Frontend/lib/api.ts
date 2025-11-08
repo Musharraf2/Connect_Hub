@@ -48,6 +48,44 @@ export interface Connection {
     status: string;
 }
 
+// Define types for Posts
+export interface PostRequest {
+    content: string;
+    userId: number;
+}
+
+export interface CommentRequest {
+    content: string;
+    userId: number;
+}
+
+export interface PostResponse {
+    id: number;
+    content: string;
+    user: {
+        id: number;
+        name: string;
+        email: string;
+        profession: string;
+    };
+    profession: string;
+    createdAt: string;
+    likesCount: number;
+    commentsCount: number;
+    likedByCurrentUser: boolean;
+    comments: CommentResponse[];
+}
+
+export interface CommentResponse {
+    id: number;
+    content: string;
+    user: {
+        id: number;
+        name: string;
+    };
+    createdAt: string;
+}
+
 
 // This function sends the registration data to your Spring backend.
 export const signupUser = async (userData: RegistrationRequestType) => {
@@ -232,6 +270,104 @@ export const getAcceptedConnections = async (userId: number): Promise<Connection
         return await response.json();
     } catch (error) {
         console.error("Failed to fetch accepted connections:", error);
+        throw error;
+    }
+};
+
+// Post API functions
+
+export const createPost = async (postData: PostRequest): Promise<PostResponse> => {
+    try {
+        const response = await fetch('http://localhost:8080/api/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postData),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to create post: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to create post:", error);
+        throw error;
+    }
+};
+
+export const getPostsByProfession = async (profession: string, userId: number): Promise<PostResponse[]> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/posts/by-profession?profession=${encodeURIComponent(profession)}&userId=${userId}`);
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch posts: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch posts:", error);
+        throw error;
+    }
+};
+
+export const deletePost = async (postId: number, userId: number): Promise<string> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/posts/${postId}?userId=${userId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to delete post: ${response.status} - ${errorText}`);
+        }
+
+        return await response.text();
+    } catch (error) {
+        console.error("Failed to delete post:", error);
+        throw error;
+    }
+};
+
+export const toggleLike = async (postId: number, userId: number): Promise<PostResponse> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/posts/${postId}/like?userId=${userId}`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to toggle like: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to toggle like:", error);
+        throw error;
+    }
+};
+
+export const addComment = async (postId: number, commentData: CommentRequest): Promise<PostResponse> => {
+    try {
+        const response = await fetch(`http://localhost:8080/api/posts/${postId}/comment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(commentData),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to add comment: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to add comment:", error);
         throw error;
     }
 };
