@@ -1,22 +1,11 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Textarea } from "@/components/ui/textarea"
-import { Header } from "@/components/header"
+import { UserProfileResponse } from "@/lib/api";
+import { ProfileUpdatePayload, updateProfile } from "@/lib/api";
+import { useState, useEffect } from "react";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
-} from "@/components/ui/dialog"
-import { UserPlus, MapPin, Users, Edit3, Save, X, Image as ImageIcon, Heart, MessageSquare, Trash2 } from "lucide-react"
-import {
+    // get  // ❌ removed: unused after cleanup
+    UserProfile,
     getUsersByProfession,
     LoginResponse,
     Connection,
@@ -31,21 +20,32 @@ import {
     deletePost,
     toggleLike,
     addComment,
-    CommentRequest
-} from "@/lib/api"
-import { motion } from "framer-motion"
-import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
-import toast from "react-hot-toast"
+} from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Header } from "@/components/header";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, Trash2 } from "lucide-react";
+import { FadeInUp, StaggerContainer } from "@/components/animations";
+import toast from "react-hot-toast";
 
-// Define the types for the data we'll get from the backend
-interface UserProfile {
-    id: number;
-    name: string;
-    profession: string;
-    email: string;
-}
-
-// Define the types for the user data required by the Header component.
+// ---------------- Types local to this component ----------------
 interface CurrentUser {
     name: string;
     avatar: string;
@@ -53,7 +53,6 @@ interface CurrentUser {
     pendingRequests?: number;
 }
 
-// Define types for the profile card
 interface ProfileData {
     name: string;
     email: string;
@@ -64,95 +63,78 @@ interface ProfileData {
 }
 
 export default function HomePage() {
-    const [members, setMembers] = useState<UserProfile[]>([])
-    const [membersLoading, setMembersLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
-    const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
-    const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([])
-    const [connections, setConnections] = useState<Connection[]>([])
+
+    const [members, setMembers] = useState<UserProfileResponse[]>([]);
+    const [membersLoading, setMembersLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [pendingRequests, setPendingRequests] = useState<Connection[]>([]);
+    const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([]);
+    const [connections, setConnections] = useState<Connection[]>([]);
     const router = useRouter();
 
-    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
-    const [profileData, setProfileData] = useState<ProfileData | null>(null)
+    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [profileData, setProfileData] = useState<ProfileData | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
 
     // Post-related states
-    const [posts, setPosts] = useState<PostResponse[]>([])
-    const [postsLoading, setPostsLoading] = useState(true)
-    const [postContent, setPostContent] = useState("")
-    const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false)
-    const [isSubmittingPost, setIsSubmittingPost] = useState(false)
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [postToDelete, setPostToDelete] = useState<number | null>(null)
-    const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null)
-    const [commentText, setCommentText] = useState("")
+    const [posts, setPosts] = useState<PostResponse[]>([]);
+    const [postsLoading, setPostsLoading] = useState(true);
+    const [postContent, setPostContent] = useState("");
+    const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false);
+    const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [postToDelete, setPostToDelete] = useState<number | null>(null);
+    const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null);
+    const [commentText, setCommentText] = useState("");
 
-    useEffect(() => {
-        const userDataString = sessionStorage.getItem('user');
+    // ---------------- Auth bootstrap ----------------
 
-        if (!userDataString) {
-            router.push('/login');
-        } else {
-            const user: LoginResponse = JSON.parse(userDataString);
 
-            setCurrentUser({
-                name: user.name,
-                community: user.profession,
-                avatar: "/placeholder.svg?height=40&width=40",
-                pendingRequests: 0, // Will be updated after fetching
-            });
-
+    const fetchUserProfile = async (userId: number) => {
+        try {
+            const res = await fetch(`http://localhost:8080/api/users/${userId}`);
+            const data = await res.json();
             setProfileData({
-                name: user.name,
-                email: user.email,
-                profession: user.profession,
-                location: "New York, NY", // Mocked
-                connections: 0, // Will be updated after fetching
-                bio: "Passionate about my field and eager to connect with fellow professionals!",
+                name: data.name,
+                email: data.email,
+                profession: data.profession,
+                location: data.location || "New York, NY",
+                connections: connections.length,
+                bio: data.aboutMe || "No bio yet."
             });
-
-            fetchMembers(user.profession);
-            fetchPendingRequests(user.id);
-            fetchSentPendingRequests(user.id);
-            fetchAcceptedConnections(user.id);
-            fetchPosts(user.profession, user.id);
-            setAuthLoading(false);
+        } catch (error) {
+            console.error("Failed to load profile:", error);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    };
 
 
+    // ---------------- Data fetchers ----------------
     const fetchMembers = async (profession: string) => {
-        setMembersLoading(true)
-        setError(null)
+        setMembersLoading(true);
+        setError(null);
         try {
             const allMembers = await getUsersByProfession(profession);
-            const userDataString = sessionStorage.getItem('user');
+            const userDataString = sessionStorage.getItem("user");
             if (userDataString) {
-                const currentUser: LoginResponse = JSON.parse(userDataString);
-                const otherMembers = allMembers.filter(member => member.id !== currentUser.id);
+                const cu: LoginResponse = JSON.parse(userDataString);
+                const otherMembers = allMembers.filter((m) => m.id !== cu.id);
                 setMembers(otherMembers);
             } else {
                 setMembers(allMembers);
             }
         } catch (err: unknown) {
             console.error("[fetchMembers] Error:", err);
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError("Failed to fetch members.");
-            }
+            setError(err instanceof Error ? err.message : "Failed to fetch members.");
         } finally {
-            setMembersLoading(false)
+            setMembersLoading(false);
         }
-    }
+    };
 
     const fetchPendingRequests = async (userId: number) => {
         try {
             const requests = await getPendingRequests(userId);
             setPendingRequests(requests);
-            // Update the pending requests count in currentUser
-            setCurrentUser((prev: CurrentUser | null) => prev ? { ...prev, pendingRequests: requests.length } : null);
+            setCurrentUser((prev) => (prev ? { ...prev, pendingRequests: requests.length } : null));
         } catch (error) {
             console.error("Failed to fetch pending requests:", error);
         }
@@ -171,8 +153,7 @@ export default function HomePage() {
         try {
             const conns = await getAcceptedConnections(userId);
             setConnections(conns);
-            // Update the connections count in profileData
-            setProfileData((prev: ProfileData | null) => prev ? { ...prev, connections: conns.length } : null);
+            setProfileData((prev) => (prev ? { ...prev, connections: conns.length } : null));
         } catch (error) {
             console.error("Failed to fetch accepted connections:", error);
         }
@@ -191,13 +172,14 @@ export default function HomePage() {
         }
     };
 
+    // ---------------- Post handlers ----------------
     const handleCreatePost = async () => {
         if (!postContent.trim()) {
             toast.error("Post content cannot be empty");
             return;
         }
 
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
@@ -208,8 +190,7 @@ export default function HomePage() {
             setPostContent("");
             setIsPostingDialogOpen(false);
             toast.success("Post created successfully!");
-            // Add the new post to the beginning of the posts array
-            setPosts(prevPosts => [newPost, ...prevPosts]);
+            setPosts((prev) => [newPost, ...prev]);
         } catch (error) {
             console.error("Failed to create post:", error);
             toast.error("Failed to create post");
@@ -221,7 +202,7 @@ export default function HomePage() {
     const handleDeletePost = async () => {
         if (!postToDelete) return;
 
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
@@ -231,7 +212,6 @@ export default function HomePage() {
             toast.success("Post deleted successfully!");
             setDeleteDialogOpen(false);
             setPostToDelete(null);
-            // Refresh posts
             fetchPosts(user.profession, user.id);
         } catch (error) {
             console.error("Failed to delete post:", error);
@@ -240,17 +220,14 @@ export default function HomePage() {
     };
 
     const handleToggleLike = async (postId: number) => {
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
 
         try {
             const updatedPost = await toggleLike(postId, user.id);
-            // Update the post in the list
-            setPosts(prevPosts =>
-                prevPosts.map(post => post.id === postId ? updatedPost : post)
-            );
+            setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
         } catch (error) {
             console.error("Failed to toggle like:", error);
             toast.error("Failed to update like");
@@ -263,17 +240,14 @@ export default function HomePage() {
             return;
         }
 
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
 
         try {
             const updatedPost = await addComment(postId, { content: commentText, userId: user.id });
-            // Update the post in the list
-            setPosts(prevPosts =>
-                prevPosts.map(post => post.id === postId ? updatedPost : post)
-            );
+            setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
             setCommentText("");
             setCommentingOnPost(null);
             toast.success("Comment added!");
@@ -288,61 +262,63 @@ export default function HomePage() {
         setDeleteDialogOpen(true);
     };
 
-    // Helper function to get connection status for a user
-    const getConnectionStatus = (userId: number): { status: 'none' | 'pending' | 'connected', connectionId?: number } => {
-        const userDataString = sessionStorage.getItem('user');
-        if (!userDataString) return { status: 'none' };
-        const currentUser: LoginResponse = JSON.parse(userDataString);
+    // ---------------- Connections helpers ----------------
+    const getConnectionStatus = (
+        userId: number
+    ): { status: "none" | "pending" | "connected"; connectionId?: number } => {
+        const userDataString = sessionStorage.getItem("user");
+        if (!userDataString) return { status: "none" };
+        const cu: LoginResponse = JSON.parse(userDataString);
 
-        // Check if I sent a pending request to this user
         const sentRequest = sentPendingRequests.find(
-            req => req.requester.id === currentUser.id && req.receiver.id === userId
+            (req) => req.requester.id === cu.id && req.receiver.id === userId
         );
-        if (sentRequest) return { status: 'pending', connectionId: sentRequest.id };
+        if (sentRequest) return { status: "pending", connectionId: sentRequest.id };
 
-        // Check if already connected
         const isConnected = connections.some(
-            conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
-                (conn.receiver.id === currentUser.id && conn.requester.id === userId)
+            (conn) =>
+                (conn.requester.id === cu.id && conn.receiver.id === userId) ||
+                (conn.receiver.id === cu.id && conn.requester.id === userId)
         );
-        if (isConnected) return { status: 'connected' };
+        if (isConnected) return { status: "connected" };
 
-        return { status: 'none' };
+        return { status: "none" };
     };
 
     const handleSendRequest = async (memberId: number) => {
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
         try {
             await sendConnectionRequest(user.id, memberId);
-            // Refetch sent pending requests to update the UI
             fetchSentPendingRequests(user.id);
-            console.log("Connection request sent successfully");
+            toast.success("Connection request sent");
         } catch (error) {
             console.error("Failed to send connection request:", error);
+            toast.error("Failed to send request");
         }
-    }
+    };
 
     const handleCancelRequest = async (connectionId: number) => {
-        const userDataString = sessionStorage.getItem('user');
+        const userDataString = sessionStorage.getItem("user");
         if (!userDataString) return;
 
         const user: LoginResponse = JSON.parse(userDataString);
         try {
             await cancelConnectionRequest(connectionId);
-            // Refetch sent pending requests to update the UI
             fetchSentPendingRequests(user.id);
-            console.log("Connection request canceled successfully");
+            toast.success("Request canceled");
         } catch (error) {
             console.error("Failed to cancel connection request:", error);
+            toast.error("Failed to cancel request");
         }
-    }
+    };
 
-    const [isEditingBio, setIsEditingBio] = useState(false)
-    const [bioText, setBioText] = useState(profileData?.bio || "")
-    const [tempBioText, setTempBioText] = useState(profileData?.bio || "")
+    // ---------------- Bio edit ----------------
+    const [isEditingBio, setIsEditingBio] = useState(false);
+    const [bioText, setBioText] = useState(profileData?.bio || "");
+    const [tempBioText, setTempBioText] = useState(profileData?.bio || "");
 
     useEffect(() => {
         if (profileData) {
@@ -351,15 +327,36 @@ export default function HomePage() {
         }
     }, [profileData]);
 
-    const handleSaveBio = () => {
-        setBioText(tempBioText)
-        setIsEditingBio(false)
-    }
+    const handleSaveBio = async () => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString || !profileData) {
+            toast.error("User session expired.");
+            return;
+        }
+
+        const user: LoginResponse = JSON.parse(userDataString);
+        const trimmedBio = tempBioText.trim();
+
+        try {
+            const updatedUser = await updateProfile(user.id, { aboutMe: trimmedBio });
+
+            setBioText(updatedUser.aboutMe);
+            setTempBioText(
+                updatedUser.aboutMe);
+            setProfileData(prev => prev ? { ...prev, bio: updatedUser.aboutMe } : null);
+
+            setIsEditingBio(false);
+            toast.success("Bio updated successfully!");
+        } catch (error) {
+            toast.error("Failed to update bio.");
+            console.error(error);
+        }
+    };
 
     const handleCancelBio = () => {
-        setTempBioText(bioText)
-        setIsEditingBio(false)
-    }
+        setTempBioText(bioText);
+        setIsEditingBio(false);
+    };
 
     if (authLoading || !currentUser || !profileData) {
         return (
@@ -374,7 +371,6 @@ export default function HomePage() {
             <Header user={currentUser} />
 
             <main className="container mx-auto grid lg:grid-cols-4 gap-8 py-8">
-
                 {/* Left Sidebar (Sticky) */}
                 <aside className="hidden lg:block lg:col-span-1">
                     <div className="sticky top-8 space-y-6">
@@ -383,18 +379,24 @@ export default function HomePage() {
                                 <CardContent className="p-6">
                                     <div className="text-center pb-4">
                                         <Avatar className="w-24 h-24 mx-auto mb-4">
-                                            <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
+                                            <AvatarImage
+                                                src={currentUser.avatar || "/placeholder.svg"}
+                                                alt={profileData.name}
+                                            />
                                             <AvatarFallback className="text-xl">
-                                                {profileData.name.split(" ").map((n) => n[0]).join("")}
+                                                {profileData.name
+                                                    .split(" ")
+                                                    .map((n) => n[0])
+                                                    .join("")}
                                             </AvatarFallback>
                                         </Avatar>
                                         <h2 className="font-serif text-xl font-semibold">{profileData.name}</h2>
                                         <p className="text-muted-foreground text-sm space-y-1 mt-2">
                                             <span className="font-medium">{profileData.profession}</span>
                                             <span className="flex items-center justify-center space-x-1">
-                                                <MapPin className="w-4 h-4" />
-                                                <span>{profileData.location}</span>
-                                            </span>
+                        <MapPin className="w-4 h-4" />
+                        <span>{profileData.location}</span>
+                      </span>
                                         </p>
                                     </div>
                                     <div className="space-y-4">
@@ -405,7 +407,9 @@ export default function HomePage() {
                                                 <div className="text-xs text-muted-foreground">Connections</div>
                                             </div>
                                             <div className="text-center">
-                                                <div className="font-semibold text-lg">{currentUser.pendingRequests}</div>
+                                                <div className="font-semibold text-lg">
+                                                    {currentUser.pendingRequests}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">Requests</div>
                                             </div>
                                         </div>
@@ -415,7 +419,12 @@ export default function HomePage() {
                                             <div className="flex items-center justify-between">
                                                 <h4 className="font-medium text-sm">About Me</h4>
                                                 {!isEditingBio && (
-                                                    <Button variant="ghost" size="sm" onClick={() => setIsEditingBio(true)} className="h-6 w-6 p-0">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setIsEditingBio(true)}
+                                                        className="h-6 w-6 p-0"
+                                                    >
                                                         <Edit3 className="w-3 h-3" />
                                                     </Button>
                                                 )}
@@ -432,13 +441,20 @@ export default function HomePage() {
                                                         <Button size="sm" onClick={handleSaveBio} className="flex-1">
                                                             <Save className="w-3 h-3 mr-1" /> Save
                                                         </Button>
-                                                        <Button size="sm" variant="outline" onClick={handleCancelBio} className="flex-1 bg-transparent">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={handleCancelBio}
+                                                            className="flex-1 bg-transparent"
+                                                        >
                                                             <X className="w-3 h-3 mr-1" /> Cancel
                                                         </Button>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <p className="text-sm text-muted-foreground leading-relaxed">{bioText}</p>
+                                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                                    {bioText}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -455,14 +471,22 @@ export default function HomePage() {
                         <Card className="border">
                             <CardHeader className="flex-row items-center space-x-4 pb-4">
                                 <Avatar className="w-12 h-12">
-                                    <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
-                                    <AvatarFallback>{profileData.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                                    <AvatarImage
+                                        src={currentUser.avatar || "/placeholder.svg"}
+                                        alt={profileData.name}
+                                    />
+                                    <AvatarFallback>
+                                        {profileData.name
+                                            .split(" ")
+                                            .map((n) => n[0])
+                                            .join("")}
+                                    </AvatarFallback>
                                 </Avatar>
                                 <div
                                     onClick={() => setIsPostingDialogOpen(true)}
                                     className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors"
                                 >
-                                    What's on your mind, {profileData.name.split(" ")[0]}?
+                                    {`What's on your mind, ${profileData.name.split(" ")[0]}?`}
                                 </div>
                             </CardHeader>
                             <CardContent className="flex justify-around pt-0">
@@ -471,7 +495,7 @@ export default function HomePage() {
                                     className="flex-1"
                                     onClick={() => setIsPostingDialogOpen(true)}
                                 >
-                                    <MessageSquare className="w-5 h-5 mr-2 text-blue-500" /> Create Post
+                                    <MessageSquare className="w-5 h-5 mr-2" /> Create Post
                                 </Button>
                             </CardContent>
                         </Card>
@@ -490,125 +514,145 @@ export default function HomePage() {
                     {!postsLoading && posts.length === 0 && (
                         <Card className="border">
                             <CardContent className="py-8 text-center">
-                                <p className="text-muted-foreground">No posts yet. Be the first to share something!</p>
+                                <p className="text-muted-foreground">
+                                    No posts yet. Be the first to share something!
+                                </p>
                             </CardContent>
                         </Card>
                     )}
 
                     {/* Posts Feed */}
                     <StaggerContainer stagger={0.1} className="space-y-6">
-                        {!postsLoading && posts.map((post) => {
-                            const userDataString = sessionStorage.getItem('user');
-                            const currentUserId = userDataString ? JSON.parse(userDataString).id : null;
-                            const isOwnPost = currentUserId === post.user.id;
-                            const timeAgo = new Date(post.createdAt).toLocaleString();
+                        {!postsLoading &&
+                            posts.map((post) => {
+                                const userDataString = sessionStorage.getItem("user");
+                                const currentUserId = userDataString ? JSON.parse(userDataString).id : null;
+                                const isOwnPost = currentUserId === post.user.id;
+                                const timeAgo = new Date(post.createdAt).toLocaleString();
 
-                            return (
-                                <div key={post.id}>
-                                    <Card className="border">
-                                        <CardHeader>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-3">
-                                                    <Avatar>
-                                                        <AvatarImage src={`/placeholder.svg?text=${post.user.name.split(" ").map(n => n[0]).join("")}`} alt={post.user.name} />
-                                                        <AvatarFallback>{post.user.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <h4 className="font-semibold">{post.user.name}</h4>
-                                                        <p className="text-xs text-muted-foreground">{post.user.profession} • {timeAgo}</p>
+                                return (
+                                    <div key={post.id}>
+                                        <Card className="border">
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-3">
+                                                        <Avatar>
+                                                            <AvatarImage
+                                                                src={`/placeholder.svg?text=${post.user.name
+                                                                    .split(" ")
+                                                                    .map((n) => n[0])
+                                                                    .join("")}`}
+                                                                alt={post.user.name}
+                                                            />
+                                                            <AvatarFallback>
+                                                                {post.user.name
+                                                                    .split(" ")
+                                                                    .map((n) => n[0])
+                                                                    .join("")}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <div>
+                                                            <h4 className="font-semibold">{post.user.name}</h4>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {post.user.profession} • {timeAgo}
+                                                            </p>
+                                                        </div>
                                                     </div>
+                                                    {isOwnPost && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => openDeleteDialog(post.id)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                                        </Button>
+                                                    )}
                                                 </div>
-                                                {isOwnPost && (
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                                <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                                                <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => openDeleteDialog(post.id)}
+                                                        onClick={() => handleToggleLike(post.id)}
+                                                        className={post.likedByCurrentUser ? "text-red-500" : ""}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                        <Heart
+                                                            className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`}
+                                                        />
+                                                        {post.likesCount} {post.likesCount === 1 ? "Like" : "Likes"}
                                                     </Button>
-                                                )}
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <p className="text-muted-foreground leading-relaxed">
-                                                {post.content}
-                                            </p>
-                                            <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleToggleLike(post.id)}
-                                                    className={post.likedByCurrentUser ? "text-red-500" : ""}
-                                                >
-                                                    <Heart className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`} />
-                                                    {post.likesCount} {post.likesCount === 1 ? 'Like' : 'Likes'}
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
-                                                >
-                                                    <MessageSquare className="w-4 h-4 mr-2" />
-                                                    {post.commentsCount} {post.commentsCount === 1 ? 'Comment' : 'Comments'}
-                                                </Button>
-                                            </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setCommentingOnPost(
+                                                                commentingOnPost === post.id ? null : post.id
+                                                            )
+                                                        }
+                                                    >
+                                                        <MessageSquare className="w-4 h-4 mr-2" />
+                                                        {post.commentsCount} {post.commentsCount === 1 ? "Comment" : "Comments"}
+                                                    </Button>
+                                                </div>
 
-                                            {/* Comments Section */}
-                                            {post.comments.length > 0 && (
-                                                <div className="space-y-3 pt-4 border-t">
-                                                    {post.comments.map((comment) => (
-                                                        <div key={comment.id} className="flex space-x-3">
-                                                            <Avatar className="w-8 h-8">
-                                                                <AvatarFallback className="text-xs">
-                                                                    {comment.user.name.split(" ").map(n => n[0]).join("")}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                            <div className="flex-1 bg-muted rounded-lg p-3">
-                                                                <p className="font-semibold text-sm">{comment.user.name}</p>
-                                                                <p className="text-sm text-muted-foreground">{comment.content}</p>
-                                                                <p className="text-xs text-muted-foreground mt-1">
-                                                                    {new Date(comment.createdAt).toLocaleString()}
-                                                                </p>
+                                                {/* Comments Section */}
+                                                {post.comments.length > 0 && (
+                                                    <div className="space-y-3 pt-4 border-t">
+                                                        {post.comments.map((comment) => (
+                                                            <div key={comment.id} className="flex space-x-3">
+                                                                <Avatar className="w-8 h-8">
+                                                                    <AvatarFallback className="text-xs">
+                                                                        {comment.user.name
+                                                                            .split(" ")
+                                                                            .map((n) => n[0])
+                                                                            .join("")}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <div className="flex-1 bg-muted rounded-lg p-3">
+                                                                    <p className="font-semibold text-sm">{comment.user.name}</p>
+                                                                    <p className="text-sm text-muted-foreground">{comment.content}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                                        {new Date(comment.createdAt).toLocaleString()}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Add Comment Input */}
-                                            {commentingOnPost === post.id && (
-                                                <div className="flex space-x-2 pt-2">
-                                                    <Textarea
-                                                        value={commentText}
-                                                        onChange={(e) => setCommentText(e.target.value)}
-                                                        placeholder="Write a comment..."
-                                                        className="min-h-[60px]"
-                                                    />
-                                                    <div className="flex flex-col space-y-2">
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleAddComment(post.id)}
-                                                        >
-                                                            Post
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setCommentingOnPost(null);
-                                                                setCommentText("");
-                                                            }}
-                                                        >
-                                                            Cancel
-                                                        </Button>
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            );
-                        })}
+                                                )}
+
+                                                {/* Add Comment Input */}
+                                                {commentingOnPost === post.id && (
+                                                    <div className="flex space-x-2 pt-2">
+                                                        <Textarea
+                                                            value={commentText}
+                                                            onChange={(e) => setCommentText(e.target.value)}
+                                                            placeholder="Write a comment..."
+                                                            className="min-h-[60px]"
+                                                        />
+                                                        <div className="flex flex-col space-y-2">
+                                                            <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                                                                Post
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setCommentingOnPost(null);
+                                                                    setCommentText("");
+                                                                }}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                );
+                            })}
                     </StaggerContainer>
                 </section>
 
@@ -638,10 +682,9 @@ export default function HomePage() {
 
                                         {!membersLoading && !error && members.length > 0 &&
                                             members
-                                                .filter(member => {
-                                                    // Filter out connected users
+                                                .filter((member) => {
                                                     const { status } = getConnectionStatus(member.id);
-                                                    return status !== 'connected';
+                                                    return status !== "connected";
                                                 })
                                                 .slice(0, 5)
                                                 .map((member) => {
@@ -651,7 +694,10 @@ export default function HomePage() {
                                                             <Avatar className="w-10 h-10">
                                                                 <AvatarImage src={"/placeholder.svg"} alt={member.name} />
                                                                 <AvatarFallback>
-                                                                    {member.name.split(" ").map((n) => n[0]).join("")}
+                                                                    {member.name
+                                                                        .split(" ")
+                                                                        .map((n) => n[0])
+                                                                        .join("")}
                                                                 </AvatarFallback>
                                                             </Avatar>
 
@@ -662,7 +708,7 @@ export default function HomePage() {
                                                                 </p>
                                                             </div>
 
-                                                            {connectionStatus.status === 'none' && (
+                                                            {connectionStatus.status === "none" && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant="outline"
@@ -672,7 +718,7 @@ export default function HomePage() {
                                                                     <UserPlus className="w-4 h-4" />
                                                                 </Button>
                                                             )}
-                                                            {connectionStatus.status === 'pending' && connectionStatus.connectionId && (
+                                                            {connectionStatus.status === "pending" && connectionStatus.connectionId && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant="outline"
@@ -684,12 +730,12 @@ export default function HomePage() {
                                                             )}
                                                         </div>
                                                     );
-                                                })
-                                        }
+                                                })}
                                     </div>
 
-
-                                    <Button variant="link" size="sm" className="w-full mt-4">See all</Button>
+                                    <Button variant="link" size="sm" className="w-full mt-4">
+                                        See all
+                                    </Button>
                                 </CardContent>
                             </Card>
                         </FadeInUp>
@@ -722,10 +768,7 @@ export default function HomePage() {
                         >
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleCreatePost}
-                            disabled={isSubmittingPost || !postContent.trim()}
-                        >
+                        <Button onClick={handleCreatePost} disabled={isSubmittingPost || !postContent.trim()}>
                             {isSubmittingPost ? "Posting..." : "Post"}
                         </Button>
                     </DialogFooter>
@@ -751,15 +794,12 @@ export default function HomePage() {
                         >
                             Cancel
                         </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDeletePost}
-                        >
+                        <Button variant="destructive" onClick={handleDeletePost}>
                             Delete
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
-    )
+    );
 }

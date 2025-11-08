@@ -103,7 +103,7 @@ export default function ProfilePage() {
       router.push('/login');
     } else {
       const sessionUser: LoginResponse = JSON.parse(userDataString);
-      
+
       // Merge real session data with mock data
       setCurrentUser({
         ...profileMockData, // Start with all the mock data
@@ -111,7 +111,7 @@ export default function ProfilePage() {
         email: sessionUser.email,   // Overwrite with real data
         community: sessionUser.profession, // Overwrite with real data
       });
-      
+
       setAuthLoading(false);
     }
   }, [router]);
