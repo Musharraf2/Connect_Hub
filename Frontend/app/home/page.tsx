@@ -7,16 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Header } from "@/components/header"
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogDescription, 
-    DialogFooter, 
-    DialogHeader, 
-    DialogTitle 
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from "@/components/ui/dialog"
 import { UserPlus, MapPin, Users, Edit3, Save, X, Image as ImageIcon, Heart, MessageSquare, Trash2 } from "lucide-react"
-import { 
+import {
     getUsersByProfession,
     LoginResponse,
     Connection,
@@ -199,7 +199,7 @@ export default function HomePage() {
 
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
         setIsSubmittingPost(true);
 
@@ -223,7 +223,7 @@ export default function HomePage() {
 
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
 
         try {
@@ -242,13 +242,13 @@ export default function HomePage() {
     const handleToggleLike = async (postId: number) => {
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
 
         try {
             const updatedPost = await toggleLike(postId, user.id);
             // Update the post in the list
-            setPosts(prevPosts => 
+            setPosts(prevPosts =>
                 prevPosts.map(post => post.id === postId ? updatedPost : post)
             );
         } catch (error) {
@@ -265,13 +265,13 @@ export default function HomePage() {
 
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
 
         try {
             const updatedPost = await addComment(postId, { content: commentText, userId: user.id });
             // Update the post in the list
-            setPosts(prevPosts => 
+            setPosts(prevPosts =>
                 prevPosts.map(post => post.id === postId ? updatedPost : post)
             );
             setCommentText("");
@@ -303,7 +303,7 @@ export default function HomePage() {
         // Check if already connected
         const isConnected = connections.some(
             conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
-                    (conn.receiver.id === currentUser.id && conn.requester.id === userId)
+                (conn.receiver.id === currentUser.id && conn.requester.id === userId)
         );
         if (isConnected) return { status: 'connected' };
 
@@ -313,7 +313,7 @@ export default function HomePage() {
     const handleSendRequest = async (memberId: number) => {
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
         try {
             await sendConnectionRequest(user.id, memberId);
@@ -328,7 +328,7 @@ export default function HomePage() {
     const handleCancelRequest = async (connectionId: number) => {
         const userDataString = sessionStorage.getItem('user');
         if (!userDataString) return;
-        
+
         const user: LoginResponse = JSON.parse(userDataString);
         try {
             await cancelConnectionRequest(connectionId);
@@ -458,7 +458,7 @@ export default function HomePage() {
                                     <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
                                     <AvatarFallback>{profileData.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
                                 </Avatar>
-                                <div 
+                                <div
                                     onClick={() => setIsPostingDialogOpen(true)}
                                     className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors"
                                 >
@@ -466,8 +466,8 @@ export default function HomePage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="flex justify-around pt-0">
-                                <Button 
-                                    variant="ghost" 
+                                <Button
+                                    variant="ghost"
                                     className="flex-1"
                                     onClick={() => setIsPostingDialogOpen(true)}
                                 >
@@ -504,7 +504,7 @@ export default function HomePage() {
                             const timeAgo = new Date(post.createdAt).toLocaleString();
 
                             return (
-                                <StaggerItem key={post.id}>
+                                <div key={post.id}>
                                     <Card className="border">
                                         <CardHeader>
                                             <div className="flex items-center justify-between">
@@ -519,8 +519,8 @@ export default function HomePage() {
                                                     </div>
                                                 </div>
                                                 {isOwnPost && (
-                                                    <Button 
-                                                        variant="ghost" 
+                                                    <Button
+                                                        variant="ghost"
                                                         size="sm"
                                                         onClick={() => openDeleteDialog(post.id)}
                                                     >
@@ -534,21 +534,21 @@ export default function HomePage() {
                                                 {post.content}
                                             </p>
                                             <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
-                                                <Button 
-                                                    variant="ghost" 
+                                                <Button
+                                                    variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleToggleLike(post.id)}
                                                     className={post.likedByCurrentUser ? "text-red-500" : ""}
                                                 >
-                                                    <Heart className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`} /> 
+                                                    <Heart className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`} />
                                                     {post.likesCount} {post.likesCount === 1 ? 'Like' : 'Likes'}
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
+                                                <Button
+                                                    variant="ghost"
                                                     size="sm"
                                                     onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
                                                 >
-                                                    <MessageSquare className="w-4 h-4 mr-2" /> 
+                                                    <MessageSquare className="w-4 h-4 mr-2" />
                                                     {post.commentsCount} {post.commentsCount === 1 ? 'Comment' : 'Comments'}
                                                 </Button>
                                             </div>
@@ -585,13 +585,13 @@ export default function HomePage() {
                                                         className="min-h-[60px]"
                                                     />
                                                     <div className="flex flex-col space-y-2">
-                                                        <Button 
+                                                        <Button
                                                             size="sm"
                                                             onClick={() => handleAddComment(post.id)}
                                                         >
                                                             Post
                                                         </Button>
-                                                        <Button 
+                                                        <Button
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() => {
@@ -606,7 +606,7 @@ export default function HomePage() {
                                             )}
                                         </CardContent>
                                     </Card>
-                                </StaggerItem>
+                                </div>
                             );
                         })}
                     </StaggerContainer>
@@ -713,8 +713,8 @@ export default function HomePage() {
                         className="min-h-[150px]"
                     />
                     <DialogFooter>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             onClick={() => {
                                 setIsPostingDialogOpen(false);
                                 setPostContent("");
@@ -722,7 +722,7 @@ export default function HomePage() {
                         >
                             Cancel
                         </Button>
-                        <Button 
+                        <Button
                             onClick={handleCreatePost}
                             disabled={isSubmittingPost || !postContent.trim()}
                         >
@@ -742,8 +742,8 @@ export default function HomePage() {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             onClick={() => {
                                 setDeleteDialogOpen(false);
                                 setPostToDelete(null);
@@ -751,7 +751,7 @@ export default function HomePage() {
                         >
                             Cancel
                         </Button>
-                        <Button 
+                        <Button
                             variant="destructive"
                             onClick={handleDeletePost}
                         >
