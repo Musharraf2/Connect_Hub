@@ -8,14 +8,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Header } from "@/components/header"
 import { UserPlus, MapPin, Users, Edit3, Save, X, Image as ImageIcon, Heart, MessageSquare } from "lucide-react"
-import { getUsersByProfession } from "@/lib/api"
-import { LoginResponse } from "@/app/login/page"
+import { 
+    getUsersByProfession,
+    LoginResponse,
+    Connection,
+    sendConnectionRequest,
+    getSentPendingRequests,
+    cancelConnectionRequest,
+    getPendingRequests,
+    getAcceptedConnections
+} from "@/lib/api"
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
 
 // Define the types for the data we'll get from the backend
 interface UserProfile {
-    id: string;
+    id: number;
     name: string;
     profession: string;
     email: string;
@@ -52,6 +60,9 @@ export default function HomePage() {
     const [members, setMembers] = useState<UserProfile[]>([])
     const [membersLoading, setMembersLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
+    const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([])
+    const [connections, setConnections] = useState<Connection[]>([])
     const router = useRouter();
 
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -70,7 +81,7 @@ export default function HomePage() {
                 name: user.name,
                 community: user.profession,
                 avatar: "/placeholder.svg?height=40&width=40",
-                pendingRequests: 0,
+                pendingRequests: 0, // Will be updated after fetching
             });
 
             setProfileData({
@@ -78,11 +89,14 @@ export default function HomePage() {
                 email: user.email,
                 profession: user.profession,
                 location: "New York, NY", // Mocked
-                connections: 42, // Mocked
-                bio: "Passionate computer science student specializing in AI and machine learning. Eager to connect with fellow students!",
+                connections: 0, // Will be updated after fetching
+                bio: "Passionate about my field and eager to connect with fellow professionals!",
             });
 
             fetchMembers(user.profession);
+            fetchPendingRequests(user.id);
+            fetchSentPendingRequests(user.id);
+            fetchAcceptedConnections(user.id);
             setAuthLoading(false);
         }
     }, [router])
@@ -93,10 +107,14 @@ export default function HomePage() {
         setError(null)
         try {
             const allMembers = await getUsersByProfession(profession);
-            const loggedInEmail = JSON.parse(sessionStorage.getItem('user') || '{}').email;
-            const otherMembers = allMembers.filter(member => member.email !== loggedInEmail);
-            setMembers(otherMembers);
-
+            const userDataString = sessionStorage.getItem('user');
+            if (userDataString) {
+                const currentUser: LoginResponse = JSON.parse(userDataString);
+                const otherMembers = allMembers.filter(member => member.id !== currentUser.id);
+                setMembers(otherMembers);
+            } else {
+                setMembers(allMembers);
+            }
         } catch (err: unknown) {
             console.error("[fetchMembers] Error:", err);
             if (err instanceof Error) {
@@ -106,6 +124,89 @@ export default function HomePage() {
             }
         } finally {
             setMembersLoading(false)
+        }
+    }
+
+    const fetchPendingRequests = async (userId: number) => {
+        try {
+            const requests = await getPendingRequests(userId);
+            setPendingRequests(requests);
+            // Update the pending requests count in currentUser
+            setCurrentUser((prev: CurrentUser | null) => prev ? { ...prev, pendingRequests: requests.length } : null);
+        } catch (error) {
+            console.error("Failed to fetch pending requests:", error);
+        }
+    };
+
+    const fetchSentPendingRequests = async (userId: number) => {
+        try {
+            const requests = await getSentPendingRequests(userId);
+            setSentPendingRequests(requests);
+        } catch (error) {
+            console.error("Failed to fetch sent pending requests:", error);
+        }
+    };
+
+    const fetchAcceptedConnections = async (userId: number) => {
+        try {
+            const conns = await getAcceptedConnections(userId);
+            setConnections(conns);
+            // Update the connections count in profileData
+            setProfileData((prev: ProfileData | null) => prev ? { ...prev, connections: conns.length } : null);
+        } catch (error) {
+            console.error("Failed to fetch accepted connections:", error);
+        }
+    };
+
+    // Helper function to get connection status for a user
+    const getConnectionStatus = (userId: number): { status: 'none' | 'pending' | 'connected', connectionId?: number } => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return { status: 'none' };
+        const currentUser: LoginResponse = JSON.parse(userDataString);
+
+        // Check if I sent a pending request to this user
+        const sentRequest = sentPendingRequests.find(
+            req => req.requester.id === currentUser.id && req.receiver.id === userId
+        );
+        if (sentRequest) return { status: 'pending', connectionId: sentRequest.id };
+
+        // Check if already connected
+        const isConnected = connections.some(
+            conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
+                    (conn.receiver.id === currentUser.id && conn.requester.id === userId)
+        );
+        if (isConnected) return { status: 'connected' };
+
+        return { status: 'none' };
+    };
+
+    const handleSendRequest = async (memberId: number) => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+        try {
+            await sendConnectionRequest(user.id, memberId);
+            // Refetch sent pending requests to update the UI
+            fetchSentPendingRequests(user.id);
+            console.log("Connection request sent successfully");
+        } catch (error) {
+            console.error("Failed to send connection request:", error);
+        }
+    }
+
+    const handleCancelRequest = async (connectionId: number) => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString) return;
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+        try {
+            await cancelConnectionRequest(connectionId);
+            // Refetch sent pending requests to update the UI
+            fetchSentPendingRequests(user.id);
+            console.log("Connection request canceled successfully");
+        } catch (error) {
+            console.error("Failed to cancel connection request:", error);
         }
     }
 
@@ -119,10 +220,6 @@ export default function HomePage() {
             setTempBioText(profileData.bio);
         }
     }, [profileData]);
-
-    const handleSendRequest = (memberId: string) => {
-        console.log(`Sending connection request to user with ID: ${memberId}`);
-    }
 
     const handleSaveBio = () => {
         setBioText(tempBioText)
@@ -315,32 +412,54 @@ export default function HomePage() {
                                         )}
 
                                         {!membersLoading && !error && members.length > 0 &&
-                                            members.slice(0, 5).map((member) => (
-                                                <div key={member.id} className="flex items-center space-x-3">
-                                                    <Avatar className="w-10 h-10">
-                                                        <AvatarImage src={"/placeholder.svg"} alt={member.name} />
-                                                        <AvatarFallback>
-                                                            {member.name.split(" ").map((n) => n[0]).join("")}
-                                                        </AvatarFallback>
-                                                    </Avatar>
+                                            members
+                                                .filter(member => {
+                                                    // Filter out connected users
+                                                    const { status } = getConnectionStatus(member.id);
+                                                    return status !== 'connected';
+                                                })
+                                                .slice(0, 5)
+                                                .map((member) => {
+                                                    const connectionStatus = getConnectionStatus(member.id);
+                                                    return (
+                                                        <div key={member.id} className="flex items-center space-x-3">
+                                                            <Avatar className="w-10 h-10">
+                                                                <AvatarImage src={"/placeholder.svg"} alt={member.name} />
+                                                                <AvatarFallback>
+                                                                    {member.name.split(" ").map((n) => n[0]).join("")}
+                                                                </AvatarFallback>
+                                                            </Avatar>
 
-                                                    <div className="flex-1 min-w-0">
-                                                        <h4 className="font-medium text-sm truncate">{member.name}</h4>
-                                                        <p className="text-xs text-muted-foreground truncate">
-                                                            {member.profession}
-                                                        </p>
-                                                    </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-medium text-sm truncate">{member.name}</h4>
+                                                                <p className="text-xs text-muted-foreground truncate">
+                                                                    {member.profession}
+                                                                </p>
+                                                            </div>
 
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="bg-transparent"
-                                                        onClick={() => handleSendRequest(member.id)}
-                                                    >
-                                                        <UserPlus className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            ))
+                                                            {connectionStatus.status === 'none' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="bg-transparent"
+                                                                    onClick={() => handleSendRequest(member.id)}
+                                                                >
+                                                                    <UserPlus className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                            {connectionStatus.status === 'pending' && connectionStatus.connectionId && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="bg-transparent"
+                                                                    onClick={() => handleCancelRequest(connectionStatus.connectionId!)}
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })
                                         }
                                     </div>
 
