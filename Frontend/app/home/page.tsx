@@ -482,7 +482,7 @@ export default function HomePage() {
                     {/* Loading State */}
                     {postsLoading && (
                         <div className="text-center py-8">
-                            <p className="text-muted-foreground">Loading posts..</p>
+                            <p className="text-muted-foreground">Loading posts...</p>
                         </div>
                     )}
 
