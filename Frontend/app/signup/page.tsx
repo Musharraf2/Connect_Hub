@@ -8,14 +8,53 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Combobox } from "@/components/ui/combobox"
 // We no longer need RadioGroup or the community icons
 import { ArrowLeft, Users } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
+// List of professions for the dropdown
+const PROFESSIONS = [
+    "Student",
+    "Doctor",
+    "Singer",
+    "Teacher",
+    "Engineer",
+    "Lawyer",
+    "Architect",
+    "Chef",
+    "Police Officer",
+    "Firefighter",
+    "Pilot",
+    "Nurse",
+    "Farmer",
+    "Actor",
+    "Photographer",
+    "Writer",
+    "Journalist",
+    "Scientist",
+    "Fashion Designer",
+    "Software Developer",
+    "Electrician",
+    "Mechanic",
+    "Accountant",
+    "Pharmacist",
+    "Social Worker",
+    "Plumber",
+    "Graphic Designer",
+    "Entrepreneur",
+    "Dancer",
+    "Athlete"
+].map(profession => ({
+    value: profession.toLowerCase().replace(/\s+/g, '-'),
+    label: profession
+}))
+
 export default function SignupPage() {
     // We no longer need 'step' or 'selectedCommunity'
     const router = useRouter()
+    const [profession, setProfession] = useState<string>("")
 
     return (
         <div className="min-h-screen flex">
@@ -89,7 +128,15 @@ export default function SignupPage() {
                                 {/* --- THIS IS THE NEW FIELD --- */}
                                 <div className="space-y-2">
                                     <Label htmlFor="profession">Your Profession</Label>
-                                    <Input id="profession" type="text" placeholder="e.g., Painter, Influencer, Engineer" className="bg-input" />
+                                    <Combobox
+                                        options={PROFESSIONS}
+                                        value={profession}
+                                        onValueChange={setProfession}
+                                        placeholder="Select your profession..."
+                                        searchPlaceholder="Search profession..."
+                                        emptyText="No profession found."
+                                        className="bg-input"
+                                    />
                                 </div>
                                 {/* --- END OF NEW FIELD --- */}
 
@@ -111,11 +158,14 @@ export default function SignupPage() {
                                     size="lg"
                                     onClick={async () => {
                                         try {
+                                            // Find the selected profession label from the value
+                                            const selectedProfession = PROFESSIONS.find(p => p.value === profession)?.label || "";
+                                            
                                             const userData = {
                                                 name: (document.getElementById("firstName") as HTMLInputElement).value + " " + (document.getElementById("lastName") as HTMLInputElement).value,
                                                 email: (document.getElementById("email") as HTMLInputElement).value,
-                                                // Get profession from the new input field
-                                                profession: (document.getElementById("profession") as HTMLInputElement).value,
+                                                // Get profession from the state
+                                                profession: selectedProfession,
                                                 password: (document.getElementById("password") as HTMLInputElement).value,
                                             };
                                             
