@@ -19,6 +19,7 @@ export interface LoginRequestType {
 
 // Define the type for the login response data from the backend.
 export interface LoginResponse {
+    id: number;
     name: string;
     email: string;
     profession: string;

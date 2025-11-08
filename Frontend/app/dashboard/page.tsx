@@ -26,10 +26,22 @@ import {
   X,
 } from "lucide-react"
 import Link from "next/link"
-import { LoginResponse } from "@/app/login/page" // Re-use login interface
 import { Textarea } from "@/components/ui/textarea" // Import Textarea
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import { 
+  LoginResponse, 
+  Connection,
+  UserProfileResponse,
+  sendConnectionRequest,
+  acceptConnectionRequest,
+  declineConnectionRequest,
+  getPendingRequests,
+  getSentPendingRequests,
+  cancelConnectionRequest,
+  getAcceptedConnections,
+  getUsersByProfession
+} from "@/lib/api"
 
 
 // --- Define User Types ---
@@ -50,79 +62,7 @@ interface ProfileData {
     bio: string;
 }
 
-// --- Mock data for community members (REMAINS MOCKED FOR NOW) ---
-const communityMembers = [
-  {
-    id: "2",
-    name: "Sarah Chen",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Boston, MA",
-    university: "MIT",
-    major: "Computer Science",
-    year: "Junior",
-    mutualConnections: 5,
-    status: "none", // none, pending, connected
-  },
-  {
-    id: "3",
-    name: "Marcus Williams",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Stanford, CA",
-    university: "Stanford University",
-    major: "Business Administration",
-    year: "Senior",
-    mutualConnections: 3,
-    status: "none",
-  },
-  {
-    id: "4",
-    name: "Emily Rodriguez",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Austin, TX",
-    university: "UT Austin",
-    major: "Psychology",
-    year: "Sophomore",
-    mutualConnections: 8,
-    status: "pending",
-  },
-  {
-    id: "5",
-    name: "David Kim",
-    community: "student",
-    avatar: "/placeholder.svg?height=60&width=60",
-    location: "Seattle, WA",
-    university: "University of Washington",
-    major: "Engineering",
-    year: "Graduate",
-    mutualConnections: 2,
-    status: "connected",
-  },
-]
-
-const pendingRequests = [
-  {
-    id: "6",
-    name: "Jessica Park",
-    community: "student",
-    avatar: "/placeholder.svg?height=50&width=50",
-    university: "UCLA",
-    major: "Art History",
-    mutualConnections: 4,
-  },
-  {
-    id: "7",
-    name: "Ryan Thompson",
-    community: "student",
-    avatar: "/placeholder.svg?height=50&width=50",
-    university: "NYU",
-    major: "Film Studies",
-    mutualConnections: 1,
-  },
-]
-// --- End Mock Data ---
+// --- End User Types ---
 
 
 const communityIcons = {
@@ -142,8 +82,12 @@ const communityColors = {
 }
 
 export default function DashboardPage() {
-  const [members, setMembers] = useState(communityMembers)
+  const [members, setMembers] = useState<UserProfileResponse[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [pendingRequests, setPendingRequests] = useState<Connection[]>([])
+  const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([])
+  const [connections, setConnections] = useState<Connection[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
 
   // --- Auth & Profile State ---
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
@@ -162,7 +106,7 @@ export default function DashboardPage() {
         name: user.name,
         community: user.profession,
         avatar: "/placeholder.svg?height=40&width=40",
-        pendingRequests: 3, // Mocked
+        pendingRequests: 0, // Will be updated after fetching
       });
       
       setProfileData({
@@ -170,14 +114,76 @@ export default function DashboardPage() {
         email: user.email,
         profession: user.profession,
         location: "New York, NY", // Mocked
-        connections: 42, // Mocked
-        bio: "Passionate computer science student specializing in AI and machine learning. Eager to connect with fellow students!",
+        connections: 0, // Will be updated after fetching
+        bio: "Passionate about my field and eager to connect with fellow professionals!",
       });
+
+      // Fetch pending requests and accepted connections
+      fetchPendingRequests(user.id);
+      fetchSentPendingRequests(user.id);
+      fetchAcceptedConnections(user.id);
+      // Fetch users by profession
+      fetchUsersByProfession(user.profession);
 
       setAuthLoading(false);
     }
   }, [router]);
   // --- End Auth & Profile State ---
+
+  // Fetch users by profession
+  const fetchUsersByProfession = async (profession: string) => {
+    setIsLoadingMembers(true);
+    try {
+      const users = await getUsersByProfession(profession);
+      // Filter out the current user
+      const userDataString = sessionStorage.getItem('user');
+      if (userDataString) {
+        const currentUser: LoginResponse = JSON.parse(userDataString);
+        const filteredUsers = users.filter(user => user.id !== currentUser.id);
+        setMembers(filteredUsers);
+      } else {
+        setMembers(users);
+      }
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  // Fetch pending requests
+  const fetchPendingRequests = async (userId: number) => {
+    try {
+      const requests = await getPendingRequests(userId);
+      setPendingRequests(requests);
+      // Update the pending requests count in currentUser
+      setCurrentUser((prev: CurrentUser | null) => prev ? { ...prev, pendingRequests: requests.length } : null);
+    } catch (error) {
+      console.error("Failed to fetch pending requests:", error);
+    }
+  };
+
+  // Fetch sent pending requests
+  const fetchSentPendingRequests = async (userId: number) => {
+    try {
+      const requests = await getSentPendingRequests(userId);
+      setSentPendingRequests(requests);
+    } catch (error) {
+      console.error("Failed to fetch sent pending requests:", error);
+    }
+  };
+
+  // Fetch accepted connections
+  const fetchAcceptedConnections = async (userId: number) => {
+    try {
+      const conns = await getAcceptedConnections(userId);
+      setConnections(conns);
+      // Update the connections count in profileData
+      setProfileData((prev: ProfileData | null) => prev ? { ...prev, connections: conns.length } : null);
+    } catch (error) {
+      console.error("Failed to fetch accepted connections:", error);
+    }
+  };
 
 
   // --- Bio Edit State & Handlers ---
@@ -204,24 +210,101 @@ export default function DashboardPage() {
   // --- End Bio Edit State ---
 
 
-  // --- Mocked Handlers ---
-  const handleSendRequest = (memberId: string) => {
-    setMembers(members.map((member) => (member.id === memberId ? { ...member, status: "pending" } : member)))
+  // --- Connection Handlers ---
+  const handleSendRequest = async (memberId: number) => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return;
+    
+    const user: LoginResponse = JSON.parse(userDataString);
+    try {
+      await sendConnectionRequest(user.id, memberId);
+      // Refetch sent pending requests to update the UI
+      fetchSentPendingRequests(user.id);
+      console.log("Connection request sent successfully");
+    } catch (error) {
+      console.error("Failed to send connection request:", error);
+    }
   }
-  const handleAcceptRequest = (memberId: string) => {
-    console.log(`Accepted request from ${memberId}`)
+  
+  const handleCancelRequest = async (connectionId: number) => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return;
+    
+    const user: LoginResponse = JSON.parse(userDataString);
+    try {
+      await cancelConnectionRequest(connectionId);
+      // Refetch sent pending requests to update the UI
+      fetchSentPendingRequests(user.id);
+      console.log("Connection request canceled successfully");
+    } catch (error) {
+      console.error("Failed to cancel connection request:", error);
+    }
   }
-  const handleDeclineRequest = (memberId: string) => {
-    console.log(`Declined request from ${memberId}`)
+  
+  const handleAcceptRequest = async (connectionId: number) => {
+    try {
+      await acceptConnectionRequest(connectionId);
+      // Remove from pending requests
+      setPendingRequests(pendingRequests.filter(req => req.id !== connectionId));
+      // Refetch connections and users to update the discover tab
+      const userDataString = sessionStorage.getItem('user');
+      if (userDataString) {
+        const user: LoginResponse = JSON.parse(userDataString);
+        fetchAcceptedConnections(user.id);
+        // Refetch users to update the discover list
+        fetchUsersByProfession(user.profession);
+      }
+    } catch (error) {
+      console.error("Failed to accept connection request:", error);
+    }
   }
-  // --- End Mocked Handlers ---
+  
+  const handleDeclineRequest = async (connectionId: number) => {
+    try {
+      await declineConnectionRequest(connectionId);
+      // Remove from pending requests
+      setPendingRequests(pendingRequests.filter(req => req.id !== connectionId));
+    } catch (error) {
+      console.error("Failed to decline connection request:", error);
+    }
+  }
+  // --- End Connection Handlers ---
 
-  const filteredMembers = members.filter(
-    (member) =>
+  // Helper function to get connection status for a user
+  const getConnectionStatus = (userId: number): { status: 'none' | 'pending' | 'connected', connectionId?: number } => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) return { status: 'none' };
+    const currentUser: LoginResponse = JSON.parse(userDataString);
+
+    // Check if I sent a pending request to this user
+    const sentRequest = sentPendingRequests.find(
+      req => req.requester.id === currentUser.id && req.receiver.id === userId
+    );
+    if (sentRequest) return { status: 'pending', connectionId: sentRequest.id };
+
+    // Check if already connected
+    const isConnected = connections.some(
+      conn => (conn.requester.id === currentUser.id && conn.receiver.id === userId) ||
+              (conn.receiver.id === currentUser.id && conn.requester.id === userId)
+    );
+    if (isConnected) return { status: 'connected' };
+
+    return { status: 'none' };
+  };
+
+  const filteredMembers = members.filter((member) => {
+    // First apply search filter
+    const matchesSearch = 
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.university.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.major.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.profession.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    // Filter out users who are already connected
+    const { status } = getConnectionStatus(member.id);
+    return status !== 'connected';
+  });
 
   if (authLoading || !currentUser || !profileData) {
     return (
@@ -353,142 +436,157 @@ export default function DashboardPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search students by name, university, or major..."
+                    placeholder="Search by name, email, or profession..."
                     className="pl-10 bg-input"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <h2 className="text-2xl font-serif font-bold text-foreground">Discover Fellow Students</h2>
-                <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-6">
-                  {filteredMembers.map((member) => (
-                    <StaggerItem key={member.id}>
-                      <Card className="hover:shadow-md transition-shadow">
-                        <CardHeader>
-                          <div className="flex items-start space-x-4">
-                            <Avatar className="w-16 h-16">
-                              <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name} />
-                              <AvatarFallback>
-                                {member.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
-                              <CardDescription className="space-y-1">
-                                <div className="flex items-center space-x-1">
-                                  <MapPin className="w-3 h-3" />
-                                  <span>{member.location}</span>
+                <h2 className="text-2xl font-serif font-bold text-foreground">Discover People in Your Field</h2>
+                {isLoadingMembers ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading...</p>
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No users found in your profession yet.</p>
+                  </div>
+                ) : (
+                  <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-6">
+                    {filteredMembers.map((member) => {
+                      const connectionStatus = getConnectionStatus(member.id);
+                      return (
+                        <StaggerItem key={member.id}>
+                          <Card className="hover:shadow-md transition-shadow">
+                            <CardHeader>
+                              <div className="flex items-start space-x-4">
+                                <Avatar className="w-16 h-16">
+                                  <AvatarImage src="/placeholder.svg" alt={member.name} />
+                                  <AvatarFallback>
+                                    {member.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <CardTitle className="font-serif text-lg">{member.name}</CardTitle>
+                                  <CardDescription className="space-y-1">
+                                    <div className="font-medium">{member.profession}</div>
+                                    <div className="text-sm">{member.email}</div>
+                                  </CardDescription>
                                 </div>
-                                <div>{member.university}</div>
-                                <div className="font-medium">
-                                  {member.major} • {member.year}
-                                </div>
-                              </CardDescription>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              {member.mutualConnections} mutual connections
-                            </span>
-                            {member.status === "none" && (
-                              <Button size="sm" onClick={() => handleSendRequest(member.id)}>
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                Connect
-                              </Button>
-                            )}
-                            {member.status === "pending" && (
-                              <Button size="sm" variant="outline" disabled>
-                                <Clock className="w-4 h-4 mr-2" />
-                                Pending
-                              </Button>
-                            )}
-                            {member.status === "connected" && (
-                              <Button size="sm" variant="outline">
-                                <MessageCircle className="w-4 h-4 mr-2" />
-                                Message
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </StaggerItem>
-                  ))}
-                </StaggerContainer>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex items-center justify-end">
+                                {connectionStatus.status === 'none' && (
+                                  <Button size="sm" onClick={() => handleSendRequest(member.id)}>
+                                    <UserPlus className="w-4 h-4 mr-2" />
+                                    Connect
+                                  </Button>
+                                )}
+                                {connectionStatus.status === 'pending' && connectionStatus.connectionId && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => handleCancelRequest(connectionStatus.connectionId!)}
+                                  >
+                                    <X className="w-4 h-4 mr-2" />
+                                    Cancel Request
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </StaggerItem>
+                      );
+                    })}
+                  </StaggerContainer>
+                )}
               </TabsContent>
 
               <TabsContent value="requests" className="space-y-6">
                 <h2 className="text-2xl font-serif font-bold text-foreground">Connection Requests</h2>
                 <StaggerContainer stagger={0.1} className="space-y-4">
-                  {pendingRequests.map((request) => (
-                    <StaggerItem key={request.id}>
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <Avatar className="w-12 h-12">
-                                <AvatarImage src={request.avatar || "/placeholder.svg"} alt={request.name} />
-                                <AvatarFallback>
-                                  {request.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <h3 className="font-serif font-semibold">{request.name}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.university} • {request.major}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {request.mutualConnections} mutual connections
-                                </p>
+                  {pendingRequests.map((request) => {
+                    const requesterName = request.requester?.name || "Unknown User";
+                    return (
+                      <StaggerItem key={request.id}>
+                        <Card>
+                          <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <Avatar className="w-12 h-12">
+                                  <AvatarImage src="/placeholder.svg" alt={requesterName} />
+                                  <AvatarFallback>
+                                    {requesterName
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h3 className="font-serif font-semibold">{requesterName}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.requester?.profession || "N/A"}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.requester?.email || "N/A"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex space-x-2">
+                                <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>
+                                  <UserCheck className="w-4 h-4 mr-2" />
+                                  Accept
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleDeclineRequest(request.id)}>
+                                  <UserX className="w-4 h-4 mr-2" />
+                                  Decline
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" onClick={() => handleAcceptRequest(request.id)}>
-                                <UserCheck className="w-4 h-4 mr-2" />
-                                Accept
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeclineRequest(request.id)}>
-                                <UserX className="w-4 h-4 mr-2" />
-                                Decline
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </StaggerItem>
-                  ))}
+                          </CardContent>
+                        </Card>
+                      </StaggerItem>
+                    );
+                  })}
                 </StaggerContainer>
               </TabsContent>
 
               <TabsContent value="connections" className="space-y-6">
                 <h2 className="text-2xl font-serif font-bold text-foreground">
-                  My Connections ({profileData.connections})
+                  My Connections ({connections.length})
                 </h2>
                 <StaggerContainer stagger={0.1} className="grid md:grid-cols-2 gap-4">
-                  {members
-                    .filter((member) => member.status === "connected")
-                    .map((connection) => (
+                  {connections.map((connection) => {
+                    const userDataString = sessionStorage.getItem('user');
+                    if (!userDataString) return null;
+                    const currentLoggedInUser: LoginResponse = JSON.parse(userDataString);
+                    
+                    // Determine which user to display (the other person in the connection)
+                    const otherUser = connection.requester.id === currentLoggedInUser.id 
+                      ? connection.receiver 
+                      : connection.requester;
+                    
+                    const otherUserName = otherUser?.name || "Unknown User";
+                    
+                    return (
                       <StaggerItem key={connection.id}>
                         <Card className="hover:shadow-md transition-shadow">
                           <CardContent className="p-4 text-center">
                             <Avatar className="w-16 h-16 mx-auto mb-3">
-                              <AvatarImage src={connection.avatar || "/placeholder.svg"} alt={connection.name} />
+                              <AvatarImage src="/placeholder.svg" alt={otherUserName} />
                               <AvatarFallback>
-                                {connection.name
+                                {otherUserName
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <h3 className="font-serif font-semibold mb-1">{connection.name}</h3>
-                            <p className="text-sm text-muted-foreground mb-3">{connection.university}</p>
+                            <h3 className="font-serif font-semibold mb-1">{otherUserName}</h3>
+                            <p className="text-sm text-muted-foreground mb-3">{otherUser?.profession || "N/A"}</p>
                             <Button size="sm" variant="outline" className="w-full bg-transparent">
                               <MessageCircle className="w-4 h-4 mr-2" />
                               Message
@@ -496,7 +594,8 @@ export default function DashboardPage() {
                           </CardContent>
                         </Card>
                       </StaggerItem>
-                    ))}
+                    );
+                  })}
                 </StaggerContainer>
               </TabsContent>
             </Tabs>
