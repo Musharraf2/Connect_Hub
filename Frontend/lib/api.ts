@@ -10,9 +10,17 @@ export interface RegistrationRequestType {
 
 // Define the request body type
 export interface ProfileUpdatePayload {
-    name?: string;
-    location?: string;
-    aboutMe?: string;
+    name?: string;
+    location?: string;
+    aboutMe?: string;
+    university?: string;
+    major?: string;
+    year?: string;
+    gpa?: string;
+    skills?: string[];
+    interests?: string[];
+    connectionsCount?: number;
+    pendingRequestsCount?: number;
 }
 
 // Define the full UserProfile response type (must match backend User model)
@@ -117,12 +125,48 @@ export interface UserProfile {
     // Add other fields you need
 }
 
+// Add these new types in lib/api.ts
+
+export interface AcademicInfo {
+  id: number;
+  userId: number;
+  university: string;
+  major: string;
+  year: string;
+  gpa: string;
+}
+
+export interface Skill {
+  id: number;
+  userId: number;
+  skill: string;
+}
+
+export interface Interest {
+  id: number;
+  userId: number;
+  interest: string;
+}
+
+
+// This matches your new backend DTO
+export interface UserProfileDetailResponse {
+  id: number;
+  name: string;
+  email: string;
+  profession: string;
+  location: string | null;
+  aboutMe: string | null;
+  academicInfo: AcademicInfo | null;
+  skills: Skill[];
+  interests: Interest[];
+}
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080/api";
 
-export async function getUserProfile(userId: number): Promise<UserProfileResponse> {
+export async function getUserProfile(userId: number): Promise<UserProfileDetailResponse> { // <-- 1. Change return type
     const res = await fetch(`${BASE}/users/${userId}`, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to fetch profile");
-    return res.json();
+    return res.json(); // <-- 2. This now returns the new DTO
 }
 
 export async function updateProfile(

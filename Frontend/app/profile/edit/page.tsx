@@ -93,13 +93,13 @@ export default function EditProfilePage() {
                     location: profile.location ?? "",
                     aboutMe: profile.aboutMe ?? "",
                     // UI-only fields (persist later when backend supports them)
+                    university: profile.academicInfo?.university ?? "",
+                    major: profile.academicInfo?.major ?? "",
+                    year: profile.academicInfo?.year ?? "",
+                    gpa: profile.academicInfo?.gpa ?? "",
+                    skills: profile.skills.map(s => s.skill),
+                    interests: profile.interests.map(i => i.interest),
                     phone: "",
-                    university: "",
-                    major: "",
-                    year: "",
-                    gpa: "",
-                    skills: [],       // TODO: wire to backend table/JSON
-                    interests: [],    // TODO: wire to backend table/JSON
                     avatar: "/placeholder.svg?height=120&width=120",
                     community: profile.profession ?? "",
                     pendingRequests: 0,
@@ -159,7 +159,14 @@ export default function EditProfilePage() {
         const payload: ProfileUpdatePayload = {
             name: user.name,
             location: user.location,
-            aboutMe: user.aboutMe, // This matches your state
+            aboutMe: user.aboutMe,
+            // Add all the other fields from your state
+            university: user.university,
+            major: user.major,
+            year: user.year,
+            gpa: user.gpa,
+            skills: user.skills,
+            interests: user.interests
         };
 
         setSaving(true);
@@ -170,13 +177,8 @@ export default function EditProfilePage() {
             const updatedUser: UserProfileResponse = await updateProfile(user.id, payload);
 
             // 4. Update session storage with the new data
-            sessionStorage.setItem("user", JSON.stringify({
-                id: updatedUser.id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                profession: updatedUser.profession
-            }));
-            
+            sessionStorage.setItem("user", JSON.stringify(updatedUser));
+
             toast.dismiss();
             toast.success("Profile updated!");
             router.push("/profile"); // Use router to navigate
