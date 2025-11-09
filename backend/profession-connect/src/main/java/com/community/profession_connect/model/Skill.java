@@ -1,4 +1,4 @@
-package com.community.profession_connect.Entity;
+package com.community.profession_connect.model;
 
 import jakarta.persistence.*;
 import lombok.Data;

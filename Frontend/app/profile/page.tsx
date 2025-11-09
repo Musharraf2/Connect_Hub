@@ -4,7 +4,14 @@ import { useState, useEffect } from "react" // Import hooks
 import { useRouter } from "next/navigation" // Import router
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import toast from "react-hot-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  getUserProfile,
+  UserProfileResponse,
+  updateProfile, // <-- ADD THIS
+  ProfileUpdatePayload, // <-- ADD THIS
+} from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
@@ -34,10 +41,11 @@ import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations
 
 // This is our MOCKED data. We will merge session data into this.
 const profileMockData = {
-  id: "1",
+  id: 1,
   name: "Mock User",
   email: "mock@email.com",
   phone: "+1 (555) 123-4567",
+  profession: "student",
   community: "student",
   avatar: "/placeholder.svg?height=120&width=120",
   coverImage: "/placeholder.svg?height=200&width=800",
@@ -68,7 +76,34 @@ const profileMockData = {
 }
 
 // Define the full user type
-type CurrentUser = typeof profileMockData;
+// Define the full user type based on our new API response
+type CurrentUser = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string; // from mock
+  profession: string;
+  community: string;
+  avatar: string; // from mock
+  coverImage: string; // from mock
+  location: string;
+  joinDate: string; // from mock
+  connections: number; // from mock
+  pendingRequests: number; // from mock
+  bio: string;
+  
+  // REAL DATA FROM API
+  university: string;
+  major: string;
+  year: string;
+  gpa: string;
+  skills: string[]; // We will map the Skill[] objects to string[]
+  interests: string[]; // We will map the Interest[] objects to string[]
+
+  // from mock
+  achievements: string[];
+  projects: { title: string; description: string; tech: string[]; }[];
+};
 
 const communityIcons = {
   student: BookOpen,
@@ -97,25 +132,63 @@ export default function ProfilePage() {
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
 
-  useEffect(() => {
+ useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
     if (!userDataString) {
       router.push('/login');
-    } else {
-      const sessionUser: LoginResponse = JSON.parse(userDataString);
-
-      // Merge real session data with mock data
-      setCurrentUser({
-        ...profileMockData, // Start with all the mock data
-        name: sessionUser.name,     // Overwrite with real data
-        email: sessionUser.email,   // Overwrite with real data
-        community: sessionUser.profession, // Overwrite with real data
-      });
-
-      setAuthLoading(false);
+      return; // Stop execution
     }
-  }, [router]);
 
+    const sessionUser: UserProfileResponse = JSON.parse(userDataString);
+    if (!sessionUser?.id) {
+        router.push('/login');
+        return; // Stop execution
+    }
+
+    // Fetch the REAL profile data
+    (async () => {
+      try {
+        // 1. Fetch the most up-to-date profile from the database
+        const profile = await getUserProfile(sessionUser.id);
+
+        // 2. Merge real data with mock data (for fields you haven't built yet)
+        setCurrentUser({
+          ...profileMockData, // Use mock for projects, achievements, etc.
+          
+          // --- REAL USER DATA ---
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          profession: profile.profession,
+          community: profile.profession,
+          location: profile.location ?? "No location set",
+          bio: profile.aboutMe ?? "No bio set",
+
+          // --- REAL ACADEMIC DATA ---
+          university: profile.academicInfo?.university ?? "Not specified",
+          major: profile.academicInfo?.major ?? "Not specified",
+          year: profile.academicInfo?.year ?? "Not specified",
+          gpa: profile.academicInfo?.gpa ?? "Not specified",
+
+          // --- REAL SKILLS & INTERESTS ---
+          // Map the {id, skill} objects to simple strings
+          skills: profile.skills.map(s => s.skill),
+          interests: profile.interests.map(i => i.interest),
+
+          connections: (profile as any).connectionsCount ?? (profile as any).connections ?? (profile as any).totalConnections ?? 0,
+          pendingRequests: (profile as any).pendingRequestsCount ?? (profile as any).pendingRequests ?? 0,
+        });
+
+      } catch (error) {
+        console.error("Failed to fetch profile", error);
+        toast.error("Could not load profile. Logging out.");
+        router.push('/login'); // Failed to load, send to login
+      } finally {
+        setAuthLoading(false);
+      }
+    })();
+
+  }, [router]);
   // --- Bio Edit State & Handlers ---
   const [isEditingBio, setIsEditingBio] = useState(false)
   const [bioText, setBioText] = useState(currentUser?.bio || "") // Use currentUser
@@ -128,11 +201,37 @@ export default function ProfilePage() {
       }
   }, [currentUser]);
 
-  const handleSaveBio = () => {
-      setBioText(tempBioText)
-      // We would also update the currentUser state if it were fully dynamic
-      setIsEditingBio(false)
-  }
+ const handleSaveBio = async () => { // Make it async
+    if (!currentUser) return;
+
+    // Show a loading toast
+    const toastId = toast.loading("Saving bio...");
+    
+    const payload: ProfileUpdatePayload = {
+      aboutMe: tempBioText, // Only send the new bio
+    };
+
+    try {
+      // Call the API
+      const updatedUser = await updateProfile(currentUser.id, payload);
+
+      // Update the main currentUser state
+      setCurrentUser({ ...currentUser, bio: updatedUser.aboutMe ?? "" });
+
+      // Update the local bio text state
+      setBioText(updatedUser.aboutMe ?? "");
+
+      // Update session storage so it persists after a refresh
+      sessionStorage.setItem("user", JSON.stringify(updatedUser));
+
+      toast.success("Bio updated!", { id: toastId });
+    } catch (error) {
+      console.error("Failed to save bio", error);
+      toast.error("Could not save bio.", { id: toastId });
+    } finally {
+      setIsEditingBio(false);
+    }
+  };
 
   const handleCancelBio = () => {
       setTempBioText(bioText)
@@ -228,7 +327,6 @@ export default function ProfilePage() {
                   <TabsTrigger value="about">About</TabsTrigger>
                   <TabsTrigger value="projects">Projects</TabsTrigger>
                   <TabsTrigger value="activity">Activity</TabsTrigger>
-                  <TabsTrigger value="connections">Connections</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="about" className="space-y-6">
@@ -374,23 +472,6 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
                 </TabsContent>
-
-                <TabsContent value="connections" className="space-y-6">
-                  <Card className="bg-card/50 rounded-2xl border">
-                    <CardHeader>
-                      <CardTitle className="font-serif">My Connections ({currentUser.connections})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Your connections will appear here</p>
-                        <Button variant="outline" className="mt-4 bg-transparent" asChild>
-                          <Link href="/dashboard">Discover People</Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
               </Tabs>
             </FadeInUp>
           </section>
@@ -434,32 +515,6 @@ export default function ProfilePage() {
                         </StaggerItem>
                       ))}
                     </StaggerContainer>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card/50 rounded-2xl border">
-                  <CardHeader>
-                    <CardTitle className="font-serif">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start bg-transparent" asChild>
-                      <Link href="/profile/edit">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Profile
-                      </Link>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent" asChild>
-                      <Link href="/profile/settings">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Account Settings
-                      </Link>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent" asChild>
-                      <Link href="/dashboard">
-                        <Users className="w-4 h-4 mr-2" />
-                        Find Connections
-                      </Link>
-                    </Button>
                   </CardContent>
                 </Card>
               </FadeInUp>

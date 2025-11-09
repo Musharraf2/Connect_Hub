@@ -1,4 +1,4 @@
-package com.community.profession_connect.Entity;
+package com.community.profession_connect.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -11,7 +11,9 @@ public class AcademicInfo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true) // Each user should only have one academic info row
     private Long userId;
+
     private String university;
     private String major;
     private String year;

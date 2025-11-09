@@ -3,7 +3,7 @@ package com.community.profession_connect.controller;
 import com.community.profession_connect.dto.LoginRequest;
 import com.community.profession_connect.dto.LoginResponse;
 import com.community.profession_connect.dto.RegistrationRequest;
-// import com.community.profession_connect.dto.UserDashboardResponse;
+import com.community.profession_connect.dto.UserProfileDetailResponse; // <-- IMPORT THIS
 import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.UserService;
@@ -30,6 +30,7 @@ public class UserController {
         String message = userService.registerUser(request);
         return ResponseEntity.ok(message);
     }
+
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         LoginResponse response = userService.loginUser(request);
@@ -40,6 +41,7 @@ public class UserController {
             return ResponseEntity.badRequest().build();
         }
     }
+
     @GetMapping("/by-profession")
     public ResponseEntity<List<User>> getUsersByProfession(@RequestParam String profession) {
         List<User> users = userService.getUsersByProfession(profession);
@@ -50,17 +52,17 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<User> getUserProfile(@PathVariable Long userId) {
-        // In a real application, you'd verify the request's user is authorized to view this profile.
+    public ResponseEntity<UserProfileDetailResponse> getUserProfile(@PathVariable Long userId) { // <-- Use new DTO
         try {
-            User user = userService.getUserById(userId);
-            return ResponseEntity.ok(user);
-        } catch (RuntimeException e) { // Assuming UserService throws a clear exception if not found
+            // This now returns our new DTO
+            UserProfileDetailResponse profile = userService.getUserById(userId);
+            return ResponseEntity.ok(profile);
+        } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    @PutMapping("/{userId}") // Use PUT for full update or PATCH for partial
+    @PutMapping("/{userId}")
     public ResponseEntity<User> updateProfile(@PathVariable Long userId, @RequestBody UserProfileUpdateRequest updateRequest) {
         try {
             User updatedUser = userService.updateUserProfile(userId, updateRequest);
@@ -70,4 +72,3 @@ public class UserController {
         }
     }
 }
-
