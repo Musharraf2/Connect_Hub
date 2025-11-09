@@ -8,6 +8,24 @@ export interface RegistrationRequestType {
     profession: string;
 }
 
+// Define the request body type
+export interface ProfileUpdatePayload {
+    name?: string;
+    location?: string;
+    aboutMe?: string;
+}
+
+// Define the full UserProfile response type (must match backend User model)
+export interface UserProfile {
+    id: number;
+    name: string;
+    profession: string;
+    email: string;
+    location: string;
+    aboutMe: string; // Ensure this is present
+    // ... other fields
+}
+
 // Define the type for the login request data
 export interface LoginRequestType {
     email: string;
@@ -26,8 +44,10 @@ export interface LoginResponse {
 export interface UserProfileResponse {
     id: number;
     name: string;
-    profession: string;
     email: string;
+    profession: string;
+    aboutMe?: string | null;
+    location?: string | null;
 }
 
 // Define the type for Connection from backend
@@ -85,6 +105,41 @@ export interface CommentResponse {
     };
     createdAt: string;
 }
+
+// Define the full User type structure (only showing relevant fields for profile)
+export interface UserProfile {
+    id: number;
+    name: string;
+    email: string;
+    profession: string;
+    location: string;
+    aboutMe: string; // Add this field
+    // Add other fields you need
+}
+
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080/api";
+
+export async function getUserProfile(userId: number): Promise<UserProfileResponse> {
+    const res = await fetch(`${BASE}/users/${userId}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch profile");
+    return res.json();
+}
+
+export async function updateProfile(
+    userId: number,
+    payload: ProfileUpdatePayload
+): Promise<UserProfileResponse> {
+    const res = await fetch(`${BASE}/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Failed to update profile");
+    return res.json();
+}
+
+
+
 
 
 // This function sends the registration data to your Spring backend.

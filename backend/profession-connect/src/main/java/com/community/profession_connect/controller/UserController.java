@@ -4,6 +4,7 @@ import com.community.profession_connect.dto.LoginRequest;
 import com.community.profession_connect.dto.LoginResponse;
 import com.community.profession_connect.dto.RegistrationRequest;
 // import com.community.profession_connect.dto.UserDashboardResponse;
+import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,27 @@ public class UserController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<User> getUserProfile(@PathVariable Long userId) {
+        // In a real application, you'd verify the request's user is authorized to view this profile.
+        try {
+            User user = userService.getUserById(userId);
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) { // Assuming UserService throws a clear exception if not found
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{userId}") // Use PUT for full update or PATCH for partial
+    public ResponseEntity<User> updateProfile(@PathVariable Long userId, @RequestBody UserProfileUpdateRequest updateRequest) {
+        try {
+            User updatedUser = userService.updateUserProfile(userId, updateRequest);
+            return ResponseEntity.ok(updatedUser);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
 

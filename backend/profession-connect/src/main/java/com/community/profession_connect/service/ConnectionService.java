@@ -1,3 +1,4 @@
+// /backend/profession-connect/src/main/java/com/community/profession_connect/service/ConnectionService.java
 package com.community.profession_connect.service;
 
 import com.community.profession_connect.dto.ConnectionResponse;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects; // <-- ADDED IMPORT
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,11 @@ public class ConnectionService {
     private UserRepository userRepository;
 
     public String sendConnectionRequest(Long requesterId, Long receiverId) {
+        // --- FIX: Check for nulls first ---
+        Objects.requireNonNull(requesterId, "Requester ID must not be null");
+        Objects.requireNonNull(receiverId, "Receiver ID must not be null");
+        // --- END FIX ---
+
         Optional<User> requesterOpt = userRepository.findById(requesterId);
         Optional<User> receiverOpt = userRepository.findById(receiverId);
 
@@ -53,6 +60,9 @@ public class ConnectionService {
     }
 
     public String acceptConnectionRequest(Long connectionId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(connectionId, "Connection ID must not be null");
+        
         Optional<Connection> connectionOpt = connectionRepository.findById(connectionId);
 
         if (connectionOpt.isEmpty()) {
@@ -72,6 +82,9 @@ public class ConnectionService {
     }
 
     public String declineConnectionRequest(Long connectionId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(connectionId, "Connection ID must not be null");
+
         Optional<Connection> connectionOpt = connectionRepository.findById(connectionId);
 
         if (connectionOpt.isEmpty()) {
@@ -83,6 +96,9 @@ public class ConnectionService {
     }
 
     public List<ConnectionResponse> getPendingRequests(Long receiverId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(receiverId, "Receiver ID must not be null");
+
         Optional<User> receiverOpt = userRepository.findById(receiverId);
 
         if (receiverOpt.isEmpty()) {
@@ -98,6 +114,9 @@ public class ConnectionService {
     }
 
     public List<ConnectionResponse> getSentPendingRequests(Long requesterId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(requesterId, "Requester ID must not be null");
+
         Optional<User> requesterOpt = userRepository.findById(requesterId);
 
         if (requesterOpt.isEmpty()) {
@@ -113,6 +132,9 @@ public class ConnectionService {
     }
 
     public List<ConnectionResponse> getAcceptedConnections(Long userId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(userId, "User ID must not be null");
+
         Optional<User> userOpt = userRepository.findById(userId);
 
         if (userOpt.isEmpty()) {

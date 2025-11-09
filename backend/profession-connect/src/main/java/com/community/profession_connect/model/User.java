@@ -22,4 +22,12 @@ public class User {
     private String password;
 
     private String profession;
+
+    private String aboutMe; // <-- This is the key field you need!
+    private String location; // <-- You likely need this for the location shown in the image.
+
+    public void setName(String name) { this.name = name; }
+    public void setLocation(String location) { this.location = location; }
+    public void setAboutMe(String aboutMe) { this.aboutMe = aboutMe; }
+
 }

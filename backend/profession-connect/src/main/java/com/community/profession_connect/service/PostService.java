@@ -1,3 +1,4 @@
+// /backend/profession-connect/src/main/java/com/community/profession_connect/service/PostService.java
 package com.community.profession_connect.service;
 
 import com.community.profession_connect.dto.CommentRequest;
@@ -16,8 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+// import java.util.ArrayList; // <-- FIX: REMOVED UNUSED IMPORT
 import java.util.List;
+import java.util.Objects; // <-- FIX: ADDED IMPORT
 import java.util.stream.Collectors;
 
 @Service
@@ -36,7 +38,10 @@ public class PostService {
     private PostLikeRepository postLikeRepository;
 
     public PostResponse createPost(PostRequest request) {
-        User user = userRepository.findById(request.getUserId())
+        // --- FIX: Check for null and satisfy nullness analyzer ---
+        Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
+        
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
         Post post = new Post();
@@ -46,7 +51,7 @@ public class PostService {
 
         post = postRepository.save(post);
 
-        return convertToPostResponse(post, request.getUserId());
+        return convertToPostResponse(post, userId);
     }
 
     public List<PostResponse> getPostsByProfession(String profession, Long currentUserId) {
@@ -58,6 +63,10 @@ public class PostService {
 
     @Transactional
     public String deletePost(Long postId, Long userId) {
+        // --- FIX: Check for nulls ---
+        Objects.requireNonNull(postId, "Post ID must not be null");
+        Objects.requireNonNull(userId, "User ID must not be null");
+
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new RuntimeException("Post not found"));
 
@@ -71,6 +80,10 @@ public class PostService {
 
     @Transactional
     public PostResponse toggleLike(Long postId, Long userId) {
+        // --- FIX: Check for nulls ---
+        Objects.requireNonNull(postId, "Post ID must not be null");
+        Objects.requireNonNull(userId, "User ID must not be null");
+
         Post post = postRepository.findById(postId)
             .orElseThrow(() -> new RuntimeException("Post not found"));
 
@@ -97,10 +110,14 @@ public class PostService {
     }
 
     public PostResponse addComment(CommentRequest request) {
-        Post post = postRepository.findById(request.getPostId())
+        // --- FIX: Check for nulls ---
+        Long postId = Objects.requireNonNull(request.getPostId(), "Post ID must not be null");
+        Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
+
+        Post post = postRepository.findById(postId)
             .orElseThrow(() -> new RuntimeException("Post not found"));
 
-        User user = userRepository.findById(request.getUserId())
+        User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
         Comment comment = new Comment();
@@ -110,10 +127,13 @@ public class PostService {
 
         commentRepository.save(comment);
 
-        return convertToPostResponse(post, request.getUserId());
+        return convertToPostResponse(post, userId);
     }
 
     public List<CommentResponse> getCommentsByPostId(Long postId) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(postId, "Post ID must not be null");
+
         List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
         return comments.stream()
             .map(this::convertToCommentResponse)
