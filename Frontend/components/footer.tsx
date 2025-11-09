@@ -3,15 +3,15 @@ import Link from "next/link"
 
 export function Footer() {
   return (
-    <footer className="bg-card border-t border-border py-12 px-4">
+    <footer className="bg-card/50 border-t border-border/50 py-12 px-4 backdrop-blur-sm">
       <div className="container mx-auto max-w-6xl">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-primary-foreground" />
+              <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-md">
+                <Users className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-serif font-bold text-foreground">ConnectHub</span>
+              <span className="text-xl font-serif font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">ConnectHub</span>
             </div>
             <p className="text-muted-foreground leading-relaxed max-w-md">
               The professional networking platform designed for domain-specific connections. Build meaningful

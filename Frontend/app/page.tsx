@@ -21,7 +21,7 @@ const communities = [
     description: "Connect with fellow learners, share study resources, and build academic networks",
     icon: BookOpen,
     members: "12.5K+",
-    color: "bg-blue-100 text-blue-700",
+    color: "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-transparent",
     image: "/diverse-students-library.png",
   },
   {
@@ -30,7 +30,7 @@ const communities = [
     description: "Collaborate with educators, share teaching methods, and inspire each other",
     icon: Users,
     members: "8.2K+",
-    color: "bg-green-100 text-green-700",
+    color: "bg-gradient-to-r from-green-500 to-green-600 text-white border-transparent",
     image: "/teachers-collaborating.png",
   },
   {
@@ -39,7 +39,7 @@ const communities = [
     description: "Jam with fellow artists, share compositions, and grow your musical network",
     icon: Music,
     members: "15.7K+",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-transparent",
     image: "/recording-studio-session.png",
   },
   {
@@ -48,7 +48,7 @@ const communities = [
     description: "Network with medical professionals, discuss cases, and advance healthcare",
     icon: Stethoscope,
     members: "6.9K+",
-    color: "bg-red-100 text-red-700",
+    color: "bg-gradient-to-r from-red-500 to-red-600 text-white border-transparent",
     image: "/placeholder-tzp81.png",
   },
   {
@@ -57,7 +57,7 @@ const communities = [
     description: "Move with the community, share choreography, and celebrate the art of dance",
     icon: Zap,
     members: "9.3K+",
-    color: "bg-yellow-100 text-yellow-700",
+    color: "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-transparent",
     image: "/diverse-dancers-studio.png",
   },
 ]
@@ -99,7 +99,7 @@ export default function LandingPage() {
         <div className="container mx-auto text-center max-w-4xl">
           <FadeInUp>
             <h1 className="text-5xl md:text-7xl font-serif font-bold text-foreground mb-6 leading-tight">
-              Connect, Collaborate, <span className="text-primary">Create</span>
+              Connect, Collaborate, <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Create</span>
             </h1>
           </FadeInUp>
           <FadeInUp delay={0.2}>
@@ -138,7 +138,7 @@ export default function LandingPage() {
               <StaggerItem key={index}>
                 <Card className="bg-card/50 h-full"> {/* Added h-full */}
                   <CardHeader>
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center mb-4 shadow-sm">
                       <feature.icon className="w-6 h-6 text-primary" />
                     </div>
                     <CardTitle className="text-xl font-serif">{feature.title}</CardTitle>
@@ -173,7 +173,7 @@ export default function LandingPage() {
                   className="h-full"
                 >
                   <Card
-                    className="group overflow-hidden h-full flex flex-col transition-all duration-300 ease-in-out border-2 hover:border-primary/20"
+                    className="group overflow-hidden h-full flex flex-col transition-all duration-300 ease-in-out border-2 hover:border-primary/30 hover:shadow-2xl"
                   >
                     <CardHeader className="p-0">
                       <div className="relative h-48 overflow-hidden">
@@ -194,7 +194,7 @@ export default function LandingPage() {
 
                     <CardContent className="p-6 flex flex-col flex-1"> {/* Added flex classes */}
                       <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full flex items-center justify-center shadow-sm">
                           <community.icon className="w-5 h-5 text-primary" />
                         </div>
                         <CardTitle className="text-xl font-serif">{community.title}</CardTitle>
@@ -221,7 +221,7 @@ export default function LandingPage() {
       <section className="py-24 px-4 overflow-hidden">
         <div className="container mx-auto max-w-5xl">
           <FadeIn>
-            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-12 md:p-16 text-center">
+            <div className="bg-gradient-to-br from-primary/5 via-secondary/5 to-primary/5 border-2 border-primary/20 rounded-3xl p-12 md:p-16 text-center shadow-xl">
               <h2 className="text-4xl font-serif font-bold mb-6">Ready to Connect with Your Community?</h2>
               <p className="text-xl mb-10 text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                 Join thousands of professionals who are already building meaningful connections in their domains.

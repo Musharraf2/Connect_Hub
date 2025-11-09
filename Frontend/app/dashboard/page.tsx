@@ -325,7 +325,7 @@ export default function DashboardPage() {
           <div className="sticky top-8 space-y-6">
             <FadeInUp>
               {/* User Profile Card - Now REAL data */}
-              <Card className="bg-card/50 rounded-2xl border">
+              <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                   <CardContent className="p-6">
                       <div className="text-center pb-4">
                           <Avatar className="w-24 h-24 mx-auto mb-4">
@@ -392,7 +392,7 @@ export default function DashboardPage() {
               </Card>
 
               {/* Community Stats Card (Mocked) */}
-              <Card className="bg-card/50 rounded-2xl border">
+              <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg font-serif">Community Stats</CardTitle>
                 </CardHeader>
@@ -457,7 +457,7 @@ export default function DashboardPage() {
                       const connectionStatus = getConnectionStatus(member.id);
                       return (
                         <StaggerItem key={member.id}>
-                          <Card className="hover:shadow-md transition-shadow">
+                          <Card className="hover:shadow-xl transition-all duration-200 border-2 border-border/50">
                             <CardHeader>
                               <div className="flex items-start space-x-4">
                                 <Avatar className="w-16 h-16">
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                     const requesterName = request.requester?.name || "Unknown User";
                     return (
                       <StaggerItem key={request.id}>
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-lg hover:shadow-xl transition-all duration-200">
                           <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-4">
@@ -574,7 +574,7 @@ export default function DashboardPage() {
                     
                     return (
                       <StaggerItem key={connection.id}>
-                        <Card className="hover:shadow-md transition-shadow">
+                        <Card className="hover:shadow-xl transition-all duration-200 border-2 border-border/50">
                           <CardContent className="p-4 text-center">
                             <Avatar className="w-16 h-16 mx-auto mb-3">
                               <AvatarImage src="/placeholder.svg" alt={otherUserName} />
