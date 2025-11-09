@@ -18,10 +18,10 @@ import toast from "react-hot-toast";
 // ---- API types & functions you already have in `@/lib/api` ----
 import {
     LoginResponse,
-    UserProfileResponse,     // should match your Spring User → id,name,email,profession,aboutMe,location
-    ProfileUpdatePayload,    // { name?: string; location?: string; aboutMe?: string; }
-    getUserProfile,          // (userId: number) => Promise<UserProfileResponse>
-    updateProfile,           // (userId: number, payload: ProfileUpdatePayload) => Promise<UserProfileResponse>
+    UserProfileResponse,    // should match your Spring User → id,name,email,profession,aboutMe,location
+    ProfileUpdatePayload,   // { name?: string; location?: string; aboutMe?: string; }
+    getUserProfile,         // (userId: number) => Promise<UserProfileResponse>
+    updateProfile,          // (userId: number, payload: ProfileUpdatePayload) => Promise<UserProfileResponse>
 } from "@/lib/api";
 
 // ---------- Local helper types used only by this page ----------
@@ -147,53 +147,49 @@ export default function EditProfilePage() {
         setUser({ ...user, interests: user.interests.filter((x) => x !== i) });
     };
 
+    // --- THIS IS THE CORRECTED HENDLESAVE FUNCTION ---
     const handleSave = async () => {
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) {
-            alert("Session expired. Please login again.");
+        // 1. Check if user state is loaded
+        if (!user) {
+            toast.error("User data not loaded. Please try again.");
             return;
         }
 
-        const currentUser = JSON.parse(userDataString);
-        const userId = currentUser.id; // ✅ Correct userId is taken from session
-
-        const payload = {
-            name: userData.name,
-            location: userData.location,
-            aboutMe: userData.bio,   // ✅ matches backend field
+        // 2. Build the payload from the 'user' state
+        const payload: ProfileUpdatePayload = {
+            name: user.name,
+            location: user.location,
+            aboutMe: user.aboutMe, // This matches your state
         };
 
+        setSaving(true);
+        toast.loading("Saving profile...");
+
         try {
-            const response = await fetch(`http://localhost:8080/api/users/${userId}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(payload),
-            });
+            // 3. Use the imported 'updateProfile' function
+            const updatedUser: UserProfileResponse = await updateProfile(user.id, payload);
 
-            if (!response.ok) {
-                throw new Error("Failed to update profile");
-            }
-
-            const updatedUser = await response.json();
-
-            // ✅ Update session so Profile page shows new values after refresh
+            // 4. Update session storage with the new data
             sessionStorage.setItem("user", JSON.stringify({
                 id: updatedUser.id,
                 name: updatedUser.name,
                 email: updatedUser.email,
                 profession: updatedUser.profession
             }));
-
-            alert("Profile updated!");
-            window.location.href = "/profile";
+            
+            toast.dismiss();
+            toast.success("Profile updated!");
+            router.push("/profile"); // Use router to navigate
 
         } catch (error) {
             console.error("Error updating profile:", error);
-            alert("Update failed. Check console.");
+            toast.dismiss();
+            toast.error("Update failed. Please try again.");
+        } finally {
+            setSaving(false);
         }
     };
+    // --- END OF CORRECTION ---
 
 
     if (loading || !user) {

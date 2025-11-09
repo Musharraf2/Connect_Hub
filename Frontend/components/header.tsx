@@ -36,7 +36,7 @@ import { useRouter } from "next/navigation"
 // The HeaderProps now accepts a more general 'string' for community.
 interface HeaderProps {
     user?: {
-        id?: string
+        id?: number // <-- This is correct
         name: string
         community: string
         avatar: string

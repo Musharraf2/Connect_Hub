@@ -1,5 +1,4 @@
 // src/main/java/com/community/profession_connect/service/UserService.java
-
 package com.community.profession_connect.service;
 
 
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects; // <-- ADDED IMPORT
 import java.util.Optional;
 
 @Service
@@ -58,6 +58,9 @@ public class UserService {
 
     @Transactional
     public User updateUserProfile(Long userId, UserProfileUpdateRequest updateRequest) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(userId, "User ID must not be null");
+        
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -71,7 +74,9 @@ public class UserService {
             user.setAboutMe(updateRequest.getAboutMe());
         }
 
-        return userRepository.save(user); // Save the updated entity
+        // --- FIX: Assure compiler that user is not null ---
+        // Although orElseThrow guarantees this, the IDE warning can be fixed this way.
+        return userRepository.save(Objects.requireNonNull(user)); 
     }
 
 
@@ -81,10 +86,10 @@ public class UserService {
     }
 
     public User getUserById(Long id) {
+        // --- FIX: Check for null ---
+        Objects.requireNonNull(id, "User ID must not be null");
+        
         return userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
     }
-
-
-
 }

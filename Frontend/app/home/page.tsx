@@ -4,7 +4,6 @@ import { UserProfileResponse } from "@/lib/api";
 import { ProfileUpdatePayload, updateProfile } from "@/lib/api";
 import { useState, useEffect } from "react";
 import {
-    // get  // ❌ removed: unused after cleanup
     UserProfile,
     getUsersByProfession,
     LoginResponse,
@@ -47,6 +46,7 @@ import toast from "react-hot-toast";
 
 // ---------------- Types local to this component ----------------
 interface CurrentUser {
+    id?: number; // Added id for internal use
     name: string;
     avatar: string;
     community: string;
@@ -63,7 +63,6 @@ interface ProfileData {
 }
 
 export default function HomePage() {
-
     const [members, setMembers] = useState<UserProfileResponse[]>([]);
     const [membersLoading, setMembersLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -89,21 +88,85 @@ export default function HomePage() {
 
     // ---------------- Auth bootstrap ----------------
 
+    // ❗️ THIS IS THE NEWLY ADDED HOOK TO LOAD ALL DATA ❗️
+    useEffect(() => {
+        // Get the user data stored during login
+        const userDataString = sessionStorage.getItem("user");
+        
+        if (!userDataString) {
+            // If no user is found in session, redirect to login
+            toast.error("Please log in.");
+            router.push("/login");
+            return;
+        }
 
+        try {
+            const user: LoginResponse = JSON.parse(userDataString);
+
+            // 1. Set the basic user info immediately for the header
+            setCurrentUser({
+                id: user.id, // Store ID for convenience
+                name: user.name,
+                community: user.profession,
+                avatar: "/placeholder.svg", // You can update this later
+                pendingRequests: 0,
+            });
+
+            // 2. Create an async function to fetch all data
+            const loadAllData = async () => {
+                try {
+                    // Fetch the user's full profile first (await it to ensure profileData is set)
+                    await fetchUserProfile(user.id);
+                    
+                    // Fetch all other data in parallel for speed
+                    await Promise.all([
+                        fetchMembers(user.profession),
+                        fetchPendingRequests(user.id),
+                        fetchSentPendingRequests(user.id),
+                        fetchAcceptedConnections(user.id),
+                        fetchPosts(user.profession, user.id)
+                    ]);
+                } catch (err) {
+                    console.error("Failed during data fetch:", err);
+                    toast.error("Failed to load some page data.");
+                } finally {
+                    // 3. Once all data is loaded (or fails), stop showing the "Loading..." screen
+                    setAuthLoading(false);
+                }
+            };
+
+            // Call the data fetching function
+            loadAllData();
+
+        } catch (error) {
+            console.error("Failed to parse user data or load initial data:", error);
+            // If data is bad, clear it and send back to login
+            sessionStorage.removeItem("user");
+            toast.error("Session invalid. Please log in again.");
+            router.push("/login");
+        }
+    }, [router]); // Add 'router' as a dependency
+
+    
     const fetchUserProfile = async (userId: number) => {
         try {
             const res = await fetch(`http://localhost:8080/api/users/${userId}`);
+            if (!res.ok) {
+                throw new Error("Failed to fetch profile");
+            }
             const data = await res.json();
             setProfileData({
                 name: data.name,
                 email: data.email,
                 profession: data.profession,
-                location: data.location || "New York, NY",
-                connections: connections.length,
+                // Use empty string as default for null/undefined
+                location: data.location || "Not set", 
+                connections: connections.length, // connections will be updated later
                 bio: data.aboutMe || "No bio yet."
             });
         } catch (error) {
             console.error("Failed to load profile:", error);
+            toast.error("Could not load user profile.");
         }
     };
 
@@ -153,6 +216,7 @@ export default function HomePage() {
         try {
             const conns = await getAcceptedConnections(userId);
             setConnections(conns);
+            // Update profileData connections count *after* fetching
             setProfileData((prev) => (prev ? { ...prev, connections: conns.length } : null));
         } catch (error) {
             console.error("Failed to fetch accepted connections:", error);
@@ -211,8 +275,9 @@ export default function HomePage() {
             await deletePost(postToDelete, user.id);
             toast.success("Post deleted successfully!");
             setDeleteDialogOpen(false);
+            // Update state directly instead of refetching
+            setPosts(prevPosts => prevPosts.filter(post => post.id !== postToDelete));
             setPostToDelete(null);
-            fetchPosts(user.profession, user.id);
         } catch (error) {
             console.error("Failed to delete post:", error);
             toast.error("Failed to delete post");
@@ -340,10 +405,10 @@ export default function HomePage() {
         try {
             const updatedUser = await updateProfile(user.id, { aboutMe: trimmedBio });
 
-            setBioText(updatedUser.aboutMe);
-            setTempBioText(
-                updatedUser.aboutMe);
-            setProfileData(prev => prev ? { ...prev, bio: updatedUser.aboutMe } : null);
+            // Ensure we always pass a string to the state setters
+            setBioText(updatedUser.aboutMe ?? "");
+            setTempBioText(updatedUser.aboutMe ?? "");
+            setProfileData(prev => prev ? { ...prev, bio: updatedUser.aboutMe ?? "" } : null);
 
             setIsEditingBio(false);
             toast.success("Bio updated successfully!");
@@ -394,9 +459,9 @@ export default function HomePage() {
                                         <p className="text-muted-foreground text-sm space-y-1 mt-2">
                                             <span className="font-medium">{profileData.profession}</span>
                                             <span className="flex items-center justify-center space-x-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{profileData.location}</span>
-                      </span>
+                                                <MapPin className="w-4 h-4" />
+                                                <span>{profileData.location}</span>
+                                            </span>
                                         </p>
                                     </div>
                                     <div className="space-y-4">
