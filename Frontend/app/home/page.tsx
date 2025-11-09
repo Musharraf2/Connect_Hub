@@ -440,7 +440,7 @@ export default function HomePage() {
                 <aside className="hidden lg:block lg:col-span-1">
                     <div className="sticky top-8 space-y-6">
                         <FadeInUp>
-                            <Card className="bg-card/50 rounded-2xl border">
+                            <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                                 <CardContent className="p-6">
                                     <div className="text-center pb-4">
                                         <Avatar className="w-24 h-24 mx-auto mb-4">
@@ -533,7 +533,7 @@ export default function HomePage() {
                 <section className="w-full lg:col-span-2 space-y-6">
                     {/* Create Post Card */}
                     <FadeInUp delay={0.1}>
-                        <Card className="border">
+                        <Card className="border-2 border-border/50 shadow-lg">
                             <CardHeader className="flex-row items-center space-x-4 pb-4">
                                 <Avatar className="w-12 h-12">
                                     <AvatarImage
@@ -549,7 +549,7 @@ export default function HomePage() {
                                 </Avatar>
                                 <div
                                     onClick={() => setIsPostingDialogOpen(true)}
-                                    className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors"
+                                    className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-all duration-200 border-2 border-transparent hover:border-primary/20"
                                 >
                                     {`What's on your mind, ${profileData.name.split(" ")[0]}?`}
                                 </div>
@@ -577,7 +577,7 @@ export default function HomePage() {
 
                     {/* Empty State */}
                     {!postsLoading && posts.length === 0 && (
-                        <Card className="border">
+                        <Card className="border-2 border-border/50 shadow-lg">
                             <CardContent className="py-8 text-center">
                                 <p className="text-muted-foreground">
                                     No posts yet. Be the first to share something!
@@ -597,7 +597,7 @@ export default function HomePage() {
 
                                 return (
                                     <div key={post.id}>
-                                        <Card className="border">
+                                        <Card className="border-2 border-border/50 shadow-lg hover:shadow-xl transition-all duration-200">
                                             <CardHeader>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center space-x-3">
@@ -725,7 +725,7 @@ export default function HomePage() {
                 <aside className="hidden lg:block lg:col-span-1">
                     <div className="sticky top-8 space-y-6">
                         <FadeInUp delay={0.2}>
-                            <Card className="bg-card/50 rounded-2xl border">
+                            <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                                 <CardHeader>
                                     <CardTitle className="font-serif text-lg">Who to connect with</CardTitle>
                                 </CardHeader>
