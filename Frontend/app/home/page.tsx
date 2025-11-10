@@ -411,7 +411,7 @@ export default function HomePage() {
             setProfileData(prev => prev ? { ...prev, bio: updatedUser.aboutMe ?? "" } : null);
 
             setIsEditingBio(false);
-            toast.success("Bio updated successfully!");
+            toast.success("Bio update successfully!");
         } catch (error) {
             toast.error("Failed to update bio.");
             console.error(error);
