@@ -114,11 +114,11 @@ const communityIcons = {
 }
 
 const communityColors = {
-  student: "bg-blue-100 text-blue-700 border-blue-200",
-  teacher: "bg-green-100 text-green-700 border-green-200",
-  musician: "bg-purple-100 text-purple-700 border-purple-200",
-  doctor: "bg-red-100 text-red-700 border-red-200",
-  dancer: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  student: "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-transparent shadow-sm",
+  teacher: "bg-gradient-to-r from-green-500 to-green-600 text-white border-transparent shadow-sm",
+  musician: "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-transparent shadow-sm",
+  doctor: "bg-gradient-to-r from-red-500 to-red-600 text-white border-transparent shadow-sm",
+  dancer: "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-transparent shadow-sm",
 }
 
 const recentActivity = [
@@ -248,7 +248,7 @@ export default function ProfilePage() {
   }
 
   const CommunityIcon = communityIcons[currentUser.community as keyof typeof communityIcons] || Users // Added default icon
-  const communityColorClass = communityColors[currentUser.community as keyof typeof communityColors] || "bg-gray-100 text-gray-700 border-gray-200" // Added default color
+  const communityColorClass = communityColors[currentUser.community as keyof typeof communityColors] || "bg-gradient-to-r from-gray-500 to-gray-600 text-white border-transparent shadow-sm" // Added default color
 
   return (
     <div className="min-h-screen bg-background">
@@ -257,10 +257,10 @@ export default function ProfilePage() {
       <main className="container mx-auto px-4 py-8">
         {/* Profile Header */}
         <FadeInUp>
-          <Card className="mb-8 bg-card/50 rounded-2xl border">
+          <Card className="mb-8 bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
             <div className="relative">
               {/* Cover Image */}
-              <div className="h-48 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-t-lg"></div>
+              <div className="h-48 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-t-3xl"></div>
 
               {/* Profile Info */}
               <div className="relative px-6 pb-6">
@@ -330,7 +330,7 @@ export default function ProfilePage() {
                 </TabsList>
 
                 <TabsContent value="about" className="space-y-6">
-                  <Card className="bg-card/50 rounded-2xl border">
+                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                     <CardHeader>
                       <CardTitle className="font-serif">About</CardTitle>
                     </CardHeader>
@@ -365,7 +365,7 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-card/50 rounded-2xl border">
+                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                     <CardHeader>
                       <CardTitle className="font-serif">Academic Information</CardTitle>
                     </CardHeader>
@@ -391,7 +391,7 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-card/50 rounded-2xl border">
+                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                     <CardHeader>
                       <CardTitle className="font-serif">Skills</CardTitle>
                     </CardHeader>
@@ -408,7 +408,7 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-card/50 rounded-2xl border">
+                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                     <CardHeader>
                       <CardTitle className="font-serif">Interests</CardTitle>
                     </CardHeader>
@@ -430,7 +430,7 @@ export default function ProfilePage() {
                   <StaggerContainer stagger={0.1} className="space-y-6">
                     {currentUser.projects.map((project, index) => (
                       <StaggerItem key={index}>
-                        <Card className="bg-card/50 rounded-2xl border">
+                        <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                           <CardHeader>
                             <CardTitle className="font-serif">{project.title}</CardTitle>
                             <CardDescription>{project.description}</CardDescription>
@@ -451,7 +451,7 @@ export default function ProfilePage() {
                 </TabsContent>
 
                 <TabsContent value="activity" className="space-y-6">
-                  <Card className="bg-card/50 rounded-2xl border">
+                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                     <CardHeader>
                       <CardTitle className="font-serif">Recent Activity</CardTitle>
                     </CardHeader>
@@ -480,7 +480,7 @@ export default function ProfilePage() {
           <aside className="hidden lg:block lg:col-span-1">
             <div className="sticky top-8 space-y-6">
               <FadeInUp delay={0.2}>
-                <Card className="bg-card/50 rounded-2xl border">
+                <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="font-serif">Contact Information</CardTitle>
                   </CardHeader>
@@ -500,7 +500,7 @@ export default function ProfilePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-card/50 rounded-2xl border">
+                <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="font-serif">Achievements</CardTitle>
                   </CardHeader>

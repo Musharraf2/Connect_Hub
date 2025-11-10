@@ -58,13 +58,13 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex">
             {/* Left Panel (Visual) - Hidden on mobile */}
-            <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary/5 to-background p-12 flex-col justify-between">
+            <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary/10 via-secondary/5 to-background p-12 flex-col justify-between">
                 <div>
-                    <Link href="/" className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <Users className="w-5 h-5 text-primary-foreground" />
+                    <Link href="/" className="flex items-center space-x-2 group">
+                        <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-200">
+                            <Users className="w-5 h-5 text-white" />
                         </div>
-                        <span className="text-xl font-serif font-bold text-foreground">ConnectHub</span>
+                        <span className="text-xl font-serif font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">ConnectHub</span>
                     </Link>
                 </div>
                 <motion.div
@@ -100,7 +100,9 @@ export default function LoginPage() {
                         className="w-full"
                     >
                         <div className="text-left mb-10">
-                            <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Sign in to your account</h1>
+                            <h1 className="text-3xl font-serif font-bold mb-2">
+                                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Sign in</span> to your account
+                            </h1>
                             <p className="text-muted-foreground">Welcome back! Please enter your details.</p>
                         </div>
                     

@@ -229,7 +229,7 @@ export default function EditProfilePage() {
                     {/* Main Form */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Basic Information */}
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl">
                             <CardHeader>
                                 <CardTitle className="font-serif">Basic Information</CardTitle>
                                 <CardDescription>Your basic profile information visible to other community members</CardDescription>
@@ -305,7 +305,7 @@ export default function EditProfilePage() {
                         </Card>
 
                         {/* Academic Information (UI-only for now) */}
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl">
                             <CardHeader>
                                 <CardTitle className="font-serif">Academic Information</CardTitle>
                                 <CardDescription>Your educational background and current status (not saved yet)</CardDescription>
@@ -353,7 +353,7 @@ export default function EditProfilePage() {
                         </Card>
 
                         {/* Skills (UI-only for now) */}
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl">
                             <CardHeader>
                                 <CardTitle className="font-serif">Skills</CardTitle>
                                 <CardDescription>Add your technical and professional skills (not saved yet)</CardDescription>
@@ -385,7 +385,7 @@ export default function EditProfilePage() {
                         </Card>
 
                         {/* Interests (UI-only for now) */}
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl">
                             <CardHeader>
                                 <CardTitle className="font-serif">Interests</CardTitle>
                                 <CardDescription>Share your interests (not saved yet)</CardDescription>
@@ -423,7 +423,7 @@ export default function EditProfilePage() {
 
                     {/* Sidebar */}
                     <div className="lg:col-span-1 space-y-6">
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl sticky top-8">
                             <CardHeader>
                                 <CardTitle className="font-serif">Save Changes</CardTitle>
                             </CardHeader>
@@ -437,7 +437,7 @@ export default function EditProfilePage() {
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="border-2 border-border/50 shadow-xl sticky top-[calc(8rem+24px)]">
                             <CardHeader>
                                 <CardTitle className="font-serif">Profile Tips</CardTitle>
                             </CardHeader>
