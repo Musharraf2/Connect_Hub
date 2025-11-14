@@ -39,6 +39,7 @@ export default function ChatArea({ currentUser, selectedRoom, onToggleInfo }: Ch
         leaveRoom(selectedRoom._id);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoom?._id]);
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function ChatArea({ currentUser, selectedRoom, onToggleInfo }: Ch
       socket.off('message:receive', handleNewMessage);
       socket.off('typing:update', handleTypingUpdate);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, selectedRoom, currentUser.id]);
 
   useEffect(() => {

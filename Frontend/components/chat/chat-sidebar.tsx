@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Plus, Users, MessageCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Search, Users, MessageCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ChatSidebarProps {
@@ -29,6 +28,7 @@ export default function ChatSidebar({ currentUser, selectedRoom, onSelectRoom }:
   useEffect(() => {
     loadChatRooms();
     loadCommunityUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser.id]);
 
   const loadChatRooms = async () => {

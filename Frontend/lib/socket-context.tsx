@@ -3,12 +3,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-interface User {
-  id: number;
-  name: string;
-  profession: string;
-}
-
 interface Message {
   _id: string;
   chatRoom: string;
@@ -19,12 +13,6 @@ interface Message {
   mediaUrl?: string;
   readBy: Array<{ userId: number; readAt: Date }>;
   createdAt: Date;
-}
-
-interface TypingStatus {
-  userId: number;
-  userName: string;
-  isTyping: boolean;
 }
 
 interface UserStatus {
@@ -44,9 +32,9 @@ interface SocketContextType {
   startTyping: (roomId: string, userId: number, userName: string) => void;
   stopTyping: (roomId: string, userId: number) => void;
   markAsRead: (roomId: string, messageId: string, userId: number) => void;
-  initiateCall: (targetUserId: number, offer: any, callerId: number, callerName: string) => void;
-  answerCall: (targetUserId: number, answer: any) => void;
-  sendIceCandidate: (targetUserId: number, candidate: any) => void;
+  initiateCall: (targetUserId: number, offer: RTCSessionDescriptionInit, callerId: number, callerName: string) => void;
+  answerCall: (targetUserId: number, answer: RTCSessionDescriptionInit) => void;
+  sendIceCandidate: (targetUserId: number, candidate: RTCIceCandidate) => void;
   endCall: (targetUserId: number) => void;
 }
 
@@ -142,19 +130,19 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
     }
   };
 
-  const initiateCall = (targetUserId: number, offer: any, callerId: number, callerName: string) => {
+  const initiateCall = (targetUserId: number, offer: RTCSessionDescriptionInit, callerId: number, callerName: string) => {
     if (socket) {
       socket.emit('call:initiate', { targetUserId, offer, callerId, callerName });
     }
   };
 
-  const answerCall = (targetUserId: number, answer: any) => {
+  const answerCall = (targetUserId: number, answer: RTCSessionDescriptionInit) => {
     if (socket) {
       socket.emit('call:answer', { targetUserId, answer });
     }
   };
 
-  const sendIceCandidate = (targetUserId: number, candidate: any) => {
+  const sendIceCandidate = (targetUserId: number, candidate: RTCIceCandidate) => {
     if (socket) {
       socket.emit('call:ice-candidate', { targetUserId, candidate });
     }
