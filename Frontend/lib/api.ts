@@ -21,6 +21,7 @@ export interface ProfileUpdatePayload {
     interests?: string[];
     connectionsCount?: number;
     pendingRequestsCount?: number;
+    profileImageUrl?: string;
 }
 
 // Define the full UserProfile response type (must match backend User model)
@@ -152,17 +153,22 @@ export interface Interest {
 
 
 // This matches your new backend DTO
+// This matches your new backend DTO
 export interface UserProfileDetailResponse {
-  id: number;
-  name: string;
-  email: string;
-  profession: string;
-  location: string | null;
-  aboutMe: string | null;
-  profileImageUrl?: string | null;
-  academicInfo: AcademicInfo | null;
-  skills: Skill[];
-  interests: Interest[];
+  id: number;
+  name: string;
+  email: string;
+  profession: string;
+  location: string | null;
+  aboutMe: string | null;
+  profileImageUrl?: string | null;
+  academicInfo: AcademicInfo | null;
+  skills: Skill[];
+  interests: Interest[];
+  
+  // --- ADD THESE TWO LINES ---
+  connectionsCount: number;
+  pendingRequestsCount: number;
 }
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080/api";
 

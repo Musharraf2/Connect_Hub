@@ -42,13 +42,7 @@ import Link from "next/link"
 import { LoginResponse } from "@/app/login/page" // Import session type
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+
 
 // This is our MOCKED data. We will merge session data into this.
 const profileMockData = {
@@ -143,10 +137,6 @@ export default function ProfilePage() {
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
   
-  // Profile image upload state
-  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
-  const [showImageUploadDialog, setShowImageUploadDialog] = useState(false)
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
 
  useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
@@ -190,10 +180,11 @@ export default function ProfilePage() {
           // --- REAL SKILLS & INTERESTS ---
           // Map the {id, skill} objects to simple strings
           skills: profile.skills.map(s => s.skill),
-          interests: profile.interests.map(i => i.interest),
+          interests: profile.interests.map(i => i.interest),
 
-          connections: (profile as UserProfileDetailResponse).connectionsCount ?? (profile as UserProfileDetailResponse).connections ?? (profile as UserProfileDetailResponse).totalConnections ?? 0,
-          pendingRequests: (profile as UserProfileDetailResponse).pendingRequestsCount ?? (profile as UserProfileDetailResponse).pendingRequests ?? 0,
+          // Now this will work perfectly
+          connections: profile.connectionsCount ?? 0,
+          pendingRequests: profile.pendingRequestsCount ?? 0,
         });
 
       } catch (error) {
@@ -256,33 +247,7 @@ export default function ProfilePage() {
   }
   // --- End Bio Edit State ---
 
-  // Profile image upload handlers
-  const handleImageSelect = (file: File) => {
-    setSelectedImageFile(file)
-  }
-
-  const handleImageUpload = async () => {
-    if (!selectedImageFile || !currentUser) return
-
-    setIsUploadingProfileImage(true)
-    const toastId = toast.loading("Uploading profile image...")
-
-    try {
-            const result = await uploadProfileImage(currentUser.id, selectedImageFile)
-      
-      // Update the current user state with new profile image (Cloudinary returns full URL)
-      setCurrentUser({ ...currentUser, avatar: result.profileImageUrl })
-      
-      toast.success("Profile image updated!", { id: toastId })
-      setShowImageUploadDialog(false)
-      setSelectedImageFile(null)
-    } catch (error) {
-      console.error("Failed to upload profile image", error)
-      toast.error("Failed to upload image", { id: toastId })
-    } finally {
-      setIsUploadingProfileImage(false)
-    }
-  }
+ 
 
   if (authLoading || !currentUser) {
     return (
@@ -317,13 +282,6 @@ export default function ProfilePage() {
                         {currentUser.name.split(" ").map((n) => n[0]).join("")}
                       </AvatarFallback>
                     </Avatar>
-                    <Button
-                      size="sm"
-                      className="absolute bottom-0 right-0 rounded-full h-10 w-10 p-0"
-                      onClick={() => setShowImageUploadDialog(true)}
-                    >
-                      <Camera className="h-4 w-4" />
-                    </Button>
                   </div>
 
                   <div className="flex-1">
@@ -576,41 +534,6 @@ export default function ProfilePage() {
           </aside>
         </div>
       </main>
-
-      {/* Profile Image Upload Dialog */}
-      <Dialog open={showImageUploadDialog} onOpenChange={setShowImageUploadDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Profile Image</DialogTitle>
-            <DialogDescription>
-              Choose an image to update your profile picture
-            </DialogDescription>
-          </DialogHeader>
-          <ImageUpload
-            onImageSelect={handleImageSelect}
-            disabled={isUploadingProfileImage}
-          />
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowImageUploadDialog(false)
-                setSelectedImageFile(null)
-              }}
-              disabled={isUploadingProfileImage}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleImageUpload}
-              disabled={!selectedImageFile || isUploadingProfileImage}
-            >
-              {isUploadingProfileImage ? "Uploading..." : "Upload"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Footer is Removed */}
     </div>
   )

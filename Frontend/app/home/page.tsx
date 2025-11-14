@@ -13,6 +13,7 @@ import {
     cancelConnectionRequest,
     getPendingRequests,
     getAcceptedConnections,
+    UserProfileDetailResponse,
     PostResponse,
     createPost,
     getPostsByProfession,
@@ -20,6 +21,7 @@ import {
     toggleLike,
     addComment,
     uploadPostImage,
+    getUserProfile,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -155,10 +157,18 @@ export default function HomePage() {
     const fetchUserProfile = async (userId: number) => {
         try {
             const res = await fetch(`http://localhost:8080/api/users/${userId}`);
-            if (!res.ok) {
-                throw new Error("Failed to fetch profile");
-            }
-            const data = await res.json();
+            if (!res.ok) {
+                throw new Error("Failed to fetch profile");
+            }
+            const data: UserProfileDetailResponse = await res.json(); // Use the detailed type
+
+            // --- THIS IS THE FIX ---
+            // Update the currentUser state with the real avatar
+            setCurrentUser((prev) => (
+                prev 
+                ? { ...prev, avatar: data.profileImageUrl || "/placeholder.svg" } 
+                : null
+            ));
             setProfileData({
                 name: data.name,
                 email: data.email,

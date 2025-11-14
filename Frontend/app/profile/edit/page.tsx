@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Upload, X } from "lucide-react";
@@ -24,6 +24,22 @@ import {
     updateProfile,          // (userId: number, payload: ProfileUpdatePayload) => Promise<UserProfileResponse>
 } from "@/lib/api";
 
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { ImageUpload } from "@/components/image-upload"
+import { uploadProfileImage } from "@/lib/api";
+import ReactCrop, {
+    type Crop,
+    centerCrop,
+    makeAspectCrop
+} from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+
 // ---------- Local helper types used only by this page ----------
 type EditableUser = {
     id: number;
@@ -45,6 +61,26 @@ type EditableUser = {
     pendingRequests?: number; // for <Header />
 };
 
+function centerAspectCrop(
+    mediaWidth: number,
+    mediaHeight: number,
+    aspect: number
+): Crop {
+    return centerCrop(
+        makeAspectCrop(
+            {
+                unit: '%',
+                width: 90,
+            },
+            aspect,
+            mediaWidth,
+            mediaHeight
+        ),
+        mediaWidth,
+        mediaHeight
+    );
+}
+
 export default function EditProfilePage() {
     const router = useRouter();
 
@@ -57,7 +93,16 @@ export default function EditProfilePage() {
     const [newSkill, setNewSkill] = useState("");
     const [newInterest, setNewInterest] = useState("");
 
-    // For Header (falls back to minimal data while fetching)
+    const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
+    const [showImageUploadDialog, setShowImageUploadDialog] = useState(false)
+    const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string>("") // For the preview/cropper src
+    const [crop, setCrop] = useState<Crop>()
+    const [completedCrop, setCompletedCrop] = useState<Crop>()
+    const imgRef = useRef<HTMLImageElement>(null)
+    const [croppedImageFile, setCroppedImageFile] = useState<File | null>(null);
+    const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+
     const headerUser = useMemo(
         () =>
             user
@@ -65,6 +110,22 @@ export default function EditProfilePage() {
                 : { name: "", community: "", avatar: "/placeholder.svg?height=40&width=40", pendingRequests: 0 },
         [user]
     );
+
+    useEffect(() => {
+        return () => {
+            if (imagePreview) {
+                URL.revokeObjectURL(imagePreview)
+            }
+        }
+    }, [imagePreview])
+
+    useEffect(() => {
+        return () => {
+            if (tempAvatarUrl) {
+                URL.revokeObjectURL(tempAvatarUrl);
+            }
+        }
+    }, [tempAvatarUrl])
 
     // ----------- Bootstrap: read session, fetch profile -----------
     useEffect(() => {
@@ -100,7 +161,7 @@ export default function EditProfilePage() {
                     skills: profile.skills.map(s => s.skill),
                     interests: profile.interests.map(i => i.interest),
                     phone: "",
-                    avatar: "/placeholder.svg?height=120&width=120",
+                    avatar: profile.profileImageUrl || "/placeholder.svg?height=120&width=120",
                     community: profile.profession ?? "",
                     pendingRequests: 0,
                 };
@@ -149,46 +210,77 @@ export default function EditProfilePage() {
 
     // --- THIS IS THE CORRECTED HENDLESAVE FUNCTION ---
     const handleSave = async () => {
-        // 1. Check if user state is loaded
         if (!user) {
             toast.error("User data not loaded. Please try again.");
             return;
         }
 
-        // 2. Build the payload from the 'user' state
-        const payload: ProfileUpdatePayload = {
-            name: user.name,
-            location: user.location,
-            aboutMe: user.aboutMe,
-            // Add all the other fields from your state
-            university: user.university,
-            major: user.major,
-            year: user.year,
-            gpa: user.gpa,
-            skills: user.skills,
-            interests: user.interests
-        };
-
         setSaving(true);
-        toast.loading("Saving profile...");
+        const toastId = toast.loading("Saving profile...");
 
         try {
-            // 3. Use the imported 'updateProfile' function
+            let newProfileImageUrl: string | undefined = undefined;
+
+            // 1. --- NEW LOGIC ---
+            // Check if there is a new image staged for upload
+            if (croppedImageFile) {
+                toast.loading("Uploading new profile image...", { id: toastId });
+
+                // Upload the cropped file
+                const uploadResult = await uploadProfileImage(user.id, croppedImageFile);
+                newProfileImageUrl = uploadResult.profileImageUrl;
+
+                toast.loading("Saving profile data...", { id: toastId });
+            }
+
+            // 2. Build the payload with all text fields
+            const payload: ProfileUpdatePayload = {
+                name: user.name,
+                location: user.location,
+                aboutMe: user.aboutMe,
+                university: user.university,
+                major: user.major,
+                year: user.year,
+                gpa: user.gpa,
+                skills: user.skills,
+                interests: user.interests,
+            };
+
+            // 3. --- NEW LOGIC ---
+            // If we uploaded a new image, add its URL to the payload
+            if (newProfileImageUrl) {
+                payload.profileImageUrl = newProfileImageUrl;
+            }
+
+            // 4. Use the imported 'updateProfile' function to save everything
             const updatedUser: UserProfileResponse = await updateProfile(user.id, payload);
 
-            // 4. Update session storage with the new data
-            sessionStorage.setItem("user", JSON.stringify(updatedUser));
+            // 5. Update session storage
+            const session = sessionStorage.getItem("user");
+            const loggedIn = session ? JSON.parse(session) : {};
+            // Merge new data (including the new image URL if it exists)
+            sessionStorage.setItem("user", JSON.stringify({
+                ...loggedIn,
+                ...updatedUser,
+                profileImageUrl: newProfileImageUrl || user.avatar // Use new URL or existing
+            }));
 
-            toast.dismiss();
-            toast.success("Profile updated!");
-            router.push("/profile"); // Use router to navigate
+            toast.success("Profile updated!", { id: toastId });
+            router.push("/profile");
 
         } catch (error) {
             console.error("Error updating profile:", error);
-            toast.dismiss();
-            toast.error("Update failed. Please try again.");
+            toast.error("Update failed. Please try again.", { id: toastId });
         } finally {
             setSaving(false);
+
+            // 6. --- NEW LOGIC ---
+            // Clean up the temporary file and URL
+            if (tempAvatarUrl) {
+                URL.revokeObjectURL(tempAvatarUrl);
+            }
+            setTempAvatarUrl(null);
+            setCroppedImageFile(null);
         }
     };
     // --- END OF CORRECTION ---
@@ -201,6 +293,126 @@ export default function EditProfilePage() {
             </div>
         );
     }
+
+    // --- ADDED --- (All new handlers for cropping and uploading)
+
+    // Cleans up the image preview URL from memory
+
+
+    // Triggers when the <img_..> in the cropper loads
+    function onImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+        const { width, height } = e.currentTarget;
+        const crop = centerAspectCrop(width, height, 1); // 1 = 1:1 aspect ratio
+        setCrop(crop);
+        setCompletedCrop(crop);
+    }
+
+    // Triggers when you select a file from the <ImageUpload> component
+    const handleImageSelect = (file: File) => {
+        setSelectedImageFile(file)
+        if (imagePreview) {
+            URL.revokeObjectURL(imagePreview) // Revoke old URL
+        }
+        const newPreviewUrl = URL.createObjectURL(file)
+        setImagePreview(newPreviewUrl)
+    }
+
+    // Helper function to convert the crop data into a real image file
+    async function getCroppedImg(
+        image: HTMLImageElement,
+        crop: Crop,
+        fileName: string
+    ): Promise<File | null> {
+        const canvas = document.createElement('canvas');
+        const scaleX = image.naturalWidth / image.width;
+        const scaleY = image.naturalHeight / image.height;
+
+        canvas.width = Math.floor(crop.width * scaleX);
+        canvas.height = Math.floor(crop.height * scaleY);
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return null;
+        }
+
+        ctx.drawImage(
+            image,
+            crop.x * scaleX,
+            crop.y * scaleY,
+            crop.width * scaleX,
+            crop.height * scaleY,
+            0,
+            0,
+            crop.width * scaleX,
+            crop.height * scaleY
+        );
+
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        reject(new Error('Canvas is empty'));
+                        return;
+                    }
+                    const file = new File([blob], fileName, { type: blob.type });
+                    resolve(file);
+                },
+                'image/png',
+                0.9 // Quality
+            );
+        });
+    }
+
+    // This is the main upload function, now modified to use the cropper
+    const handleCropComplete = async () => {
+        if (!completedCrop || !imgRef.current || !selectedImageFile || !user) {
+            toast.error("Crop data is missing. Please try again.");
+            return
+        }
+
+        // Show a quick loading state, as cropping can take a moment
+        setIsUploadingProfileImage(true);
+
+        try {
+            // 1. Create the cropped file
+            const croppedFile = await getCroppedImg(
+                imgRef.current,
+                completedCrop,
+                selectedImageFile.name
+            )
+
+            if (!croppedFile) {
+                throw new Error("Failed to create cropped image.");
+            }
+
+            // 2. Create a temporary URL for the *newly cropped file*
+            const newAvatarPreviewUrl = URL.createObjectURL(croppedFile);
+
+            // 3. Clean up any *previous* temporary URL
+            if (tempAvatarUrl) {
+                URL.revokeObjectURL(tempAvatarUrl);
+            }
+
+            // 4. Save the new cropped file and its temporary URL to state
+            setCroppedImageFile(croppedFile); // This is staged for the *real* upload
+            setTempAvatarUrl(newAvatarPreviewUrl); // This is for the cleanup
+            setUser({ ...user, avatar: newAvatarPreviewUrl }); // This updates the <Avatar> preview
+
+            // 5. Reset and close dialog
+            setShowImageUploadDialog(false)
+            setSelectedImageFile(null)
+            setImagePreview("")
+            setCrop(undefined)
+            setCompletedCrop(undefined)
+
+        } catch (error) {
+            console.error("Failed to apply crop", error)
+            toast.error("Failed to apply crop");
+        } finally {
+            setIsUploadingProfileImage(false); // Done with cropping
+        }
+    }
+    // --- END ADDED ---
 
     // split name into first/last for the UI only
     const firstName = user.name.split(" ")[0] ?? "";
@@ -246,7 +458,11 @@ export default function EditProfilePage() {
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <Button variant="outline" size="sm" disabled>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setShowImageUploadDialog(true)}
+                                        >
                                             <Upload className="w-4 h-4 mr-2" />
                                             Change Photo
                                         </Button>
@@ -453,6 +669,89 @@ export default function EditProfilePage() {
             </div>
 
             <Footer />
+
+
+            {/* ---- ADD THIS DIALOG ---- */}
+            <Dialog open={showImageUploadDialog} onOpenChange={setShowImageUploadDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Profile Image</DialogTitle>
+                        <DialogDescription>
+                            Crop your image to a 1:1 aspect ratio.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {/* This logic shows the <ImageUpload> component OR the cropper */}
+                    {!imagePreview ? (
+                        // 1. If no image is selected, show the upload box
+                        <ImageUpload
+                            onImageSelect={handleImageSelect}
+                            disabled={isUploadingProfileImage}
+                        />
+                    ) : (
+                        // 2. If an image IS selected, show the cropper
+                        <div className="flex flex-col items-center space-y-4">
+                            <ReactCrop
+                                crop={crop}
+                                onChange={(_, percentCrop) => setCrop(percentCrop)}
+                                onComplete={(c) => setCompletedCrop(c)}
+                                aspect={1} // Square aspect ratio
+                                circularCrop // Makes the cropper UI circular
+                                className="max-w-full"
+                            >
+                                <img
+                                    ref={imgRef}
+                                    src={imagePreview}
+                                    alt="Profile preview"
+                                    className="max-h-[60vh] object-contain"
+                                    onLoad={onImageLoad}
+                                />
+                            </ReactCrop>
+                            {/* Button to let user pick a different image */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setImagePreview("")
+                                    setSelectedImageFile(null)
+                                    setCrop(undefined)
+                                    if (imagePreview) URL.revokeObjectURL(imagePreview)
+                                }}
+                                disabled={isUploadingProfileImage}
+                            >
+                                <X className="h-4 w-4 mr-2" /> Change Image
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end space-x-2 mt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowImageUploadDialog(false)
+                                // Reset state on cancel
+                                if (imagePreview) URL.revokeObjectURL(imagePreview)
+                                setImagePreview("")
+                                setSelectedImageFile(null)
+                                setCrop(undefined)
+                                setCompletedCrop(undefined)
+                            }}
+                            disabled={isUploadingProfileImage}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            // --- CHANGE THIS ---
+                            onClick={handleCropComplete}
+                            disabled={!imagePreview || !completedCrop || isUploadingProfileImage}
+                        >
+                            {/* --- AND CHANGE THIS --- */}
+                            {isUploadingProfileImage ? "Applying..." : "Apply Crop"}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
