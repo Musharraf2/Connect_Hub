@@ -161,4 +161,14 @@ public class UserService {
         // 4. Build and return the new complete DTO
         return UserProfileDetailResponse.from(user, academicInfo, skills, interests, connectionsCount, pendingRequestsCount);
     }
+
+    public User updateProfileImage(Long userId, String profileImageUrl) {
+        Objects.requireNonNull(userId, "User ID must not be null");
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        user.setProfileImageUrl(profileImageUrl);
+        return userRepository.save(user);
+    }
 }

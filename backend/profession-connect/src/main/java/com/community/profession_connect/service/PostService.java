@@ -147,6 +147,7 @@ public class PostService {
         response.setProfession(post.getProfession());
         response.setCreatedAt(post.getCreatedAt());
         response.setLikesCount(post.getLikesCount());
+        response.setImageUrl(post.getImageUrl()); // Add image URL
 
         // User info
         PostResponse.UserInfo userInfo = new PostResponse.UserInfo();
@@ -169,6 +170,16 @@ public class PostService {
             .collect(Collectors.toList()));
 
         return response;
+    }
+
+    public void updatePostImage(Long postId, String imageUrl) {
+        Objects.requireNonNull(postId, "Post ID must not be null");
+        
+        Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new RuntimeException("Post not found"));
+        
+        post.setImageUrl(imageUrl);
+        postRepository.save(post);
     }
 
     private CommentResponse convertToCommentResponse(Comment comment) {

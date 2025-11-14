@@ -9,13 +9,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getUserProfile,
   UserProfileResponse,
-  updateProfile, // <-- ADD THIS
-  ProfileUpdatePayload, // <-- ADD THIS
+  UserProfileDetailResponse,
+  updateProfile,
+  ProfileUpdatePayload,
+  uploadProfileImage,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { Textarea } from "@/components/ui/textarea" 
+import { ImageUpload } from "@/components/image-upload"
 import {
   MapPin,
   Calendar,
@@ -30,14 +33,16 @@ import {
   Mail,
   Phone,
   Award,
-  Save,  // <-- ADDED THIS IMPORT
-  X,     // <-- ADDED THIS IMPORT
-  Edit3, // <-- ADDED THIS IMPORT
+  Save,
+  X,
+  Edit3,
+  Camera,
 } from "lucide-react"
 import Link from "next/link"
 import { LoginResponse } from "@/app/login/page" // Import session type
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+
 
 // This is our MOCKED data. We will merge session data into this.
 const profileMockData = {
@@ -131,6 +136,7 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
+  
 
  useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
@@ -163,6 +169,7 @@ export default function ProfilePage() {
           community: profile.profession,
           location: profile.location ?? "No location set",
           bio: profile.aboutMe ?? "No bio set",
+          avatar: profile.profileImageUrl || "/placeholder.svg?height=120&width=120",
 
           // --- REAL ACADEMIC DATA ---
           university: profile.academicInfo?.university ?? "Not specified",
@@ -173,10 +180,11 @@ export default function ProfilePage() {
           // --- REAL SKILLS & INTERESTS ---
           // Map the {id, skill} objects to simple strings
           skills: profile.skills.map(s => s.skill),
-          interests: profile.interests.map(i => i.interest),
+          interests: profile.interests.map(i => i.interest),
 
-          connections: (profile as any).connectionsCount ?? (profile as any).connections ?? (profile as any).totalConnections ?? 0,
-          pendingRequests: (profile as any).pendingRequestsCount ?? (profile as any).pendingRequests ?? 0,
+          // Now this will work perfectly
+          connections: profile.connectionsCount ?? 0,
+          pendingRequests: profile.pendingRequestsCount ?? 0,
         });
 
       } catch (error) {
@@ -239,6 +247,8 @@ export default function ProfilePage() {
   }
   // --- End Bio Edit State ---
 
+ 
+
   if (authLoading || !currentUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -265,12 +275,14 @@ export default function ProfilePage() {
               {/* Profile Info */}
               <div className="relative px-6 pb-6">
                 <div className="flex flex-col md:flex-row md:items-end md:space-x-6 -mt-16">
-                  <Avatar className="w-32 h-32 border-4 border-background mb-4 md:mb-0">
-                    <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-                    <AvatarFallback className="text-2xl">
-                      {currentUser.name.split(" ").map((n) => n[0]).join("")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative mb-4 md:mb-0">
+                    <Avatar className="w-32 h-32 border-4 border-background">
+                      <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
+                      <AvatarFallback className="text-2xl">
+                        {currentUser.name.split(" ").map((n) => n[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
 
                   <div className="flex-1">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -522,7 +534,6 @@ export default function ProfilePage() {
           </aside>
         </div>
       </main>
-
       {/* Footer is Removed */}
     </div>
   )

@@ -4,12 +4,16 @@ import com.community.profession_connect.dto.CommentRequest;
 import com.community.profession_connect.dto.CommentResponse;
 import com.community.profession_connect.dto.PostRequest;
 import com.community.profession_connect.dto.PostResponse;
+import com.community.profession_connect.service.FileStorageService;
 import com.community.profession_connect.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -18,6 +22,9 @@ public class PostController {
 
     @Autowired
     private PostService postService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @PostMapping
     public ResponseEntity<PostResponse> createPost(@RequestBody PostRequest request) {
@@ -66,5 +73,35 @@ public class PostController {
     public ResponseEntity<List<CommentResponse>> getComments(@PathVariable Long postId) {
         List<CommentResponse> comments = postService.getCommentsByPostId(postId);
         return ResponseEntity.ok(comments);
+    }
+
+    @PostMapping("/{postId}/image")
+    public ResponseEntity<Map<String, String>> uploadPostImage(
+            @PathVariable Long postId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+            }
+
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
+            }
+
+            // Store file
+            String filePath = fileStorageService.storeFile(file, "post-images");
+
+            // Update post with image URL
+            postService.updatePostImage(postId, filePath);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("imageUrl", filePath);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
+        }
     }
 }
