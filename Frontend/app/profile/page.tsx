@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getUserProfile,
   UserProfileResponse,
+  UserProfileDetailResponse,
   updateProfile,
   ProfileUpdatePayload,
   uploadProfileImage,
@@ -190,8 +191,8 @@ export default function ProfilePage() {
           skills: profile.skills.map(s => s.skill),
           interests: profile.interests.map(i => i.interest),
 
-          connections: (profile as any).connectionsCount ?? (profile as any).connections ?? (profile as any).totalConnections ?? 0,
-          pendingRequests: (profile as any).pendingRequestsCount ?? (profile as any).pendingRequests ?? 0,
+          connections: (profile as UserProfileDetailResponse).connectionsCount ?? (profile as UserProfileDetailResponse).connections ?? (profile as UserProfileDetailResponse).totalConnections ?? 0,
+          pendingRequests: (profile as UserProfileDetailResponse).pendingRequestsCount ?? (profile as UserProfileDetailResponse).pendingRequests ?? 0,
         });
 
       } catch (error) {

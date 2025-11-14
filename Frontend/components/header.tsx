@@ -45,7 +45,7 @@ interface HeaderProps {
 }
 
 // We keep the specific icons for our "main" communities
-const communityIcons: Record<string, any> = {
+const communityIcons: Record<string, React.ComponentType<{ className?: string }>> = {
     student: BookOpen,
     teacher: Users,
     musician: Music,

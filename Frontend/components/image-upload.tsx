@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Upload, X, Loader2 } from "lucide-react"
+import { Upload, X } from "lucide-react"
 import Image from "next/image"
 
 interface ImageUploadProps {
