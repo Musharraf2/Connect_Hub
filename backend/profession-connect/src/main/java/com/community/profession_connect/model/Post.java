@@ -30,6 +30,8 @@ public class Post {
 
     @Column(name = "likes_count")
     private Integer likesCount = 0;
+    
+    private String imageUrl; // URL/path to the post image
 
     // ⬇️ --- ADD THIS SECTION --- ⬇️
 

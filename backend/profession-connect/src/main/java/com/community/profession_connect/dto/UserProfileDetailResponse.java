@@ -18,6 +18,7 @@ public class UserProfileDetailResponse {
     private String profession;
     private String location;
     private String aboutMe;
+    private String profileImageUrl;
 
     // Related Data
     private AcademicInfo academicInfo;
@@ -38,6 +39,7 @@ public class UserProfileDetailResponse {
         dto.setProfession(user.getProfession());
         dto.setLocation(user.getLocation());
         dto.setAboutMe(user.getAboutMe());
+        dto.setProfileImageUrl(user.getProfileImageUrl());
 
         dto.setAcademicInfo(academicInfo);
         dto.setSkills(skills);

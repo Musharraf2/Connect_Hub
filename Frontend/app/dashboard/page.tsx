@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
+import toast from "react-hot-toast";
 import {
   Search,
   UserPlus,
@@ -33,12 +34,16 @@ import {
   LoginResponse, 
   Connection,
   UserProfileResponse,
+  UserProfileDetailResponse,
+  ProfileUpdatePayload,
   sendConnectionRequest,
   acceptConnectionRequest,
   declineConnectionRequest,
   getPendingRequests,
   getSentPendingRequests,
   cancelConnectionRequest,
+  getUserProfile,
+  updateProfile,
   getAcceptedConnections,
   getUsersByProfession
 } from "@/lib/api"
@@ -95,39 +100,68 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter()
 
-  useEffect(() => {
-    const userDataString = sessionStorage.getItem('user');
-    if (!userDataString) {
-      router.push('/login');
-    } else {
-      const user: LoginResponse = JSON.parse(userDataString);
+ useEffect(() => {
+    const userDataString = sessionStorage.getItem('user');
+    if (!userDataString) {
+      router.push('/login');
+    } else {
+      const user: LoginResponse = JSON.parse(userDataString);
 
-      setCurrentUser({
-        name: user.name,
-        community: user.profession,
-        avatar: "/placeholder.svg?height=40&width=40",
-        pendingRequests: 0, // Will be updated after fetching
-      });
-      
-      setProfileData({
-        name: user.name,
-        email: user.email,
-        profession: user.profession,
-        location: "New York, NY", // Mocked
-        connections: 0, // Will be updated after fetching
-        bio: "Passionate about my field and eager to connect with fellow professionals!",
-      });
+      // --- NEW LOGIC START ---
 
-      // Fetch pending requests and accepted connections
-      fetchPendingRequests(user.id);
-      fetchSentPendingRequests(user.id);
-      fetchAcceptedConnections(user.id);
-      // Fetch users by profession
-      fetchUsersByProfession(user.profession);
+      // Set a basic loading state first
+      setCurrentUser({
+        name: user.name,
+        community: user.profession,
+        avatar: "/placeholder.svg?height=40&width=40", // Placeholder
+        pendingRequests: 0,
+      });
 
-      setAuthLoading(false);
-    }
-  }, [router]);
+      // Create an async function to fetch all data
+      const loadInitialData = async (userId: number, userProfession: string) => {
+        try {
+          // Fetch the full user profile first to get avatar, location, and bio
+          const profile: UserProfileDetailResponse = await getUserProfile(userId);
+
+          // 1. Update currentUser with the real avatar
+          setCurrentUser((prev) => (
+            prev 
+            ? { ...prev, avatar: profile.profileImageUrl || "/placeholder.svg?height=40&width=40" }
+            : null
+          ));
+          
+          // 2. Set the real profile data (no more mock data)
+          setProfileData({
+            name: profile.name,
+            email: profile.email,
+            profession: profile.profession,
+            location: profile.location || "Not set", 
+            connections: 0, // Will be updated by fetchAcceptedConnections
+            bio: profile.aboutMe || "No bio yet."
+          });
+          
+          // 3. Now fetch all other data in parallel
+          await Promise.all([
+            fetchPendingRequests(userId),
+            fetchSentPendingRequests(userId),
+            fetchAcceptedConnections(userId),
+            fetchUsersByProfession(userProfession)
+          ]);
+          
+        } catch (err) {
+          console.error("Failed to load dashboard data:", err);
+          toast.error("Failed to load dashboard data.");
+        } finally {
+          setAuthLoading(false);
+        }
+      };
+      
+      // Call the function
+      loadInitialData(user.id, user.profession);
+      
+      // --- NEW LOGIC END ---
+    }
+  }, [router]);
   // --- End Auth & Profile State ---
 
   // Fetch users by profession
@@ -198,10 +232,32 @@ export default function DashboardPage() {
       }
   }, [profileData]);
 
-  const handleSaveBio = () => {
-      setBioText(tempBioText)
-      setIsEditingBio(false)
-  }
+const handleSaveBio = async () => {
+        const userDataString = sessionStorage.getItem('user');
+        if (!userDataString || !profileData) {
+            toast.error("User session expired.");
+            return;
+        }
+        
+        const user: LoginResponse = JSON.parse(userDataString);
+        const trimmedBio = tempBioText.trim();
+        
+        const toastId = toast.loading("Saving bio...");
+        try {
+            const updatedUser = await updateProfile(user.id, { aboutMe: trimmedBio });
+            
+            const newBio = updatedUser.aboutMe ?? "";
+            setBioText(newBio);
+            setTempBioText(newBio);
+            setProfileData(prev => prev ? { ...prev, bio: newBio } : null);
+            
+            setIsEditingBio(false);
+            toast.success("Bio updated successfully!", { id: toastId });
+        } catch (error) {
+            toast.error("Failed to update bio.", { id: toastId });
+            console.error(error);
+        }
+    };
 
   const handleCancelBio = () => {
       setTempBioText(bioText)
