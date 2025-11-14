@@ -1,17 +1,17 @@
 # Image Upload Features
 
-This document describes the newly implemented image upload features for profile images and post images.
+This document describes the image upload features for profile images and post images using **Cloudinary** cloud storage.
 
 ## Features
 
 ### 1. Profile Image Upload
 
-Users can now upload and display profile images.
+Users can upload and display profile images stored on Cloudinary.
 
 **Backend Endpoints:**
 - `POST /api/users/{userId}/profile-image` - Upload profile image
   - Request: multipart/form-data with `file` parameter
-  - Response: `{ "profileImageUrl": "profile-images/uuid.ext" }`
+  - Response: `{ "profileImageUrl": "https://res.cloudinary.com/..." }`
   - Max file size: 10MB
   - Supported formats: jpg, jpeg, png, gif, webp
 
@@ -19,19 +19,19 @@ Users can now upload and display profile images.
 - Navigate to profile page
 - Click camera icon on profile avatar
 - Select image from file picker
-- Upload and see updated profile image
+- Upload and see updated profile image instantly
 
 **Database Changes:**
-- Added `profileImageUrl` VARCHAR column to `users` table
+- Added `profileImageUrl` VARCHAR column to `users` table (stores Cloudinary URL)
 
 ### 2. Post Image Upload
 
-Users can attach images to their posts.
+Users can attach images to their posts, stored on Cloudinary.
 
 **Backend Endpoints:**
 - `POST /api/posts/{postId}/image` - Upload post image
   - Request: multipart/form-data with `file` parameter
-  - Response: `{ "imageUrl": "post-images/uuid.ext" }`
+  - Response: `{ "imageUrl": "https://res.cloudinary.com/..." }`
   - Max file size: 10MB
   - Supported formats: jpg, jpeg, png, gif, webp
 
@@ -43,40 +43,39 @@ Users can attach images to their posts.
 - Submit post with image
 
 **Database Changes:**
-- Added `imageUrl` VARCHAR column to `posts` table
-
-### 3. File Serving
-
-Uploaded images are served through a dedicated endpoint.
-
-**Backend Endpoint:**
-- `GET /api/files/{subDirectory}/{filename}` - Serve uploaded files
-  - Serves images from local `uploads/` directory
-  - Automatically sets correct Content-Type
-  - Returns 404 for non-existent files
+- Added `imageUrl` VARCHAR column to `posts` table (stores Cloudinary URL)
 
 ## Technical Implementation
 
 ### Backend (Spring Boot)
 
-**Services:**
-- `FileStorageService` - Handles file storage operations
-  - Stores files in `uploads/{subDirectory}/` with UUID filenames
-  - Validates file types and sizes
-  - Supports file deletion
+**Dependencies:**
+```xml
+<dependency>
+    <groupId>com.cloudinary</groupId>
+    <artifactId>cloudinary-http44</artifactId>
+    <version>1.36.0</version>
+</dependency>
+```
 
-**Controllers:**
-- `UserController` - Added profile image upload endpoint
-- `PostController` - Added post image upload endpoint
-- `FileController` - Serves uploaded files
+**Services:**
+- `FileStorageService` - Handles file upload to Cloudinary
+  - Uploads files with automatic folder organization
+  - Returns secure HTTPS URLs
+  - Supports file deletion
 
 **Configuration:**
 ```properties
-spring.servlet.multipart.enabled=true
-spring.servlet.multipart.max-file-size=10MB
-spring.servlet.multipart.max-request-size=10MB
-file.upload-dir=uploads
+# Cloudinary Configuration
+cloudinary.cloud-name=${CLOUDINARY_CLOUD_NAME:your-cloud-name}
+cloudinary.api-key=${CLOUDINARY_API_KEY:your-api-key}
+cloudinary.api-secret=${CLOUDINARY_API_SECRET:your-api-secret}
 ```
+
+**Environment Variables Required:**
+- `CLOUDINARY_CLOUD_NAME` - Your Cloudinary cloud name
+- `CLOUDINARY_API_KEY` - Your Cloudinary API key
+- `CLOUDINARY_API_SECRET` - Your Cloudinary API secret
 
 ### Frontend (Next.js/React)
 
@@ -91,35 +90,52 @@ file.upload-dir=uploads
 - `uploadPostImage(postId, file)` - Upload post image
 
 **Updated Pages:**
-- Profile page - Profile image upload dialog
+- Profile page - Profile image upload dialog with live preview
 - Home page - Post creation with image support
 
-## File Structure
+## Cloudinary Setup
 
-```
-uploads/
-├── profile-images/
-│   └── {uuid}.{ext}
-└── post-images/
-    └── {uuid}.{ext}
-```
+To use this feature, you need a Cloudinary account:
 
-The `uploads/` directory is excluded from version control via `.gitignore`.
+1. Sign up at [cloudinary.com](https://cloudinary.com)
+2. Get your credentials from the dashboard:
+   - Cloud name
+   - API Key
+   - API Secret
+3. Set environment variables:
+   ```bash
+   export CLOUDINARY_CLOUD_NAME=your-cloud-name
+   export CLOUDINARY_API_KEY=your-api-key
+   export CLOUDINARY_API_SECRET=your-api-secret
+   ```
+
+## Image Organization
+
+Images are automatically organized in Cloudinary folders:
+- `profile-images/` - User profile pictures
+- `post-images/` - Post attachments
 
 ## Security Considerations
 
-1. **File Type Validation**: Only image files are accepted
+1. **File Type Validation**: Only image files are accepted (server-side check)
 2. **File Size Limit**: Maximum 10MB per file
-3. **UUID Filenames**: Prevents path traversal attacks
-4. **No User-Controlled Paths**: Files stored with generated names
-5. **Content-Type Verification**: Server validates file types
+3. **Cloudinary Security**: Images are served via HTTPS
+4. **API Key Protection**: Credentials stored in environment variables
+5. **Automatic Optimization**: Cloudinary provides automatic image optimization
+
+## Benefits Over Local Storage
+
+1. **Scalability**: No server storage limits
+2. **CDN**: Fast global content delivery
+3. **Automatic Optimization**: Image compression and format conversion
+4. **Reliability**: Built-in backup and redundancy
+5. **Transformations**: On-the-fly image resizing and manipulation available
 
 ## Future Enhancements
 
-Possible improvements for future versions:
-- Cloud storage integration (AWS S3, Azure Blob, etc.)
-- Image compression and optimization
+Possible improvements:
+- Image transformations (resize, crop, filters)
 - Multiple image support per post
-- Image cropping/editing tools
-- Profile cover images
 - Image galleries
+- Video upload support
+- Profile cover images

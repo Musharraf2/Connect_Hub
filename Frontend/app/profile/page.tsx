@@ -179,6 +179,7 @@ export default function ProfilePage() {
           community: profile.profession,
           location: profile.location ?? "No location set",
           bio: profile.aboutMe ?? "No bio set",
+          avatar: profile.profileImageUrl || "/placeholder.svg?height=120&width=120",
 
           // --- REAL ACADEMIC DATA ---
           university: profile.academicInfo?.university ?? "Not specified",
@@ -267,11 +268,10 @@ export default function ProfilePage() {
     const toastId = toast.loading("Uploading profile image...")
 
     try {
-      const result = await uploadProfileImage(currentUser.id, selectedImageFile)
+            const result = await uploadProfileImage(currentUser.id, selectedImageFile)
       
-      // Update the current user state with new profile image
-      const updatedAvatar = `http://localhost:8080/api/files/${result.profileImageUrl}`
-      setCurrentUser({ ...currentUser, avatar: updatedAvatar })
+      // Update the current user state with new profile image (Cloudinary returns full URL)
+      setCurrentUser({ ...currentUser, avatar: result.profileImageUrl })
       
       toast.success("Profile image updated!", { id: toastId })
       setShowImageUploadDialog(false)

@@ -657,7 +657,7 @@ export default function HomePage() {
                                                 {post.imageUrl && (
                                                     <div className="relative w-full h-96 rounded-lg overflow-hidden border-2 border-border">
                                                         <Image
-                                                            src={`http://localhost:8080/api/files/${post.imageUrl}`}
+                                                            src={post.imageUrl}
                                                             alt="Post image"
                                                             fill
                                                             className="object-cover"

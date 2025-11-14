@@ -1,22 +1,71 @@
-# Quick Start Guide - Image Upload Features
+# Quick Start Guide - Image Upload Features with Cloudinary
+
+## Prerequisites
+
+1. **Cloudinary Account**: Sign up at [cloudinary.com](https://cloudinary.com) and get your credentials
+2. **MySQL Database**: Ensure MySQL is running
+3. **Java 17**: Backend requires Java 17+
+4. **Node.js**: Frontend requires Node.js for npm
 
 ## Setup Instructions
 
+### Cloudinary Configuration
+
+1. **Get Cloudinary Credentials**:
+   - Go to your [Cloudinary Dashboard](https://cloudinary.com/console)
+   - Copy your:
+     - Cloud Name
+     - API Key
+     - API Secret
+
+2. **Set Environment Variables**:
+   
+   **Linux/Mac**:
+   ```bash
+   export CLOUDINARY_CLOUD_NAME=your-cloud-name
+   export CLOUDINARY_API_KEY=your-api-key
+   export CLOUDINARY_API_SECRET=your-api-secret
+   ```
+   
+   **Windows (CMD)**:
+   ```cmd
+   set CLOUDINARY_CLOUD_NAME=your-cloud-name
+   set CLOUDINARY_API_KEY=your-api-key
+   set CLOUDINARY_API_SECRET=your-api-secret
+   ```
+   
+   **Windows (PowerShell)**:
+   ```powershell
+   $env:CLOUDINARY_CLOUD_NAME="your-cloud-name"
+   $env:CLOUDINARY_API_KEY="your-api-key"
+   $env:CLOUDINARY_API_SECRET="your-api-secret"
+   ```
+
 ### Backend Setup
 
-1. **Ensure MySQL is running** with the database configured in `application.properties`
-
-2. **Start the Spring Boot backend**:
+1. **Navigate to backend directory**:
    ```bash
    cd backend/profession-connect
+   ```
+
+2. **Update application.properties** (if needed):
+   The default configuration uses environment variables. You can also hardcode values:
+   ```properties
+   cloudinary.cloud-name=your-cloud-name
+   cloudinary.api-key=your-api-key
+   cloudinary.api-secret=your-api-secret
+   ```
+
+3. **Start the Spring Boot backend**:
+   ```bash
    ./mvnw spring-boot:run
    ```
 
-3. **Verify the backend is running** at `http://localhost:8080`
+4. **Verify the backend is running** at `http://localhost:8080`
 
 ### Frontend Setup
 
-1. **Install dependencies** (if not already done):
+1. **Install dependencies**:
    ```bash
    cd Frontend
    npm install
@@ -41,7 +90,7 @@
    - Maximum size: 10MB
 5. **Preview** the image
 6. **Click "Upload"** to save
-7. Your profile image will be **updated immediately**
+7. Your profile image will be **uploaded to Cloudinary and displayed immediately**
 
 ### Posting with Images
 
@@ -54,7 +103,16 @@
    - Maximum size: 10MB
 6. **Preview** the image before posting
 7. **Click "Post"** to share
-8. Your post will appear in the feed **with the image displayed**
+8. Your post will appear in the feed **with the image served from Cloudinary**
+
+## How It Works
+
+1. **User selects image** in browser
+2. **Frontend sends image** to backend via multipart/form-data
+3. **Backend uploads to Cloudinary** using Cloudinary SDK
+4. **Cloudinary returns secure URL** (e.g., `https://res.cloudinary.com/...`)
+5. **Backend saves URL** to database
+6. **Frontend displays image** directly from Cloudinary CDN
 
 ## API Endpoints Reference
 
@@ -68,7 +126,7 @@ Body:
 
 Response:
   {
-    "profileImageUrl": "profile-images/abc123.jpg"
+    "profileImageUrl": "https://res.cloudinary.com/your-cloud/image/upload/v1234/profile-images/abc123.jpg"
   }
 ```
 
@@ -82,14 +140,12 @@ Body:
 
 Response:
   {
-    "imageUrl": "post-images/def456.jpg"
+    "imageUrl": "https://res.cloudinary.com/your-cloud/image/upload/v1234/post-images/def456.jpg"
   }
 ```
 
-### View Uploaded Images
-```
-GET /api/files/{subDirectory}/{filename}
-```
+### View Images
+Images are served directly from Cloudinary's CDN - no special endpoint needed. Just use the URL returned from the upload endpoint.
 
 ## Troubleshooting
 
@@ -98,20 +154,36 @@ GET /api/files/{subDirectory}/{filename}
 **Problem**: "Failed to upload image"
 
 **Solutions**:
-- Check file size (must be under 10MB)
-- Verify file is a valid image format
-- Ensure backend server is running
-- Check browser console for error details
+- Check Cloudinary credentials are set correctly
+- Verify file size (must be under 10MB)
+- Ensure file is a valid image format
+- Check backend server is running
+- View backend logs for Cloudinary API errors
+- Verify internet connection (backend needs to reach Cloudinary)
+
+### "Cloudinary configuration error"
+
+**Problem**: Backend fails to start or upload fails
+
+**Solutions**:
+- Ensure all three environment variables are set:
+  - CLOUDINARY_CLOUD_NAME
+  - CLOUDINARY_API_KEY
+  - CLOUDINARY_API_SECRET
+- Check for typos in credentials
+- Verify credentials in Cloudinary dashboard
+- Restart backend after setting environment variables
 
 ### Image Not Displaying
 
 **Problem**: Image uploaded but not showing
 
 **Solutions**:
-- Refresh the page
-- Check browser developer tools for 404 errors
-- Verify the `uploads/` directory exists in backend
-- Check file permissions on uploads directory
+- Check browser console for CORS or loading errors
+- Verify the URL is a valid Cloudinary URL (starts with `https://res.cloudinary.com/`)
+- Check browser developer tools network tab
+- Ensure Cloudinary account is active
+- Try accessing the image URL directly in browser
 
 ### CORS Errors
 
@@ -122,26 +194,22 @@ GET /api/files/{subDirectory}/{filename}
 - Backend `@CrossOrigin` is set to `http://localhost:3000`
 - Clear browser cache and cookies
 
-## File Structure After Upload
+## Cloudinary Dashboard
 
-```
-backend/profession-connect/
-└── uploads/
-    ├── profile-images/
-    │   ├── a1b2c3d4-e5f6-7890-abcd-ef1234567890.jpg
-    │   └── ...
-    └── post-images/
-        ├── b2c3d4e5-f6a7-8901-bcde-f12345678901.png
-        └── ...
-```
+Monitor your uploads in the Cloudinary dashboard:
+- View all uploaded images
+- Check storage usage
+- Analyze bandwidth consumption
+- Configure delivery optimizations
+- Set up image transformations
 
-## Security Notes
+## Benefits
 
-1. **File validation** is performed on both client and server
-2. **Unique filenames** (UUIDs) prevent path traversal attacks
-3. **Type checking** ensures only images are accepted
-4. **Size limits** prevent abuse and server overload
-5. Files are stored **locally** (consider cloud storage for production)
+1. **No Local Storage**: Images stored in cloud, not on server
+2. **Fast Delivery**: Cloudinary CDN serves images globally
+3. **Automatic Optimization**: Images compressed and optimized automatically
+4. **Scalability**: Unlimited storage (based on plan)
+5. **Transformations**: Can add image transformations in future
 
 ## Next Steps
 
@@ -149,13 +217,14 @@ backend/profession-connect/
 - Try uploading images of different sizes
 - Create posts with and without images
 - Update your profile image multiple times
-- Share the app with your team for feedback
+- Monitor Cloudinary dashboard for uploads
 
 ## Support
 
 For issues or questions:
 1. Check the main `IMAGE_UPLOAD_FEATURES.md` documentation
 2. Review browser console for errors
-3. Check backend logs for server-side issues
-4. Ensure all dependencies are installed
-5. Verify database migrations ran successfully
+3. Check backend logs for Cloudinary API issues
+4. Verify Cloudinary credentials
+5. Ensure internet connectivity
+6. Check Cloudinary status page if service issues suspected

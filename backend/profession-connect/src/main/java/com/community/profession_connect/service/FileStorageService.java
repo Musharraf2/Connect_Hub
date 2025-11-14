@@ -1,52 +1,49 @@
 package com.community.profession_connect.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.UUID;
+import java.util.Map;
 
 @Service
 public class FileStorageService {
 
-    @Value("${file.upload-dir:uploads}")
-    private String uploadDir;
+    private final Cloudinary cloudinary;
 
-    public String storeFile(MultipartFile file, String subDirectory) throws IOException {
-        // Create upload directory if it doesn't exist
-        Path uploadPath = Paths.get(uploadDir, subDirectory);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        // Generate unique filename
-        String originalFilename = file.getOriginalFilename();
-        String fileExtension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-        String filename = UUID.randomUUID().toString() + fileExtension;
-
-        // Store the file
-        Path targetLocation = uploadPath.resolve(filename);
-        Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-
-        // Return the relative path
-        return subDirectory + "/" + filename;
+    public FileStorageService(
+            @Value("${cloudinary.cloud-name}") String cloudName,
+            @Value("${cloudinary.api-key}") String apiKey,
+            @Value("${cloudinary.api-secret}") String apiSecret) {
+        this.cloudinary = new Cloudinary(ObjectUtils.asMap(
+                "cloud_name", cloudName,
+                "api_key", apiKey,
+                "api_secret", apiSecret));
     }
 
-    public void deleteFile(String filePath) {
+    public String storeFile(MultipartFile file, String folder) throws IOException {
+        // Upload to Cloudinary
+        Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                file.getBytes(),
+                ObjectUtils.asMap(
+                        "folder", folder,
+                        "resource_type", "auto"
+                )
+        );
+
+        // Return the secure URL
+        return (String) uploadResult.get("secure_url");
+    }
+
+    public void deleteFile(String publicId) {
         try {
-            Path path = Paths.get(uploadDir, filePath);
-            Files.deleteIfExists(path);
+            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
         } catch (IOException e) {
             // Log error but don't fail
-            System.err.println("Failed to delete file: " + filePath);
+            System.err.println("Failed to delete file: " + publicId);
         }
     }
 }
