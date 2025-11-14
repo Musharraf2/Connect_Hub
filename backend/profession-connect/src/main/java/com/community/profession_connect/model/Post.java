@@ -1,8 +1,9 @@
 package com.community.profession_connect.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.*; // Make sure ToString.Exclude and EqualsAndHashCode.Exclude are imported
 import java.time.LocalDateTime;
+import java.util.List; // ❗️ Import List
 
 @Entity
 @Table(name = "posts")
@@ -29,6 +30,30 @@ public class Post {
 
     @Column(name = "likes_count")
     private Integer likesCount = 0;
+
+    // ⬇️ --- ADD THIS SECTION --- ⬇️
+
+    /**
+     * This defines the relationship to the PostLike entity.
+     * cascade = CascadeType.REMOVE: When a Post is deleted, delete all its associated likes.
+     * orphanRemoval = true: Cleans up any likes that are no longer referenced by this post.
+     */
+    @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude // Prevents infinite loops in Lombok's toString()
+    @EqualsAndHashCode.Exclude // Prevents infinite loops in Lombok's equals/hashCode()
+    private List<PostLike> likes;
+
+    /**
+     * This defines the relationship to the Comment entity.
+     * cascade = CascadeType.REMOVE: When a Post is deleted, delete all its associated comments.
+     */
+    @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Comment> comments;
+
+    // ⬆️ --- END OF ADDED SECTION --- ⬆️
+
 
     @PrePersist
     protected void onCreate() {
