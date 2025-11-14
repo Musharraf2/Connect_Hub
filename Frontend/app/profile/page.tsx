@@ -9,13 +9,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getUserProfile,
   UserProfileResponse,
-  updateProfile, // <-- ADD THIS
-  ProfileUpdatePayload, // <-- ADD THIS
+  updateProfile,
+  ProfileUpdatePayload,
+  uploadProfileImage,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { Textarea } from "@/components/ui/textarea" 
+import { ImageUpload } from "@/components/image-upload"
 import {
   MapPin,
   Calendar,
@@ -30,14 +32,22 @@ import {
   Mail,
   Phone,
   Award,
-  Save,  // <-- ADDED THIS IMPORT
-  X,     // <-- ADDED THIS IMPORT
-  Edit3, // <-- ADDED THIS IMPORT
+  Save,
+  X,
+  Edit3,
+  Camera,
 } from "lucide-react"
 import Link from "next/link"
 import { LoginResponse } from "@/app/login/page" // Import session type
 import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // This is our MOCKED data. We will merge session data into this.
 const profileMockData = {
@@ -131,6 +141,11 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
+  
+  // Profile image upload state
+  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
+  const [showImageUploadDialog, setShowImageUploadDialog] = useState(false)
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
 
  useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
@@ -239,6 +254,35 @@ export default function ProfilePage() {
   }
   // --- End Bio Edit State ---
 
+  // Profile image upload handlers
+  const handleImageSelect = (file: File) => {
+    setSelectedImageFile(file)
+  }
+
+  const handleImageUpload = async () => {
+    if (!selectedImageFile || !currentUser) return
+
+    setIsUploadingProfileImage(true)
+    const toastId = toast.loading("Uploading profile image...")
+
+    try {
+      const result = await uploadProfileImage(currentUser.id, selectedImageFile)
+      
+      // Update the current user state with new profile image
+      const updatedAvatar = `http://localhost:8080/api/files/${result.profileImageUrl}`
+      setCurrentUser({ ...currentUser, avatar: updatedAvatar })
+      
+      toast.success("Profile image updated!", { id: toastId })
+      setShowImageUploadDialog(false)
+      setSelectedImageFile(null)
+    } catch (error) {
+      console.error("Failed to upload profile image", error)
+      toast.error("Failed to upload image", { id: toastId })
+    } finally {
+      setIsUploadingProfileImage(false)
+    }
+  }
+
   if (authLoading || !currentUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -265,12 +309,21 @@ export default function ProfilePage() {
               {/* Profile Info */}
               <div className="relative px-6 pb-6">
                 <div className="flex flex-col md:flex-row md:items-end md:space-x-6 -mt-16">
-                  <Avatar className="w-32 h-32 border-4 border-background mb-4 md:mb-0">
-                    <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-                    <AvatarFallback className="text-2xl">
-                      {currentUser.name.split(" ").map((n) => n[0]).join("")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative mb-4 md:mb-0">
+                    <Avatar className="w-32 h-32 border-4 border-background">
+                      <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
+                      <AvatarFallback className="text-2xl">
+                        {currentUser.name.split(" ").map((n) => n[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button
+                      size="sm"
+                      className="absolute bottom-0 right-0 rounded-full h-10 w-10 p-0"
+                      onClick={() => setShowImageUploadDialog(true)}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </div>
 
                   <div className="flex-1">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -522,6 +575,40 @@ export default function ProfilePage() {
           </aside>
         </div>
       </main>
+
+      {/* Profile Image Upload Dialog */}
+      <Dialog open={showImageUploadDialog} onOpenChange={setShowImageUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Profile Image</DialogTitle>
+            <DialogDescription>
+              Choose an image to update your profile picture
+            </DialogDescription>
+          </DialogHeader>
+          <ImageUpload
+            onImageSelect={handleImageSelect}
+            disabled={isUploadingProfileImage}
+          />
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImageUploadDialog(false)
+                setSelectedImageFile(null)
+              }}
+              disabled={isUploadingProfileImage}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImageUpload}
+              disabled={!selectedImageFile || isUploadingProfileImage}
+            >
+              {isUploadingProfileImage ? "Uploading..." : "Upload"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer is Removed */}
     </div>

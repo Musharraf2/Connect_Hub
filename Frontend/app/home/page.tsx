@@ -19,6 +19,7 @@ import {
     deletePost,
     toggleLike,
     addComment,
+    uploadPostImage,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Header } from "@/components/header";
+import { ImageUpload } from "@/components/image-upload";
 import {
     Dialog,
     DialogContent,
@@ -40,9 +42,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, Trash2 } from "lucide-react";
+import { UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, Trash2, Image as ImageIcon } from "lucide-react";
 import { FadeInUp, StaggerContainer } from "@/components/animations";
 import toast from "react-hot-toast";
+import Image from "next/image";
 
 // ---------------- Types local to this component ----------------
 interface CurrentUser {
@@ -79,6 +82,7 @@ export default function HomePage() {
     const [posts, setPosts] = useState<PostResponse[]>([]);
     const [postsLoading, setPostsLoading] = useState(true);
     const [postContent, setPostContent] = useState("");
+    const [postImageFile, setPostImageFile] = useState<File | null>(null);
     const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false);
     const [isSubmittingPost, setIsSubmittingPost] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -238,8 +242,8 @@ export default function HomePage() {
 
     // ---------------- Post handlers ----------------
     const handleCreatePost = async () => {
-        if (!postContent.trim()) {
-            toast.error("Post content cannot be empty");
+        if (!postContent.trim() && !postImageFile) {
+            toast.error("Post must have content or an image");
             return;
         }
 
@@ -250,11 +254,23 @@ export default function HomePage() {
         setIsSubmittingPost(true);
 
         try {
+            // First create the post with text content
             const newPost = await createPost({ content: postContent, userId: user.id });
+            
+            // If there's an image, upload it
+            if (postImageFile) {
+                await uploadPostImage(newPost.id, postImageFile);
+                // Refetch the post to get the updated version with the image
+                const updatedPosts = await getPostsByProfession(user.profession, user.id);
+                setPosts(updatedPosts);
+            } else {
+                setPosts((prev) => [newPost, ...prev]);
+            }
+            
             setPostContent("");
+            setPostImageFile(null);
             setIsPostingDialogOpen(false);
             toast.success("Post created successfully!");
-            setPosts((prev) => [newPost, ...prev]);
         } catch (error) {
             console.error("Failed to create post:", error);
             toast.error("Failed to create post");
@@ -636,6 +652,19 @@ export default function HomePage() {
                                             </CardHeader>
                                             <CardContent className="space-y-4">
                                                 <p className="text-muted-foreground leading-relaxed">{post.content}</p>
+                                                
+                                                {/* Display post image if present */}
+                                                {post.imageUrl && (
+                                                    <div className="relative w-full h-96 rounded-lg overflow-hidden border-2 border-border">
+                                                        <Image
+                                                            src={`http://localhost:8080/api/files/${post.imageUrl}`}
+                                                            alt="Post image"
+                                                            fill
+                                                            className="object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+                                                
                                                 <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
                                                     <Button
                                                         variant="ghost"
@@ -809,7 +838,13 @@ export default function HomePage() {
             </main>
 
             {/* Create Post Dialog */}
-            <Dialog open={isPostingDialogOpen} onOpenChange={setIsPostingDialogOpen}>
+            <Dialog open={isPostingDialogOpen} onOpenChange={(open) => {
+                setIsPostingDialogOpen(open);
+                if (!open) {
+                    setPostContent("");
+                    setPostImageFile(null);
+                }
+            }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Create a Post</DialogTitle>
@@ -823,17 +858,32 @@ export default function HomePage() {
                         placeholder="What's on your mind?"
                         className="min-h-[150px]"
                     />
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                            <ImageIcon className="w-4 h-4" />
+                            Add an image (optional)
+                        </label>
+                        <ImageUpload
+                            onImageSelect={setPostImageFile}
+                            onImageRemove={() => setPostImageFile(null)}
+                            disabled={isSubmittingPost}
+                        />
+                    </div>
                     <DialogFooter>
                         <Button
                             variant="outline"
                             onClick={() => {
                                 setIsPostingDialogOpen(false);
                                 setPostContent("");
+                                setPostImageFile(null);
                             }}
                         >
                             Cancel
                         </Button>
-                        <Button onClick={handleCreatePost} disabled={isSubmittingPost || !postContent.trim()}>
+                        <Button 
+                            onClick={handleCreatePost} 
+                            disabled={isSubmittingPost || (!postContent.trim() && !postImageFile)}
+                        >
                             {isSubmittingPost ? "Posting..." : "Post"}
                         </Button>
                     </DialogFooter>

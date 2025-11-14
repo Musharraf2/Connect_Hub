@@ -6,12 +6,16 @@ import com.community.profession_connect.dto.RegistrationRequest;
 import com.community.profession_connect.dto.UserProfileDetailResponse; // <-- IMPORT THIS
 import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
+import com.community.profession_connect.service.FileStorageService;
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -19,10 +23,12 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final FileStorageService fileStorageService;
 
     @Autowired
-    public UserController(UserService userService) {
+    public UserController(UserService userService, FileStorageService fileStorageService) {
         this.userService = userService;
+        this.fileStorageService = fileStorageService;
     }
 
     @PostMapping("/register")
@@ -69,6 +75,36 @@ public class UserController {
             return ResponseEntity.ok(updatedUser);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/{userId}/profile-image")
+    public ResponseEntity<Map<String, String>> uploadProfileImage(
+            @PathVariable Long userId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+            }
+
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
+            }
+
+            // Store file
+            String filePath = fileStorageService.storeFile(file, "profile-images");
+
+            // Update user profile
+            User user = userService.updateProfileImage(userId, filePath);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("profileImageUrl", user.getProfileImageUrl());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
         }
     }
 }

@@ -19,6 +19,7 @@ public class PostResponse {
     private Integer commentsCount;
     private boolean likedByCurrentUser;
     private List<CommentResponse> comments;
+    private String imageUrl; // Add image URL field
 
     @Data
     @NoArgsConstructor

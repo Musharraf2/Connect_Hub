@@ -30,7 +30,8 @@ export interface UserProfile {
     profession: string;
     email: string;
     location: string;
-    aboutMe: string; // Ensure this is present
+    aboutMe: string;
+    profileImageUrl?: string | null;
     // ... other fields
 }
 
@@ -102,6 +103,7 @@ export interface PostResponse {
     commentsCount: number;
     likedByCurrentUser: boolean;
     comments: CommentResponse[];
+    imageUrl?: string | null;
 }
 
 export interface CommentResponse {
@@ -157,6 +159,7 @@ export interface UserProfileDetailResponse {
   profession: string;
   location: string | null;
   aboutMe: string | null;
+  profileImageUrl?: string | null;
   academicInfo: AcademicInfo | null;
   skills: Skill[];
   interests: Interest[];
@@ -467,6 +470,52 @@ export const addComment = async (postId: number, commentData: CommentRequest): P
         return await response.json();
     } catch (error) {
         console.error("Failed to add comment:", error);
+        throw error;
+    }
+};
+
+// Image upload functions
+
+export const uploadProfileImage = async (userId: number, file: File): Promise<{ profileImageUrl: string }> => {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${BASE}/users/${userId}/profile-image`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to upload profile image: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to upload profile image:", error);
+        throw error;
+    }
+};
+
+export const uploadPostImage = async (postId: number, file: File): Promise<{ imageUrl: string }> => {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${BASE}/posts/${postId}/image`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to upload post image: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to upload post image:", error);
         throw error;
     }
 };
