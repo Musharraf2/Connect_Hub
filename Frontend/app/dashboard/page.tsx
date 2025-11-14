@@ -643,10 +643,12 @@ const handleSaveBio = async () => {
                             </Avatar>
                             <h3 className="font-serif font-semibold mb-1">{otherUserName}</h3>
                             <p className="text-sm text-muted-foreground mb-3">{otherUser?.profession || "N/A"}</p>
-                            <Button size="sm" variant="outline" className="w-full bg-transparent">
-                              <MessageCircle className="w-4 h-4 mr-2" />
-                              Message
-                            </Button>
+                            <Link href="/dashboard/chat" className="w-full">
+                              <Button size="sm" variant="outline" className="w-full bg-transparent">
+                                <MessageCircle className="w-4 h-4 mr-2" />
+                                Message
+                              </Button>
+                            </Link>
                           </CardContent>
                         </Card>
                       </StaggerItem>

@@ -109,9 +109,9 @@ export function Header({ user }: HeaderProps) {
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" asChild>
-                                    <Link href="/messages" className="flex items-center space-x-2">
+                                    <Link href="/dashboard/chat" className="flex items-center space-x-2">
                                         <MessageCircle className="w-4 h-4" />
-                                        <span>Messages</span>
+                                        <span>Chat</span>
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" className="relative" asChild>
