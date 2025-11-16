@@ -525,3 +525,113 @@ export const uploadPostImage = async (postId: number, file: File): Promise<{ ima
         throw error;
     }
 };
+// Notification API functions
+
+export interface NotificationDTO {
+    id: number;
+    type: "LIKE" | "COMMENT" | "CONNECTION_ACCEPTED" | "CONNECTION_REQUEST";
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+    relatedEntityId?: number;
+    actor: {
+        id: number;
+        name: string;
+        profileImageUrl?: string;
+    };
+}
+
+export const getNotifications = async (userId: number): Promise<NotificationDTO[]> => {
+    try {
+        const response = await fetch(`${BASE}/notifications/${userId}`);
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch notifications: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to fetch notifications:", error);
+        throw error;
+    }
+};
+
+export const getUnreadCount = async (userId: number): Promise<number> => {
+    try {
+        const response = await fetch(`${BASE}/notifications/${userId}/unread-count`);
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to fetch unread count: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.count;
+    } catch (error) {
+        console.error("Failed to fetch unread count:", error);
+        throw error;
+    }
+};
+
+export const markNotificationAsRead = async (notificationId: number): Promise<NotificationDTO> => {
+    try {
+        const response = await fetch(`${BASE}/notifications/${notificationId}/read`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to mark notification as read: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+        throw error;
+    }
+};
+
+export const markAllNotificationsAsRead = async (userId: number): Promise<string> => {
+    try {
+        const response = await fetch(`${BASE}/notifications/${userId}/read-all`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to mark all as read: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.message;
+    } catch (error) {
+        console.error("Failed to mark all as read:", error);
+        throw error;
+    }
+};
+
+export const deleteNotification = async (notificationId: number): Promise<string> => {
+    try {
+        const response = await fetch(`${BASE}/notifications/${notificationId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Failed to delete notification: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.message;
+    } catch (error) {
+        console.error("Failed to delete notification:", error);
+        throw error;
+    }
+};

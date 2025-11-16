@@ -17,9 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// import java.util.ArrayList; // <-- FIX: REMOVED UNUSED IMPORT
 import java.util.List;
-import java.util.Objects; // <-- FIX: ADDED IMPORT
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,12 +36,15 @@ public class PostService {
     @Autowired
     private PostLikeRepository postLikeRepository;
 
+    // ADD THIS: Inject NotificationService
+    @Autowired
+    private NotificationService notificationService;
+
     public PostResponse createPost(PostRequest request) {
-        // --- FIX: Check for null and satisfy nullness analyzer ---
         Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
-        
+
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         Post post = new Post();
         post.setContent(request.getContent());
@@ -57,18 +59,17 @@ public class PostService {
     public List<PostResponse> getPostsByProfession(String profession, Long currentUserId) {
         List<Post> posts = postRepository.findByProfessionOrderByCreatedAtDesc(profession);
         return posts.stream()
-            .map(post -> convertToPostResponse(post, currentUserId))
-            .collect(Collectors.toList());
+                .map(post -> convertToPostResponse(post, currentUserId))
+                .collect(Collectors.toList());
     }
 
     @Transactional
     public String deletePost(Long postId, Long userId) {
-        // --- FIX: Check for nulls ---
         Objects.requireNonNull(postId, "Post ID must not be null");
         Objects.requireNonNull(userId, "User ID must not be null");
 
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new RuntimeException("Post not found"));
 
         if (!post.getUser().getId().equals(userId)) {
             throw new RuntimeException("Unauthorized: You can only delete your own posts");
@@ -80,15 +81,14 @@ public class PostService {
 
     @Transactional
     public PostResponse toggleLike(Long postId, Long userId) {
-        // --- FIX: Check for nulls ---
         Objects.requireNonNull(postId, "Post ID must not be null");
         Objects.requireNonNull(userId, "User ID must not be null");
 
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new RuntimeException("Post not found"));
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         PostLike existingLike = postLikeRepository.findByPostIdAndUserId(postId, userId).orElse(null);
 
@@ -103,6 +103,15 @@ public class PostService {
             like.setUser(user);
             postLikeRepository.save(like);
             post.setLikesCount(post.getLikesCount() + 1);
+
+            // CREATE NOTIFICATION: Only notify if user is NOT liking their own post
+            if (!post.getUser().getId().equals(userId)) {
+                notificationService.createLikeNotification(
+                        post.getUser().getId(),  // Post owner
+                        userId,                  // Person who liked
+                        postId                   // Post ID
+                );
+            }
         }
 
         post = postRepository.save(post);
@@ -110,15 +119,14 @@ public class PostService {
     }
 
     public PostResponse addComment(CommentRequest request) {
-        // --- FIX: Check for nulls ---
         Long postId = Objects.requireNonNull(request.getPostId(), "Post ID must not be null");
         Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
 
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new RuntimeException("Post not found"));
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         Comment comment = new Comment();
         comment.setContent(request.getContent());
@@ -127,17 +135,25 @@ public class PostService {
 
         commentRepository.save(comment);
 
+        // CREATE NOTIFICATION: Only notify if user is NOT commenting on their own post
+        if (!post.getUser().getId().equals(userId)) {
+            notificationService.createCommentNotification(
+                    post.getUser().getId(),  // Post owner
+                    userId,                  // Person who commented
+                    postId                   // Post ID
+            );
+        }
+
         return convertToPostResponse(post, userId);
     }
 
     public List<CommentResponse> getCommentsByPostId(Long postId) {
-        // --- FIX: Check for null ---
         Objects.requireNonNull(postId, "Post ID must not be null");
 
         List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
         return comments.stream()
-            .map(this::convertToCommentResponse)
-            .collect(Collectors.toList());
+                .map(this::convertToCommentResponse)
+                .collect(Collectors.toList());
     }
 
     private PostResponse convertToPostResponse(Post post, Long currentUserId) {
@@ -147,7 +163,7 @@ public class PostService {
         response.setProfession(post.getProfession());
         response.setCreatedAt(post.getCreatedAt());
         response.setLikesCount(post.getLikesCount());
-        response.setImageUrl(post.getImageUrl()); // Add image URL
+        response.setImageUrl(post.getImageUrl());
 
         // User info
         PostResponse.UserInfo userInfo = new PostResponse.UserInfo();
@@ -158,26 +174,26 @@ public class PostService {
         response.setUser(userInfo);
 
         // Check if current user liked this post
-        boolean liked = currentUserId != null && 
-            postLikeRepository.findByPostIdAndUserId(post.getId(), currentUserId).isPresent();
+        boolean liked = currentUserId != null &&
+                postLikeRepository.findByPostIdAndUserId(post.getId(), currentUserId).isPresent();
         response.setLikedByCurrentUser(liked);
 
         // Get comments
         List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtDesc(post.getId());
         response.setCommentsCount(comments.size());
         response.setComments(comments.stream()
-            .map(this::convertToCommentResponse)
-            .collect(Collectors.toList()));
+                .map(this::convertToCommentResponse)
+                .collect(Collectors.toList()));
 
         return response;
     }
 
     public void updatePostImage(Long postId, String imageUrl) {
         Objects.requireNonNull(postId, "Post ID must not be null");
-        
+
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
-        
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
         post.setImageUrl(imageUrl);
         postRepository.save(post);
     }
