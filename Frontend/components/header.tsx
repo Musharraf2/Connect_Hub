@@ -27,16 +27,15 @@ import {
     Moon,
     Sun,
     ChevronDown,
-    Briefcase, // <-- Import a generic "briefcase" icon
+    Briefcase,
 } from "lucide-react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 
-// The HeaderProps now accepts a more general 'string' for community.
 interface HeaderProps {
     user?: {
-        id?: number // <-- This is correct
+        id?: number
         name: string
         community: string
         avatar: string
@@ -44,7 +43,6 @@ interface HeaderProps {
     }
 }
 
-// We keep the specific icons for our "main" communities
 const communityIcons: Record<string, React.ComponentType<{ className?: string }>> = {
     student: BookOpen,
     teacher: Users,
@@ -53,28 +51,21 @@ const communityIcons: Record<string, React.ComponentType<{ className?: string }>
     dancer: Zap,
 }
 
-// We keep the specific colors for our "main" communities with modern palette
 const communityColors: Record<string, string> = {
     student: "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-transparent shadow-sm",
     teacher: "bg-gradient-to-r from-green-500 to-green-600 text-white border-transparent shadow-sm",
-    musician:
-        "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-transparent shadow-sm",
+    musician: "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-transparent shadow-sm",
     doctor: "bg-gradient-to-r from-red-500 to-red-600 text-white border-transparent shadow-sm",
-    dancer:
-        "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-transparent shadow-sm",
+    dancer: "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-transparent shadow-sm",
 }
 
 export function Header({ user }: HeaderProps) {
     const { theme, setTheme } = useTheme()
     const router = useRouter()
 
-    // --- THIS LOGIC IS NOW UPDATED ---
     const communityKey = user?.community.toLowerCase() || "";
-    // Get the specific icon, OR use the default Briefcase icon
     const CommunityIcon = communityIcons[communityKey] || Briefcase;
-    // Get the specific color, OR use a default gradient
     const communityColorClass = communityColors[communityKey] || "bg-gradient-to-r from-gray-500 to-gray-600 text-white border-transparent shadow-sm";
-    // --- END OF UPDATE ---
 
     const handleSignOut = () => {
         sessionStorage.removeItem('user');
@@ -103,7 +94,6 @@ export function Header({ user }: HeaderProps) {
                                 </Button>
                                 <Button variant="ghost" size="sm" asChild>
                                     <Link href="/community" className="flex items-center space-x-2">
-                                        {/* This will now show the default icon if needed */}
                                         <CommunityIcon className="w-4 h-4" />
                                         <span>My Community</span>
                                     </Link>
@@ -115,13 +105,14 @@ export function Header({ user }: HeaderProps) {
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" className="relative" asChild>
-                                    <Link href="/notifications" className="flex items-center space-x-2">
+                                    {/* FIXED: Changed from /notifications to /notification */}
+                                    <Link href="/notification" className="flex items-center space-x-2">
                                         <Bell className="w-4 h-4" />
                                         <span>Notifications</span>
                                         {user.pendingRequests && user.pendingRequests > 0 && (
                                             <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                        {user.pendingRequests}
-                      </span>
+                                                {user.pendingRequests}
+                                            </span>
                                         )}
                                     </Link>
                                 </Button>
@@ -144,9 +135,7 @@ export function Header({ user }: HeaderProps) {
                         {user ? (
                             <div className="flex items-center space-x-3">
                                 <Badge className={`${communityColorClass} font-medium hidden sm:flex`}>
-                                    {/* This will now show the default icon if needed */}
                                     <CommunityIcon className="w-4 h-4 mr-1" />
-                                    {/* This will show ANY string, e.g., "Painter" */}
                                     {user.community.charAt(0).toUpperCase() + user.community.slice(1)}
                                 </Badge>
 
@@ -190,7 +179,6 @@ export function Header({ user }: HeaderProps) {
                                 </DropdownMenu>
                             </div>
                         ) : (
-                            // Guest navigation
                             <>
                                 <Button variant="ghost" asChild>
                                     <Link href="#about">About</Link>
