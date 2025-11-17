@@ -83,4 +83,11 @@ public class MessageController {
         messageService.markMessagesAsRead(receiverId, senderId);
         return ResponseEntity.ok().build();
     }
+
+    // Get total unread message count for a user
+    @GetMapping("/unread-count/{userId}")
+    public ResponseEntity<Long> getUnreadMessageCount(@PathVariable Long userId) {
+        Long count = messageService.getTotalUnreadMessageCount(userId);
+        return ResponseEntity.ok(count);
+    }
 }

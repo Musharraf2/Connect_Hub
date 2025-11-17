@@ -40,6 +40,7 @@ interface HeaderProps {
         community: string
         avatar: string
         pendingRequests?: number
+        unreadMessages?: number
     }
 }
 
@@ -98,10 +99,15 @@ export function Header({ user }: HeaderProps) {
                                         <span>My Community</span>
                                     </Link>
                                 </Button>
-                                <Button variant="ghost" size="sm" asChild>
+                                <Button variant="ghost" size="sm" className="relative" asChild>
                                     <Link href="/messages" className="flex items-center space-x-2">
                                         <MessageCircle className="w-4 h-4" />
                                         <span>Messages</span>
+                                        {user.unreadMessages && user.unreadMessages > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                                                {user.unreadMessages}
+                                            </span>
+                                        )}
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" className="relative" asChild>

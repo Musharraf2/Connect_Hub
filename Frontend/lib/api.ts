@@ -734,3 +734,19 @@ export const markMessagesAsRead = async (receiverId: number, senderId: number): 
         throw error;
     }
 };
+
+// Get total unread message count for a user
+export const getUnreadMessageCount = async (userId: number): Promise<number> => {
+    try {
+        const response = await fetch(`${BASE}/messages/unread-count/${userId}`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch unread message count');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching unread message count:', error);
+        throw error;
+    }
+};

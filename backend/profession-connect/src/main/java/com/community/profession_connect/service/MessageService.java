@@ -103,6 +103,10 @@ public class MessageService {
         messageRepository.markMessagesAsRead(receiverId, senderId);
     }
 
+    public Long getTotalUnreadMessageCount(Long userId) {
+        return messageRepository.countTotalUnreadMessages(userId);
+    }
+
     private boolean areUsersConnected(Long userId1, Long userId2) {
         User user1 = userRepository.findById(userId1).orElse(null);
         User user2 = userRepository.findById(userId2).orElse(null);

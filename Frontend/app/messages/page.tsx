@@ -15,6 +15,7 @@ import {
     getMessageHistory,
     sendMessage,
     markMessagesAsRead,
+    getUnreadMessageCount,
     ChatUserResponse,
     MessageResponse,
 } from "@/lib/api";
@@ -27,6 +28,7 @@ interface CurrentUser {
     name: string;
     avatar: string;
     community: string;
+    unreadMessages?: number;
 }
 
 export default function MessagesPage() {
@@ -62,11 +64,16 @@ export default function MessagesPage() {
 
         try {
             const user: LoginResponse = JSON.parse(userDataString);
+            
+            // Fetch unread count initially
+            const unreadCount = await getUnreadMessageCount(user.id);
+            
             setCurrentUser({
                 id: user.id,
                 name: user.name,
                 community: user.profession,
                 avatar: "/placeholder.svg",
+                unreadMessages: unreadCount,
             });
 
             loadChatUsers(user.id);
@@ -110,6 +117,9 @@ export default function MessagesPage() {
                 const receivedMessage: MessageResponse = JSON.parse(message.body);
                 console.log("Received message:", receivedMessage);
 
+                // Check if this is a message the user is receiving (not sending)
+                const isReceivingMessage = receivedMessage.receiverId === userId;
+
                 // Update messages if the chat is currently open
                 if (
                     selectedUser &&
@@ -117,6 +127,14 @@ export default function MessagesPage() {
                         receivedMessage.receiverId === selectedUser.id)
                 ) {
                     setMessages((prev) => [...prev, receivedMessage]);
+                } else if (isReceivingMessage) {
+                    // If chat is not open, increment total unread count
+                    setCurrentUser((prev) => 
+                        prev ? { 
+                            ...prev, 
+                            unreadMessages: (prev.unreadMessages || 0) + 1 
+                        } : null
+                    );
                 }
 
                 // Update chat users list to reflect new message
@@ -160,13 +178,26 @@ export default function MessagesPage() {
             const history = await getMessageHistory(currentUser.id, user.id);
             setMessages(history);
 
+            // Get the unread count for this user before marking as read
+            const unreadForThisUser = user.unreadCount;
+
             // Mark messages as read
             await markMessagesAsRead(currentUser.id, user.id);
 
-            // Update unread count
+            // Update unread count in chat users list
             setChatUsers((prev) =>
                 prev.map((u) => (u.id === user.id ? { ...u, unreadCount: 0 } : u))
             );
+
+            // Decrement total unread count in header
+            if (unreadForThisUser > 0) {
+                setCurrentUser((prev) => 
+                    prev ? { 
+                        ...prev, 
+                        unreadMessages: Math.max(0, (prev.unreadMessages || 0) - unreadForThisUser) 
+                    } : null
+                );
+            }
         } catch (error) {
             console.error("Failed to load message history:", error);
             toast.error("Failed to load messages");
