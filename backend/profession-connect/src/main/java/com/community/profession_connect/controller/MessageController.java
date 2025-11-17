@@ -29,9 +29,18 @@ public class MessageController {
     public ResponseEntity<MessageResponse> sendMessage(@RequestBody MessageRequest request) {
         MessageResponse response = messageService.sendMessage(request);
         
+        System.out.println("Sending message via WebSocket to receiver: " + response.getReceiverId());
         // Send the message to the receiver via WebSocket
         messagingTemplate.convertAndSendToUser(
             response.getReceiverId().toString(),
+            "/queue/messages",
+            response
+        );
+        
+        System.out.println("Sending message via WebSocket to sender: " + response.getSenderId());
+        // Also send to sender for real-time update
+        messagingTemplate.convertAndSendToUser(
+            response.getSenderId().toString(),
             "/queue/messages",
             response
         );

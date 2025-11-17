@@ -49,31 +49,48 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             getUnreadMessageCount(user.id).then(setUnreadCount).catch(console.error);
 
             // Setup WebSocket for real-time updates
+            console.log(`[Global] Setting up WebSocket for user ${user.id}`);
             const socket = new SockJS("http://localhost:8080/ws");
             const stompClient = new Client({
                 webSocketFactory: () => socket as any,
                 reconnectDelay: 5000,
                 heartbeatIncoming: 4000,
                 heartbeatOutgoing: 4000,
+                debug: (str) => {
+                    console.log('[Global WebSocket Debug]:', str);
+                }
             });
 
             stompClient.onConnect = () => {
-                console.log("Global UnreadMessages WebSocket connected");
+                console.log(`[Global] UnreadMessages WebSocket connected for user ${user.id}`);
 
                 // Subscribe to personal message queue
                 stompClient.subscribe(`/user/${user.id}/queue/messages`, (message) => {
-                    console.log("Global context received new message notification");
+                    console.log("[Global] Received new message notification");
                     const receivedMessage = JSON.parse(message.body);
+                    console.log("[Global] Parsed message:", receivedMessage);
                     
                     // Only increment if we're the receiver
                     if (receivedMessage.receiverId === user.id) {
+                        console.log("[Global] Incrementing unread count");
                         setUnreadCount((prev) => prev + 1);
+                    } else {
+                        console.log("[Global] Not the receiver, ignoring");
                     }
                 });
+                console.log(`[Global] Subscribed to /user/${user.id}/queue/messages`);
             };
 
             stompClient.onStompError = (frame) => {
-                console.error("Global UnreadMessages WebSocket error:", frame);
+                console.error("[Global] UnreadMessages WebSocket error:", frame);
+            };
+
+            stompClient.onWebSocketClose = () => {
+                console.log("[Global] WebSocket closed");
+            };
+
+            stompClient.onWebSocketError = (event) => {
+                console.error("[Global] WebSocket error event:", event);
             };
 
             stompClient.activate();

@@ -120,27 +120,33 @@ export default function MessagesPage() {
 
     // Setup WebSocket connection
     const setupWebSocket = (userId: number) => {
+        console.log(`[Messages] Setting up WebSocket for user ${userId}`);
         const socket = new SockJS("http://localhost:8080/ws");
         const stompClient = new Client({
             webSocketFactory: () => socket as any,
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
             heartbeatOutgoing: 4000,
+            debug: (str) => {
+                console.log('[Messages WebSocket Debug]:', str);
+            }
         });
 
         stompClient.onConnect = () => {
-            console.log("WebSocket connected");
+            console.log(`[Messages] WebSocket connected for user ${userId}`);
 
             // Subscribe to personal message queue
             stompClient.subscribe(`/user/${userId}/queue/messages`, (message) => {
+                console.log(`[Messages] Raw message received:`, message);
                 const receivedMessage: MessageResponse = JSON.parse(message.body);
-                console.log("Received message:", receivedMessage);
+                console.log(`[Messages] Parsed message:`, receivedMessage);
 
                 // Check if this is a message the user is receiving (not sending)
                 const isReceivingMessage = receivedMessage.receiverId === userId;
 
                 // Use ref to get current selectedUser value
                 const currentSelectedUser = selectedUserRef.current;
+                console.log(`[Messages] Current selected user:`, currentSelectedUser?.id, `Receiving:`, isReceivingMessage);
 
                 // Update messages if the chat is currently open
                 if (
@@ -148,45 +154,39 @@ export default function MessagesPage() {
                     (receivedMessage.senderId === currentSelectedUser.id ||
                         receivedMessage.receiverId === currentSelectedUser.id)
                 ) {
+                    console.log(`[Messages] Adding message to chat`);
                     setMessages((prev) => [...prev, receivedMessage]);
                     
                     // If the chat is open and we're receiving a message, don't increment unread count
                     // The global context will handle this, but we should decrement since we're reading it live
                     if (isReceivingMessage) {
                         // Decrement immediately since we're viewing the message
+                        console.log(`[Messages] Decrementing unread count`);
                         decrementUnreadCount(1);
                     }
+                } else {
+                    console.log(`[Messages] Chat not open for this sender, not adding to current chat view`);
                 }
                 // Note: If chat is not open, the global WebSocket context will increment the unread count
 
-                // Update chat users list to reflect new message and sort by most recent
-                setChatUsers((prev) => {
-                    const updatedUsers = prev.map((user) => {
-                        if (user.id === receivedMessage.senderId) {
-                            // Only increment unread count if this chat is not currently open
-                            const shouldIncrementUnread = !currentSelectedUser || currentSelectedUser.id !== user.id;
-                            return {
-                                ...user,
-                                lastMessage: receivedMessage.content,
-                                unreadCount: shouldIncrementUnread ? user.unreadCount + 1 : user.unreadCount,
-                                lastMessageTime: new Date(receivedMessage.timestamp).getTime(),
-                            };
-                        }
-                        return user;
-                    });
-                    
-                    // Sort by most recent message (users with recent messages at top)
-                    return updatedUsers.sort((a, b) => {
-                        const timeA = (a as any).lastMessageTime || 0;
-                        const timeB = (b as any).lastMessageTime || 0;
-                        return timeB - timeA;
-                    });
-                });
+                // Update chat users list to reflect new message
+                // Reload the list to get proper sorting from backend
+                console.log(`[Messages] Reloading chat users list`);
+                loadChatUsers(userId);
             });
+            console.log(`[Messages] Subscribed to /user/${userId}/queue/messages`);
         };
 
         stompClient.onStompError = (frame) => {
-            console.error("WebSocket error:", frame);
+            console.error("[Messages] WebSocket error:", frame);
+        };
+
+        stompClient.onWebSocketClose = () => {
+            console.log("[Messages] WebSocket closed");
+        };
+
+        stompClient.onWebSocketError = (event) => {
+            console.error("[Messages] WebSocket error event:", event);
         };
 
         stompClient.activate();
@@ -194,6 +194,7 @@ export default function MessagesPage() {
 
         // Cleanup on unmount
         return () => {
+            console.log("[Messages] Cleaning up WebSocket");
             if (stompClient) {
                 stompClient.deactivate();
             }
@@ -248,21 +249,10 @@ export default function MessagesPage() {
             setMessages((prev) => [...prev, sentMessage]);
             setMessageText("");
 
-            // Update last message in chat users and move to top
-            setChatUsers((prev) => {
-                const updatedUsers = prev.map((user) =>
-                    user.id === selectedUser.id
-                        ? { ...user, lastMessage: sentMessage.content, lastMessageTime: new Date(sentMessage.timestamp).getTime() }
-                        : user
-                );
-                
-                // Sort by most recent message
-                return updatedUsers.sort((a, b) => {
-                    const timeA = (a as any).lastMessageTime || 0;
-                    const timeB = (b as any).lastMessageTime || 0;
-                    return timeB - timeA;
-                });
-            });
+            // Reload chat users to get updated sorting from backend
+            if (currentUser) {
+                loadChatUsers(currentUser.id);
+            }
         } catch (error) {
             console.error("Failed to send message:", error);
             toast.error("Failed to send message");

@@ -91,9 +91,18 @@ public class MessageService {
             chatUser.setProfileImageUrl(otherUser.getProfileImageUrl());
             chatUser.setLastMessage(lastMessage != null ? lastMessage.getContent() : null);
             chatUser.setUnreadCount(unreadCount);
+            chatUser.setLastMessageTimestamp(lastMessage != null ? lastMessage.getTimestamp() : null);
 
             chatUsers.add(chatUser);
         }
+        
+        // Sort by most recent message (most recent first)
+        chatUsers.sort((a, b) -> {
+            if (a.getLastMessageTimestamp() == null && b.getLastMessageTimestamp() == null) return 0;
+            if (a.getLastMessageTimestamp() == null) return 1;
+            if (b.getLastMessageTimestamp() == null) return -1;
+            return b.getLastMessageTimestamp().compareTo(a.getLastMessageTimestamp());
+        });
 
         return chatUsers;
     }
