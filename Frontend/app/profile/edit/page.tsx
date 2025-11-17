@@ -22,6 +22,7 @@ import {
     getUserProfile,
     updateProfile,
     uploadProfileImage,
+    uploadCoverImage,
 } from "@/lib/api";
 
 import {
@@ -55,7 +56,10 @@ type EditableUser = {
     gpa?: string;
     skills: string[];
     interests: string[];
+    achievements: string[];
     avatar?: string;
+    coverImage?: string;
+    phoneNumber?: string;
     community: string;
     pendingRequests?: number;
 };
@@ -104,11 +108,12 @@ export default function EditProfilePage() {
     const [saving, setSaving] = useState(false);
     const [user, setUser] = useState<EditableUser | null>(null);
 
-    // Skills & Interests
+    // Skills & Interests & Achievements
     const [newSkill, setNewSkill] = useState("");
     const [newInterest, setNewInterest] = useState("");
+    const [newAchievement, setNewAchievement] = useState("");
 
-    // Image Upload State
+    // Image Upload State (Profile)
     const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
     const [showImageUploadDialog, setShowImageUploadDialog] = useState(false)
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
@@ -118,6 +123,17 @@ export default function EditProfilePage() {
     const imgRef = useRef<HTMLImageElement>(null)
     const [croppedImageFile, setCroppedImageFile] = useState<File | null>(null);
     const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+
+    // Cover Image Upload State
+    const [isUploadingCoverImage, setIsUploadingCoverImage] = useState(false)
+    const [showCoverImageUploadDialog, setShowCoverImageUploadDialog] = useState(false)
+    const [selectedCoverImageFile, setSelectedCoverImageFile] = useState<File | null>(null)
+    const [coverImagePreview, setCoverImagePreview] = useState<string>("")
+    const [coverCrop, setCoverCrop] = useState<Crop>()
+    const [completedCoverCrop, setCompletedCoverCrop] = useState<Crop>()
+    const coverImgRef = useRef<HTMLImageElement>(null)
+    const [croppedCoverImageFile, setCroppedCoverImageFile] = useState<File | null>(null);
+    const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
 
     const headerUser = useMemo(() => user ? { 
         name: user.name, 
@@ -131,8 +147,10 @@ export default function EditProfilePage() {
         return () => {
             if (imagePreview) URL.revokeObjectURL(imagePreview);
             if (tempAvatarUrl) URL.revokeObjectURL(tempAvatarUrl);
+            if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+            if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
         }
-    }, [imagePreview, tempAvatarUrl]);
+    }, [imagePreview, tempAvatarUrl, coverImagePreview, tempCoverUrl]);
 
     // ----------- Bootstrap -----------
     useEffect(() => {
@@ -164,7 +182,10 @@ export default function EditProfilePage() {
                     gpa: profile.academicInfo?.gpa ?? "",
                     skills: profile.skills.map(s => s.skill),
                     interests: profile.interests.map(i => i.interest),
+                    achievements: profile.achievements ?? [],
                     avatar: getImageUrl(profile.profileImageUrl),
+                    coverImage: getImageUrl(profile.coverImageUrl),
+                    phoneNumber: profile.phoneNumber ?? "",
                     community: profile.profession ?? "",
                     pendingRequests: 0,
                 });
@@ -209,6 +230,19 @@ export default function EditProfilePage() {
         setUser({ ...user, interests: user.interests.filter((x) => x !== i) });
     };
 
+    const addAchievement = () => {
+        if (!user) return;
+        const a = newAchievement.trim();
+        if (!a || user.achievements.includes(a)) return;
+        setUser({ ...user, achievements: [...user.achievements, a] });
+        setNewAchievement("");
+    };
+
+    const removeAchievement = (a: string) => {
+        if (!user) return;
+        setUser({ ...user, achievements: user.achievements.filter((x) => x !== a) });
+    };
+
     // ----------- Save Logic (Sanitized) -----------
 
 const handleSave = async () => {
@@ -218,15 +252,23 @@ const handleSave = async () => {
 
     try {
         let newProfileImageUrl: string | undefined = undefined;
+        let newCoverImageUrl: string | undefined = undefined;
 
-        // 1. Upload new image if exists
+        // 1. Upload new profile image if exists
         if (croppedImageFile) {
-            toast.loading("Uploading image...", { id: toastId });
+            toast.loading("Uploading profile image...", { id: toastId });
             const uploadResult = await uploadProfileImage(user.id, croppedImageFile);
             newProfileImageUrl = uploadResult.profileImageUrl;
         }
 
-        // 2. Update text fields - SANITIZATION STEP
+        // 2. Upload new cover image if exists
+        if (croppedCoverImageFile) {
+            toast.loading("Uploading cover image...", { id: toastId });
+            const uploadResult = await uploadCoverImage(user.id, croppedCoverImageFile);
+            newCoverImageUrl = uploadResult.coverImageUrl;
+        }
+
+        // 3. Update text fields - SANITIZATION STEP
         toast.loading("Updating details...", { id: toastId });
 
         // Helper to convert empty strings to undefined (so backend ignores them instead of crashing)
@@ -236,16 +278,21 @@ const handleSave = async () => {
             name: clean(user.name),
             location: clean(user.location),
             aboutMe: clean(user.aboutMe),
+            phoneNumber: clean(user.phoneNumber),
             university: clean(user.university),
             major: clean(user.major),
             year: clean(user.year),
             gpa: clean(user.gpa), // This fixes the "" vs Number issue
             skills: user.skills,
             interests: user.interests,
+            achievements: user.achievements,
         };
 
         if (newProfileImageUrl) {
             payload.profileImageUrl = newProfileImageUrl;
+        }
+        if (newCoverImageUrl) {
+            payload.coverImageUrl = newCoverImageUrl;
         }
 
         console.log("Sending Payload:", payload); // Debug: See exactly what is being sent
@@ -274,6 +321,7 @@ const handleSave = async () => {
     } finally {
         setSaving(false);
         setCroppedImageFile(null);
+        setCroppedCoverImageFile(null);
     }
 };
     // ----------- Image Handlers -----------
@@ -313,6 +361,44 @@ const handleSave = async () => {
         }
     }
 
+    // ----------- Cover Image Handlers -----------
+    const handleCoverImageSelect = (file: File) => {
+        setSelectedCoverImageFile(file);
+        if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+        setCoverImagePreview(URL.createObjectURL(file));
+    }
+
+    const onCoverImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const { width, height } = e.currentTarget;
+        const aspectRatio = 16 / 9; // Wide aspect for cover
+        setCoverCrop(centerAspectCrop(width, height, aspectRatio));
+        setCompletedCoverCrop(centerAspectCrop(width, height, aspectRatio));
+    }
+
+    const handleCoverCropComplete = async () => {
+        if (!completedCoverCrop || !coverImgRef.current || !selectedCoverImageFile || !user) return;
+        setIsUploadingCoverImage(true);
+        try {
+            const file = await getCroppedImg(coverImgRef.current, completedCoverCrop, selectedCoverImageFile.name);
+            if (file) {
+                setCroppedCoverImageFile(file);
+                const url = URL.createObjectURL(file);
+                if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
+                setTempCoverUrl(url);
+                setUser({ ...user, coverImage: url });
+                setShowCoverImageUploadDialog(false);
+                
+                // Cleanup
+                setCoverImagePreview("");
+                setSelectedCoverImageFile(null);
+            }
+        } catch (e) {
+            toast.error("Failed to crop cover image");
+        } finally {
+            setIsUploadingCoverImage(false);
+        }
+    }
+
     if (loading || !user) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-background flex items-center justify-center">
@@ -343,6 +429,34 @@ const handleSave = async () => {
                     {/* Main Form */}
                     <div className="lg:col-span-2 space-y-6">
                         
+                        {/* Cover Image */}
+                        <FadeInUp delay={0.05}>
+                            <Card className="border border-gray-200 dark:border-border shadow-sm bg-white dark:bg-card overflow-hidden">
+                                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-900 dark:to-zinc-800">
+                                    {user.coverImage && user.coverImage !== "/placeholder.svg" ? (
+                                        <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                                            <div className="text-center">
+                                                <Upload className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">No cover image</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="absolute bottom-4 right-4">
+                                        <Button 
+                                            size="sm" 
+                                            onClick={() => setShowCoverImageUploadDialog(true)}
+                                            className="bg-white/90 dark:bg-black/90 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white shadow-lg"
+                                        >
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            {user.coverImage && user.coverImage !== "/placeholder.svg" ? "Change Cover" : "Add Cover"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </FadeInUp>
+
                         {/* Basic Info */}
                         <FadeInUp delay={0.1}>
                             <Card className="border border-gray-200 dark:border-border shadow-sm bg-white dark:bg-card">
@@ -373,6 +487,17 @@ const handleSave = async () => {
                                             <Label htmlFor="location">Location</Label>
                                             <Input id="location" value={user.location} onChange={(e) => handleField("location", e.target.value)} className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border focus:bg-white dark:focus:bg-muted" />
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phoneNumber">Phone Number</Label>
+                                        <Input 
+                                            id="phoneNumber" 
+                                            value={user.phoneNumber} 
+                                            onChange={(e) => handleField("phoneNumber", e.target.value)} 
+                                            className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border focus:bg-white dark:focus:bg-muted" 
+                                            placeholder="+1 (555) 123-4567"
+                                        />
                                     </div>
 
                                     <div className="space-y-2">
@@ -467,6 +592,27 @@ const handleSave = async () => {
                                             <Button onClick={addInterest} size="icon" variant="outline" className="shrink-0"><Plus className="w-4 h-4" /></Button>
                                         </div>
                                     </div>
+                                    <div className="space-y-3">
+                                        <Label>Achievements & Certifications</Label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {user.achievements.map((achievement, i) => (
+                                                <Badge key={i} variant="secondary" className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 px-3 py-1 font-normal">
+                                                    {achievement}
+                                                    <button onClick={() => removeAchievement(achievement)} className="ml-2 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input 
+                                                value={newAchievement} 
+                                                onChange={(e) => setNewAchievement(e.target.value)} 
+                                                onKeyDown={(e) => e.key === "Enter" && addAchievement()}
+                                                placeholder="Add an achievement (e.g., Dean's List 2023)" 
+                                                className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border"
+                                            />
+                                            <Button onClick={addAchievement} size="icon" variant="outline" className="shrink-0"><Plus className="w-4 h-4" /></Button>
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </FadeInUp>
@@ -550,6 +696,50 @@ const handleSave = async () => {
                         <Button variant="ghost" onClick={() => setShowImageUploadDialog(false)}>Cancel</Button>
                         <Button onClick={handleCropComplete} disabled={!completedCrop || isUploadingProfileImage}>
                             {isUploadingProfileImage ? "Saving..." : "Apply & Save"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Cover Image Upload Dialog */}
+            <Dialog open={showCoverImageUploadDialog} onOpenChange={setShowCoverImageUploadDialog}>
+                <DialogContent className="max-w-2xl bg-white dark:bg-card border border-gray-200 dark:border-border">
+                    <DialogHeader>
+                        <DialogTitle>Upload Cover Image</DialogTitle>
+                        <DialogDescription>Choose an image to crop and set as your cover photo (16:9 ratio recommended).</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {!coverImagePreview ? (
+                            <ImageUpload 
+                                onImageSelect={handleCoverImageSelect} 
+                                disabled={isUploadingCoverImage}
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="bg-gray-100 dark:bg-muted p-4 rounded-lg w-full flex justify-center">
+                                    <ReactCrop
+                                        crop={coverCrop}
+                                        onChange={(_, p) => setCoverCrop(p)}
+                                        onComplete={c => setCompletedCoverCrop(c)}
+                                        aspect={16/9}
+                                        className="max-h-[50vh]"
+                                    >
+                                        <img ref={coverImgRef} src={coverImagePreview} onLoad={onCoverImageLoad} alt="Crop Cover" className="max-w-full" />
+                                    </ReactCrop>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    setCoverImagePreview("");
+                                    setSelectedCoverImageFile(null);
+                                }}>
+                                    Choose Different Image
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="ghost" onClick={() => setShowCoverImageUploadDialog(false)}>Cancel</Button>
+                        <Button onClick={handleCoverCropComplete} disabled={!completedCoverCrop || isUploadingCoverImage}>
+                            {isUploadingCoverImage ? "Saving..." : "Apply & Save"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

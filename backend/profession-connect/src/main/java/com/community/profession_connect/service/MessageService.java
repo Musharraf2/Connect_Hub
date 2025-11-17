@@ -29,6 +29,9 @@ public class MessageService {
     @Autowired
     private ConnectionRepository connectionRepository;
 
+    @Autowired
+    private OnlineUserService onlineUserService;
+
     @Transactional
     public MessageResponse sendMessage(MessageRequest request) {
         User sender = userRepository.findById(request.getSenderId())
@@ -102,7 +105,7 @@ public class MessageService {
                     conversation.setUserId(user.getId());
                     conversation.setUserName(user.getName());
                     conversation.setUserProfileImageUrl(user.getProfileImageUrl());
-                    conversation.setOnline(false); // Will be updated via WebSocket
+                    conversation.setOnline(onlineUserService.isUserOnline(user.getId()));
                     
                     if (!lastMessages.isEmpty()) {
                         Message lastMessage = lastMessages.get(0);

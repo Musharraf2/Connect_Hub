@@ -4,6 +4,7 @@ import com.community.profession_connect.dto.ConnectionResponse;
 import com.community.profession_connect.service.ConnectionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,18 +17,25 @@ public class ConnectionController {
     @Autowired
     private ConnectionService connectionService;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     @PostMapping("/send")
     public ResponseEntity<String> sendConnectionRequest(
         @RequestParam Long requesterId, 
         @RequestParam Long receiverId
     ) {
         String message = connectionService.sendConnectionRequest(requesterId, receiverId);
+        // Notify the receiver of new connection request
+        messagingTemplate.convertAndSend("/topic/connections/" + receiverId, "new_request");
         return ResponseEntity.ok(message);
     }
 
     @PutMapping("/accept/{connectionId}")
     public ResponseEntity<String> acceptConnectionRequest(@PathVariable Long connectionId) {
         String message = connectionService.acceptConnectionRequest(connectionId);
+        // Notify about accepted connection
+        messagingTemplate.convertAndSend("/topic/connections/updates", connectionId);
         return ResponseEntity.ok(message);
     }
 

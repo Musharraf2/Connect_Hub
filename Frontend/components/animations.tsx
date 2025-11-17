@@ -99,3 +99,67 @@ export const StaggerItem = ({
     {children}
   </motion.div>
 )
+
+/**
+ * Page transition wrapper for smooth page changes
+ */
+export const PageTransition = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -10 }}
+    transition={{ duration: 0.3, ease: "easeInOut" }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+)
+
+/**
+ * Scale animation for interactive elements
+ */
+export const ScaleIn = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) => (
+  <motion.div
+    initial={{ scale: 0.95, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    transition={{ duration: 0.2, ease: "easeOut" }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+)
+
+/**
+ * Slide in from right
+ */
+export const SlideInRight = ({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode
+  delay?: number
+  className?: string
+}) => (
+  <motion.div
+    initial={{ x: 50, opacity: 0 }}
+    whileInView={{ x: 0, opacity: 1 }}
+    viewport={{ once: true, amount: 0.2 }}
+    transition={{ delay, duration: 0.5, ease: "easeOut" }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+)

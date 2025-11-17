@@ -29,15 +29,18 @@ export interface ProfileUpdatePayload {
     name?: string;
     location?: string;
     aboutMe?: string;
+    phoneNumber?: string;
     university?: string;
     major?: string;
     year?: string;
     gpa?: string | number; // Allow string or number, backend handling dependent
     skills?: string[];
     interests?: string[];
+    achievements?: string[];
     connectionsCount?: number;
     pendingRequestsCount?: number;
     profileImageUrl?: string;
+    coverImageUrl?: string;
 }
 
 // Sub-types for User Detail
@@ -71,9 +74,12 @@ export interface UserProfileDetailResponse {
     location: string | null;
     aboutMe: string | null;
     profileImageUrl?: string | null;
+    coverImageUrl?: string | null;
+    phoneNumber?: string | null;
     academicInfo: AcademicInfo | null;
     skills: Skill[];
     interests: Interest[];
+    achievements?: string[];
     connectionsCount: number;
     pendingRequestsCount: number;
 }
@@ -175,6 +181,9 @@ export const loginUser = async (loginData: LoginRequestType): Promise<LoginRespo
     });
 
     if (!response.ok) {
+        if (response.status === 400) {
+            throw new Error('Wrong credentials');
+        }
         const errorText = await response.text();
         throw new Error(errorText || 'Login failed');
     }
@@ -232,6 +241,22 @@ export const uploadProfileImage = async (userId: number, file: File): Promise<{ 
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to upload profile image: ${errorText}`);
+    }
+    return await response.json();
+};
+
+export const uploadCoverImage = async (userId: number, file: File): Promise<{ coverImageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${BASE}/users/${userId}/cover-image`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to upload cover image: ${errorText}`);
     }
     return await response.json();
 };

@@ -8,6 +8,7 @@ import com.community.profession_connect.service.FileStorageService;
 import com.community.profession_connect.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,9 +27,14 @@ public class PostController {
     @Autowired
     private FileStorageService fileStorageService;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     @PostMapping
     public ResponseEntity<PostResponse> createPost(@RequestBody PostRequest request) {
         PostResponse response = postService.createPost(request);
+        // Broadcast new post to all subscribers of this profession
+        messagingTemplate.convertAndSend("/topic/posts/" + response.getUser().getProfession(), response);
         return ResponseEntity.ok(response);
     }
 
@@ -56,6 +62,8 @@ public class PostController {
         @RequestParam Long userId
     ) {
         PostResponse response = postService.toggleLike(postId, userId);
+        // Broadcast like update to all subscribers
+        messagingTemplate.convertAndSend("/topic/posts/" + response.getUser().getProfession() + "/update", response);
         return ResponseEntity.ok(response);
     }
 
@@ -66,6 +74,8 @@ public class PostController {
     ) {
         request.setPostId(postId);
         PostResponse response = postService.addComment(request);
+        // Broadcast comment update to all subscribers
+        messagingTemplate.convertAndSend("/topic/posts/" + response.getUser().getProfession() + "/update", response);
         return ResponseEntity.ok(response);
     }
 

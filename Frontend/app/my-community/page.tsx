@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card" // Removed unused imports
+import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,21 +13,16 @@ import toast from "react-hot-toast";
 import {
   Search,
   UserPlus,
-  MessageCircle,
   MapPin,
   UserCheck,
   UserX,
-  Edit3, 
-  Save,
   X,
   Inbox,
   Briefcase
 } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
-import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import { FadeInUp, StaggerContainer, StaggerItem, PageTransition } from "@/components/animations"
 import { 
   LoginResponse, 
-  Connection,
   UserProfileResponse,
   UserProfileDetailResponse,
   sendConnectionRequest,
@@ -36,10 +32,10 @@ import {
   getSentPendingRequests,
   cancelConnectionRequest,
   getUserProfile,
-  updateProfile,
   getAcceptedConnections,
   getUsersByProfession,
-  getUnreadMessageCount
+  getUnreadMessageCount,
+  getUnreadCount
 } from "@/lib/api"
 
 // --- LOCAL TYPE EXTENSIONS ---
@@ -57,9 +53,11 @@ interface CurrentUser {
     id?: number;
     name: string;
     avatar: string;
+    coverImage?: string;
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
+    unreadNotificationCount?: number;
 }
 
 interface ProfileData {
@@ -69,6 +67,7 @@ interface ProfileData {
     location: string;
     connections: number;
     bio: string;
+    coverImage?: string;
 }
 
 // --- URL HELPER ---
@@ -112,7 +111,11 @@ export default function DashboardPage() {
           const profile: UserProfileDetailResponse = await getUserProfile(userId);
 
           setCurrentUser((prev) => (
-            prev ? { ...prev, avatar: getImageUrl(profile.profileImageUrl) } : null
+            prev ? { 
+              ...prev, 
+              avatar: getImageUrl(profile.profileImageUrl),
+              coverImage: getImageUrl(profile.coverImageUrl)
+            } : null
           ));
           
           setProfileData({
@@ -121,7 +124,8 @@ export default function DashboardPage() {
             profession: profile.profession,
             location: profile.location || "Not set", 
             connections: 0, 
-            bio: profile.aboutMe || "No bio yet."
+            bio: profile.aboutMe || "No bio yet.",
+            coverImage: getImageUrl(profile.coverImageUrl)
           });
           
           await Promise.all([
@@ -129,7 +133,8 @@ export default function DashboardPage() {
             fetchSentPendingRequests(userId),
             fetchAcceptedConnections(userId),
             fetchUsersByProfession(userProfession),
-            fetchUnreadMessageCount(userId)
+            fetchUnreadMessageCount(userId),
+            fetchUnreadNotificationCount(userId)
           ]);
           
         } catch (err) {
@@ -201,34 +206,13 @@ export default function DashboardPage() {
     }
   };
 
-  // --- Bio Edit ---
-  const [isEditingBio, setIsEditingBio] = useState(false)
-  const [bioText, setBioText] = useState(profileData?.bio || "")
-  const [tempBioText, setTempBioText] = useState(profileData?.bio || "")
-
-  useEffect(() => {
-      if (profileData) {
-          setBioText(profileData.bio);
-          setTempBioText(profileData.bio);
-      }
-  }, [profileData]);
-
-  const handleSaveBio = async () => {
-      const userDataString = sessionStorage.getItem('user');
-      if (!userDataString || !profileData) return;
-      
-      const user: LoginResponse = JSON.parse(userDataString);
-      try {
-          const updatedUser = await updateProfile(user.id, { aboutMe: tempBioText.trim() });
-          const newBio = updatedUser.aboutMe ?? "";
-          setBioText(newBio);
-          setTempBioText(newBio);
-          setProfileData(prev => prev ? { ...prev, bio: newBio } : null);
-          setIsEditingBio(false);
-          toast.success("Bio updated!");
-      } catch (error) {
-          toast.error("Failed to update bio.");
-      }
+  const fetchUnreadNotificationCount = async (userId: number) => {
+    try {
+      const count = await getUnreadCount(userId);
+      setCurrentUser((prev) => (prev ? { ...prev, unreadNotificationCount: count } : null));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // --- Connection Handlers ---
@@ -322,17 +306,22 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-300">
-      <Header user={{...currentUser, pendingRequests: pendingRequests.length}} />
+    <PageTransition>
+      <div className="min-h-screen bg-background transition-colors duration-300">
+        <Header user={{...currentUser, pendingRequests: pendingRequests.length}} />
 
-      <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4">
-        
-        {/* Left Sidebar */}
+        <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4">
+          
+          {/* Left Sidebar */}
         <aside className="hidden lg:block lg:col-span-1">
           <div className="sticky top-24 space-y-6">
             <FadeInUp>
               <Card className="bg-card border-border shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                  <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20" />
+                  <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20 relative">
+                      {profileData.coverImage && profileData.coverImage !== "/placeholder.svg" && (
+                          <img src={profileData.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                      )}
+                  </div>
                   <CardContent className="p-6 pt-0 relative">
                       <div className="flex justify-center -mt-12 mb-4">
                           <Avatar className="w-24 h-24 border-4 border-card shadow-sm">
@@ -369,34 +358,10 @@ export default function DashboardPage() {
                       <div className="space-y-3">
                           <div className="flex items-center justify-between">
                               <h4 className="font-semibold text-sm text-foreground/80 uppercase tracking-wider">About</h4>
-                              {!isEditingBio && (
-                                  <Button variant="ghost" size="icon" onClick={() => setIsEditingBio(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
-                                      <Edit3 className="w-3.5 h-3.5" />
-                                  </Button>
-                              )}
                           </div>
-                          {isEditingBio ? (
-                              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                                  <Textarea
-                                      value={tempBioText}
-                                      onChange={(e) => setTempBioText(e.target.value)}
-                                      placeholder="Tell us about yourself..."
-                                      className="min-h-[100px] text-sm bg-muted/50 border-border focus:border-primary resize-none"
-                                  />
-                                  <div className="flex gap-2">
-                                      <Button size="sm" onClick={handleSaveBio} className="flex-1 h-8">
-                                          <Save className="w-3 h-3 mr-1.5" /> Save
-                                      </Button>
-                                      <Button size="sm" variant="outline" onClick={() => setIsEditingBio(false)} className="flex-1 h-8 bg-transparent">
-                                          <X className="w-3 h-3 mr-1.5" /> Cancel
-                                      </Button>
-                                  </div>
-                              </div>
-                          ) : (
-                              <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-lg border border-border/50">
-                                  {bioText}
-                              </p>
-                          )}
+                          <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-lg border border-border/50">
+                              {profileData?.bio || "No bio yet."}
+                          </p>
                       </div>
                   </CardContent>
               </Card>
@@ -451,33 +416,35 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground text-sm mt-1">Try adjusting your search terms.</p>
                   </div>
                 ) : (
-                  // --- UPDATED GRID GAP ---
                   <StaggerContainer stagger={0.05} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredMembers.map((member) => {
                       const connectionStatus = getConnectionStatus(member.id);
                       return (
                         <StaggerItem key={member.id}>
                           <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/50 bg-card overflow-hidden">
-                            {/* --- UPDATED CARD CONTENT: Compact & Horizontal --- */}
-                            <CardContent className="p-4 flex items-center gap-4">
-                              {/* Avatar */}
-                              <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0">
-                                <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
-                                <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
-                                  {member.name.charAt(0)}
-                                </AvatarFallback>
-                              </Avatar>
+                            
+                            {/* UPDATED CARD CONTENT: Flex container for horizontal alignment */}
+                            <CardContent className="p-4 flex items-center justify-between gap-4">
+                              
+                              {/* Left Side: Avatar & Name */}
+                              <Link href={`/profile/${member.id}`} className="flex items-center gap-3 flex-1 min-w-0 group/link">
+                                <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0 cursor-pointer">
+                                  <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
+                                  <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
+                                    {member.name.charAt(0)}
+                                  </AvatarFallback>
+                                </Avatar>
 
-                              {/* Info */}
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-foreground text-sm truncate">{member.name}</h3>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                    <Briefcase className="w-3 h-3" />
-                                    <span className="truncate">{member.profession}</span>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-foreground text-sm truncate group-hover/link:underline">{member.name}</h3>
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                      <Briefcase className="w-3 h-3" />
+                                      <span className="truncate">{member.profession}</span>
+                                  </div>
                                 </div>
-                              </div>
+                              </Link>
 
-                              {/* Action Button (Right aligned) */}
+                              {/* Right Side: Action Button (Parallel to User Info) */}
                               <div className="shrink-0">
                                 {connectionStatus.status === 'none' && (
                                   <Button 
@@ -600,19 +567,19 @@ export default function DashboardPage() {
                         <StaggerItem key={connection.id}>
                             <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/30 bg-card">
                             <CardContent className="p-4 flex items-center gap-4">
-                                <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20">
-                                <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
-                                <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
-                                    {otherUserName.charAt(0)}
-                                </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-foreground truncate text-sm">{otherUserName}</h3>
-                                <p className="text-xs text-muted-foreground truncate">{otherUser?.profession || "N/A"}</p>
-                                </div>
-                                <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full h-8 w-8">
-                                <MessageCircle className="w-4 h-4" />
-                                </Button>
+                                <Link href={`/profile/${otherUser?.id}`} className="flex items-center gap-4 flex-1 min-w-0 group/link">
+                                    <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20 cursor-pointer">
+                                        <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
+                                        <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
+                                            {otherUserName.charAt(0)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-foreground truncate text-sm group-hover/link:underline">{otherUserName}</h3>
+                                        <p className="text-xs text-muted-foreground truncate">{otherUser?.profession || "N/A"}</p>
+                                    </div>
+                                </Link>
+                                {/* Message Icon Button Removed Here */}
                             </CardContent>
                             </Card>
                         </StaggerItem>
@@ -626,5 +593,6 @@ export default function DashboardPage() {
         </section>
       </main>
     </div>
+    </PageTransition>
   )
 }

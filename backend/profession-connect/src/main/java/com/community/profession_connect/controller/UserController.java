@@ -107,4 +107,34 @@ public class UserController {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
         }
     }
+
+    @PostMapping("/{userId}/cover-image")
+    public ResponseEntity<Map<String, String>> uploadCoverImage(
+            @PathVariable Long userId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+            }
+
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
+            }
+
+            // Store file
+            String filePath = fileStorageService.storeFile(file, "cover-images");
+
+            // Update user cover image
+            User user = userService.updateCoverImage(userId, filePath);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("coverImageUrl", user.getCoverImageUrl());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload cover image: " + e.getMessage()));
+        }
+    }
 }

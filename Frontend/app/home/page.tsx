@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
-// Icons
+// Iconss
 import { 
-    UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, 
+    UserPlus, MapPin, X, Heart, MessageSquare, 
     Trash2, Image as ImageIcon, Smile, Send, Loader2
 } from "lucide-react";
 
@@ -27,6 +29,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { FadeInUp, StaggerContainer } from "@/components/animations";
+import { PostSkeleton, ProfileCardSkeleton, SuggestionSkeleton } from "@/components/loading-skeletons";
 
 // API Imports
 import {
@@ -46,9 +49,9 @@ import {
     toggleLike,
     addComment,
     uploadPostImage,
-    updateProfile,
     UserProfileResponse,
-    getUnreadMessageCount
+    getUnreadMessageCount,
+    getUnreadCount
 } from "@/lib/api";
 
 // Cropping
@@ -63,9 +66,11 @@ interface CurrentUser {
     id?: number;
     name: string;
     avatar: string;
+    coverImage?: string;
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
+    unreadNotificationCount?: number;
 }
 
 interface ProfileData {
@@ -75,6 +80,7 @@ interface ProfileData {
     location: string;
     connections: number;
     bio: string;
+    coverImage?: string;
 }
 
 // --- URL HELPER ---
@@ -143,16 +149,14 @@ export default function HomePage() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [localSentRequests, setLocalSentRequests] = useState<number[]>([]); // For instant UI updates on connect
 
-    // Cropping & Bio
+    // Cropping
     const [isCroppingDialogOpen, setIsCroppingDialogOpen] = useState(false);
     const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [tempImagePreview, setTempImagePreview] = useState<string>("");
     const [crop, setCrop] = useState<Crop>();
     const [completedCrop, setCompletedCrop] = useState<Crop>();
     const imgRef = useRef<HTMLImageElement>(null);
-    const [isEditingBio, setIsEditingBio] = useState(false);
     const [bioText, setBioText] = useState("");
-    const [tempBioText, setTempBioText] = useState("");
 
     // --- Bootstrap ---
     useEffect(() => {
@@ -181,7 +185,8 @@ export default function HomePage() {
                         fetchSentPendingRequests(user.id),
                         fetchAcceptedConnections(user.id),
                         fetchPosts(user.profession, user.id),
-                        fetchUnreadMessageCount(user.id)
+                        fetchUnreadMessageCount(user.id),
+                        fetchUnreadNotificationCount(user.id)
                     ]);
                 } catch (err) {
                     console.error("Failed data fetch", err);
@@ -209,17 +214,21 @@ export default function HomePage() {
             const res = await fetch(`http://localhost:8080/api/users/${userId}`);
             if (!res.ok) throw new Error("Failed");
             const data: UserProfileDetailResponse = await res.json();
-            setCurrentUser((prev) => (prev ? { ...prev, avatar: getImageUrl(data.profileImageUrl) } : null));
+            setCurrentUser((prev) => (prev ? { 
+                ...prev, 
+                avatar: getImageUrl(data.profileImageUrl),
+                coverImage: getImageUrl(data.coverImageUrl)
+            } : null));
             setProfileData({
                 name: data.name,
                 email: data.email,
                 profession: data.profession,
                 location: data.location || "Not set",
                 connections: connections.length,
-                bio: data.aboutMe || "No bio yet."
+                bio: data.aboutMe || "No bio yet.",
+                coverImage: getImageUrl(data.coverImageUrl)
             });
             setBioText(data.aboutMe || "No bio yet.");
-            setTempBioText(data.aboutMe || "No bio yet.");
         } catch (error) { console.error(error); }
     };
 
@@ -266,6 +275,13 @@ export default function HomePage() {
         try {
             const count = await getUnreadMessageCount(userId);
             setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchUnreadNotificationCount = async (userId: number) => {
+        try {
+            const count = await getUnreadCount(userId);
+            setCurrentUser((prev) => (prev ? { ...prev, unreadNotificationCount: count } : null));
         } catch (e) { console.error(e); }
     };
 
@@ -438,18 +454,39 @@ export default function HomePage() {
         }
     };
 
-    const handleSaveBio = async () => {
-        const sVal = sessionStorage.getItem('user');
-        if (!sVal) return;
-        const user = JSON.parse(sVal);
-        try {
-            const up = await updateProfile(user.id, { aboutMe: tempBioText.trim() });
-            setBioText(up.aboutMe ?? "");
-            setProfileData(prev => prev ? { ...prev, bio: up.aboutMe ?? "" } : null);
-            setIsEditingBio(false);
-            toast.success("Bio updated");
-        } catch (e) { toast.error("Bio failed"); }
-    };
+    const handleWebSocketMessage = useCallback((topic: string, message: any) => {
+        // Handle new posts
+        if (topic.includes('/posts/') && !topic.includes('/update')) {
+            setPosts(prev => [message, ...prev]);
+            toast.success("New post from your community!");
+        }
+        // Handle post updates (likes/comments)
+        else if (topic.includes('/update')) {
+            setPosts(prev => prev.map(p => p.id === message.id ? message : p));
+        }
+        // Handle connection requests
+        else if (topic.includes('/connections/')) {
+            if (currentUser?.id) {
+                fetchPendingRequests(currentUser.id);
+                fetchUnreadNotificationCount(currentUser.id);
+            }
+        }
+    }, [currentUser?.id]);
+
+    // WebSocket connection
+    const wsTopics = currentUser?.community ? [
+        `/topic/posts/${currentUser.community}`,
+        `/topic/posts/${currentUser.community}/update`,
+        `/topic/connections/${currentUser.id}`
+    ] : [];
+
+    useWebSocket({
+        url: 'http://localhost:8080/ws',
+        topics: wsTopics,
+        onMessage: handleWebSocketMessage,
+        enabled: !!currentUser && !authLoading,
+        userId: currentUser?.id
+    });
 
     if (authLoading || !currentUser || !profileData) return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
 
@@ -464,7 +501,11 @@ export default function HomePage() {
                     <div className="sticky top-24 space-y-6">
                         <FadeInUp>
                             <Card className="overflow-hidden border-border shadow-sm bg-card hover:shadow-md transition-all duration-200">
-                                <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/10"></div>
+                                <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/10 relative">
+                                    {profileData.coverImage && profileData.coverImage !== "/placeholder.svg" && (
+                                        <img src={profileData.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
                                 <CardContent className="relative pt-0 pb-6 px-6">
                                     <div className="flex flex-col items-center -mt-10 mb-4">
                                         <Avatar className="w-20 h-20 border-4 border-card shadow-sm">
@@ -498,27 +539,8 @@ export default function HomePage() {
                                     <div className="pt-4 border-t border-border">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">About</h4>
-                                            {!isEditingBio && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => setIsEditingBio(true)}>
-                                                    <Edit3 className="w-3 h-3" />
-                                                </Button>
-                                            )}
                                         </div>
-                                        {isEditingBio ? (
-                                            <div className="space-y-2">
-                                                <Textarea 
-                                                    value={tempBioText} 
-                                                    onChange={e => setTempBioText(e.target.value)} 
-                                                    className="text-sm min-h-[80px] resize-none bg-muted border-border focus:bg-card text-foreground"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <Button size="sm" className="h-7 text-xs flex-1" onClick={handleSaveBio}>Save</Button>
-                                                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => setIsEditingBio(false)}>Cancel</Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{bioText}</p>
-                                        )}
+                                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{bioText}</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -551,21 +573,35 @@ export default function HomePage() {
 
                     {/* Posts Feed */}
                     <div className="space-y-5">
-                        <StaggerContainer stagger={0.1}>
-                            {posts.map((post) => {
+                        {postsLoading ? (
+                            <>
+                                <PostSkeleton />
+                                <PostSkeleton />
+                                <PostSkeleton />
+                            </>
+                        ) : posts.length === 0 ? (
+                            <Card className="border-border shadow-sm bg-card p-8 text-center">
+                                <p className="text-muted-foreground">No posts yet. Be the first to share something!</p>
+                            </Card>
+                        ) : (
+                            <StaggerContainer stagger={0.1}>
+                                {posts.map((post) => {
                                 const isOwn = currentUser?.id === post.user.id;
                                 return (
                                     <Card key={post.id} className="border-border shadow-sm bg-card hover:shadow-md transition-all duration-300 mb-4 overflow-hidden">
                                         <CardHeader className="p-4 pb-2">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex gap-3">
-                                                    <Avatar className="w-10 h-10 border border-border">
-                                                        {/* FIX: Use getImageUrl for post author */}
-                                                        <AvatarImage src={getImageUrl((post.user as any).profileImageUrl)} />
-                                                        <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
+                                                    <Link href={`/profile/${post.user.id}`}>
+                                                        <Avatar className="w-10 h-10 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                                                            <AvatarImage src={getImageUrl(post.user.profileImageUrl)} />
+                                                            <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                    </Link>
                                                     <div>
-                                                        <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">{post.user.name}</h3>
+                                                        <Link href={`/profile/${post.user.id}`}>
+                                                            <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">{post.user.name}</h3>
+                                                        </Link>
                                                         <p className="text-xs text-muted-foreground line-clamp-1">{post.user.profession}</p>
                                                         <p className="text-[10px] text-muted-foreground/70 mt-0.5">{new Date(post.createdAt).toLocaleDateString()} • <span className="font-medium">Global</span></p>
                                                     </div>
@@ -590,22 +626,22 @@ export default function HomePage() {
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
-                                                    className={`gap-2 hover:bg-red-500/10 transition-colors ${post.likedByCurrentUser ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
+                                                    className={`gap-2 hover:bg-red-500/10 transition-all active:scale-95 ${post.likedByCurrentUser ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
                                                     onClick={() => handleToggleLike(post.id)}
                                                 >
-                                                    <Heart className={`w-4 h-4 ${post.likedByCurrentUser ? "fill-current" : ""}`} />
+                                                    <Heart className={`w-4 h-4 transition-transform ${post.likedByCurrentUser ? "fill-current scale-110" : ""}`} />
                                                     <span className="text-xs font-medium">{post.likesCount || "Like"}</span>
                                                 </Button>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
-                                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500"
+                                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 transition-all active:scale-95"
                                                     onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
                                                 >
                                                     <MessageSquare className="w-4 h-4" />
                                                     <span className="text-xs font-medium">{post.commentsCount || "Comment"}</span>
                                                 </Button>
-                                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:bg-muted">
+                                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:bg-muted transition-all active:scale-95">
                                                     <Send className="w-4 h-4" />
                                                     <span className="text-xs font-medium">Share</span>
                                                 </Button>
@@ -616,8 +652,7 @@ export default function HomePage() {
                                                     {post.comments.map(c => (
                                                         <div key={c.id} className="flex gap-2 text-sm">
                                                             <Avatar className="w-6 h-6 mt-1">
-                                                                {/* FIX: Use getImageUrl for commenter */}
-                                                                <AvatarImage src={getImageUrl((c.user as any).profileImageUrl)} />
+                                                                <AvatarImage src={getImageUrl(c.user.profileImageUrl)} />
                                                                 <AvatarFallback className="text-[10px]">{c.user.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div className="bg-card p-2 px-3 rounded-lg shadow-sm border border-border flex-1">
@@ -648,6 +683,7 @@ export default function HomePage() {
                                 );
                             })}
                         </StaggerContainer>
+                        )}
                     </div>
                 </section>
 
@@ -661,22 +697,23 @@ export default function HomePage() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {members
-                                        // FIX: Filter only for users where status is 'none' (not connected AND not pending)
+                                        // Sort by ID descending (newest users first)
+                                        .sort((a, b) => b.id - a.id)
+                                        // Filter only for users where status is 'none' (not connected AND not pending)
                                         .filter(m => getConnectionStatus(m.id).status === "none")
                                         .slice(0, 5)
                                         .map(m => (
                                             <div key={m.id} className="flex items-center justify-between group">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <Avatar className="w-9 h-9 border border-border">
-                                                        {/* FIX: Use getImageUrl for suggestions */}
-                                                        <AvatarImage src={getImageUrl((m as any).profileImageUrl)} />
+                                                <Link href={`/profile/${m.id}`} className="flex items-center gap-3 overflow-hidden flex-1">
+                                                    <Avatar className="w-9 h-9 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                                                        <AvatarImage src={getImageUrl(m.profileImageUrl)} />
                                                         <AvatarFallback className="bg-primary/10 text-primary text-xs">{m.name.charAt(0)}</AvatarFallback>
                                                     </Avatar>
                                                     <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-card-foreground truncate">{m.name}</p>
+                                                        <p className="text-sm font-medium text-card-foreground truncate hover:underline">{m.name}</p>
                                                         <p className="text-xs text-muted-foreground truncate">{m.profession}</p>
                                                     </div>
-                                                </div>
+                                                </Link>
                                                 
                                                 {/* Connect Button (disappears immediately when clicked) */}
                                                 <Button 
@@ -689,7 +726,6 @@ export default function HomePage() {
                                                 </Button>
                                             </div>
                                         ))}
-                                    <Button variant="link" className="w-full text-xs text-muted-foreground h-auto p-0 hover:text-primary">View all recommendations</Button>
                                 </CardContent>
                             </Card>
                         </FadeInUp>

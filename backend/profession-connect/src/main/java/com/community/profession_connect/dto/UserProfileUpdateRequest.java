@@ -12,6 +12,9 @@ public class UserProfileUpdateRequest {
     private String location;
     private String aboutMe;
     private String phone;
+    private String phoneNumber;
+    private String profileImageUrl;
+    private String coverImageUrl;
 
     // --- ADD ALL THESE NEW FIELDS ---
     private String university;
@@ -20,4 +23,5 @@ public class UserProfileUpdateRequest {
     private String gpa;
     private List<String> skills;
     private List<String> interests;
+    private List<String> achievements;
 }

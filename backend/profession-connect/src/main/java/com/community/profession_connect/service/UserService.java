@@ -12,9 +12,11 @@ import com.community.profession_connect.repository.UserRepository;
 import com.community.profession_connect.model.AcademicInfo;
 import com.community.profession_connect.model.Skill;
 import com.community.profession_connect.model.Interest;
+import com.community.profession_connect.model.Achievement;
 import com.community.profession_connect.repository.AcademicInfoRepository;
 import com.community.profession_connect.repository.SkillRepository;
 import com.community.profession_connect.repository.InterestRepository;
+import com.community.profession_connect.repository.AchievementRepository;
 // --- END IMPORTS ---
 
 import com.community.profession_connect.model.ConnectionStatus;
@@ -43,6 +45,9 @@ public class UserService {
 
     @Autowired
     private InterestRepository interestRepository;
+
+    @Autowired
+    private AchievementRepository achievementRepository;
     // --- END INJECTIONS ---
 
     @Autowired
@@ -89,6 +94,15 @@ public class UserService {
         if (updateRequest.getAboutMe() != null) {
             user.setAboutMe(updateRequest.getAboutMe());
         }
+        if (updateRequest.getPhoneNumber() != null) {
+            user.setPhoneNumber(updateRequest.getPhoneNumber());
+        }
+        if (updateRequest.getCoverImageUrl() != null) {
+            user.setCoverImageUrl(updateRequest.getCoverImageUrl());
+        }
+        if (updateRequest.getProfileImageUrl() != null) {
+            user.setProfileImageUrl(updateRequest.getProfileImageUrl());
+        }
 
         User updatedUser = userRepository.save(user);
 
@@ -129,6 +143,18 @@ public class UserService {
             }
         }
 
+        // 5. Update Achievements (Delete all, then re-add)
+        if (updateRequest.getAchievements() != null) {
+            achievementRepository.deleteByUserId(userId);
+
+            for (String achievementText : updateRequest.getAchievements()) {
+                Achievement newAchievement = new Achievement();
+                newAchievement.setUser(user);
+                newAchievement.setAchievement(achievementText);
+                achievementRepository.save(newAchievement);
+            }
+        }
+
         return updatedUser;
     }
 
@@ -149,6 +175,10 @@ public class UserService {
         AcademicInfo academicInfo = academicInfoRepository.findByUserId(id).orElse(null);
         List<Skill> skills = skillRepository.findAllByUserId(id);
         List<Interest> interests = interestRepository.findAllByUserId(id);
+        List<Achievement> achievementsEntities = achievementRepository.findByUserId(id);
+        List<String> achievements = achievementsEntities.stream()
+                .map(Achievement::getAchievement)
+                .toList();
 
         // --- 3. (NEW) Fetch the counts ---
         int connectionsCount = connectionRepository.countByReceiverAndStatusOrRequesterAndStatus(
@@ -159,7 +189,7 @@ public class UserService {
         );
 
         // 4. Build and return the new complete DTO
-        return UserProfileDetailResponse.from(user, academicInfo, skills, interests, connectionsCount, pendingRequestsCount);
+        return UserProfileDetailResponse.from(user, academicInfo, skills, interests, achievements, connectionsCount, pendingRequestsCount);
     }
 
     public User updateProfileImage(Long userId, String profileImageUrl) {
@@ -169,6 +199,16 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
         user.setProfileImageUrl(profileImageUrl);
+        return userRepository.save(user);
+    }
+
+    public User updateCoverImage(Long userId, String coverImageUrl) {
+        Objects.requireNonNull(userId, "User ID must not be null");
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        user.setCoverImageUrl(coverImageUrl);
         return userRepository.save(user);
     }
 }
