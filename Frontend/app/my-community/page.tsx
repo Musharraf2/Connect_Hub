@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card" // Removed unused imports
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -414,23 +415,25 @@ export default function DashboardPage() {
                         <StaggerItem key={member.id}>
                           <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/50 bg-card overflow-hidden">
                             {/* --- UPDATED CARD CONTENT: Compact & Horizontal --- */}
-                            <CardContent className="p-4 flex items-center gap-4">
-                              {/* Avatar */}
-                              <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0">
-                                <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
-                                <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
-                                  {member.name.charAt(0)}
-                                </AvatarFallback>
-                              </Avatar>
+                            <CardContent className="p-4">
+                              <Link href={`/profile/${member.id}`} className="flex items-center gap-4 group/link">
+                                {/* Avatar */}
+                                <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0 cursor-pointer">
+                                  <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
+                                  <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
+                                    {member.name.charAt(0)}
+                                  </AvatarFallback>
+                                </Avatar>
 
-                              {/* Info */}
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-foreground text-sm truncate">{member.name}</h3>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                    <Briefcase className="w-3 h-3" />
-                                    <span className="truncate">{member.profession}</span>
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-foreground text-sm truncate group-hover/link:underline">{member.name}</h3>
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                      <Briefcase className="w-3 h-3" />
+                                      <span className="truncate">{member.profession}</span>
+                                  </div>
                                 </div>
-                              </div>
+                              </Link>
 
                               {/* Action Button (Right aligned) */}
                               <div className="shrink-0">
@@ -555,16 +558,18 @@ export default function DashboardPage() {
                         <StaggerItem key={connection.id}>
                             <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/30 bg-card">
                             <CardContent className="p-4 flex items-center gap-4">
-                                <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20">
-                                <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
-                                <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
-                                    {otherUserName.charAt(0)}
-                                </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-foreground truncate text-sm">{otherUserName}</h3>
-                                <p className="text-xs text-muted-foreground truncate">{otherUser?.profession || "N/A"}</p>
-                                </div>
+                                <Link href={`/profile/${otherUser?.id}`} className="flex items-center gap-4 flex-1 min-w-0 group/link">
+                                    <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20 cursor-pointer">
+                                        <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
+                                        <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
+                                            {otherUserName.charAt(0)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-foreground truncate text-sm group-hover/link:underline">{otherUserName}</h3>
+                                        <p className="text-xs text-muted-foreground truncate">{otherUser?.profession || "N/A"}</p>
+                                    </div>
+                                </Link>
                                 <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full h-8 w-8">
                                 <MessageCircle className="w-4 h-4" />
                                 </Button>

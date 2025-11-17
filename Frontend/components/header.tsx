@@ -42,6 +42,7 @@ interface HeaderProps {
         avatar: string
         pendingRequests?: number
         unreadMessageCount?: number
+        unreadNotificationCount?: number
     }
 }
 
@@ -100,7 +101,7 @@ export function Header({ user }: HeaderProps) {
             name: "Notifications",
             href: "/notification",
             icon: Bell,
-            badge: user.pendingRequests
+            badge: user.unreadNotificationCount
         }
     ] : [];
 

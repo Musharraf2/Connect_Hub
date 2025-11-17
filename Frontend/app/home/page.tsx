@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -49,7 +50,8 @@ import {
     addComment,
     uploadPostImage,
     UserProfileResponse,
-    getUnreadMessageCount
+    getUnreadMessageCount,
+    getUnreadCount
 } from "@/lib/api";
 
 // Cropping
@@ -68,6 +70,7 @@ interface CurrentUser {
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
+    unreadNotificationCount?: number;
 }
 
 interface ProfileData {
@@ -182,7 +185,8 @@ export default function HomePage() {
                         fetchSentPendingRequests(user.id),
                         fetchAcceptedConnections(user.id),
                         fetchPosts(user.profession, user.id),
-                        fetchUnreadMessageCount(user.id)
+                        fetchUnreadMessageCount(user.id),
+                        fetchUnreadNotificationCount(user.id)
                     ]);
                 } catch (err) {
                     console.error("Failed data fetch", err);
@@ -271,6 +275,13 @@ export default function HomePage() {
         try {
             const count = await getUnreadMessageCount(userId);
             setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchUnreadNotificationCount = async (userId: number) => {
+        try {
+            const count = await getUnreadCount(userId);
+            setCurrentUser((prev) => (prev ? { ...prev, unreadNotificationCount: count } : null));
         } catch (e) { console.error(e); }
     };
 
@@ -457,6 +468,7 @@ export default function HomePage() {
         else if (topic.includes('/connections/')) {
             if (currentUser?.id) {
                 fetchPendingRequests(currentUser.id);
+                fetchUnreadNotificationCount(currentUser.id);
             }
         }
     }, [currentUser?.id]);
@@ -579,12 +591,16 @@ export default function HomePage() {
                                         <CardHeader className="p-4 pb-2">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex gap-3">
-                                                    <Avatar className="w-10 h-10 border border-border">
-                                                        <AvatarImage src={getImageUrl(post.user.profileImageUrl)} />
-                                                        <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
+                                                    <Link href={`/profile/${post.user.id}`}>
+                                                        <Avatar className="w-10 h-10 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                                                            <AvatarImage src={getImageUrl(post.user.profileImageUrl)} />
+                                                            <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                    </Link>
                                                     <div>
-                                                        <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">{post.user.name}</h3>
+                                                        <Link href={`/profile/${post.user.id}`}>
+                                                            <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">{post.user.name}</h3>
+                                                        </Link>
                                                         <p className="text-xs text-muted-foreground line-clamp-1">{post.user.profession}</p>
                                                         <p className="text-[10px] text-muted-foreground/70 mt-0.5">{new Date(post.createdAt).toLocaleDateString()} • <span className="font-medium">Global</span></p>
                                                     </div>
@@ -685,16 +701,16 @@ export default function HomePage() {
                                         .slice(0, 5)
                                         .map(m => (
                                             <div key={m.id} className="flex items-center justify-between group">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <Avatar className="w-9 h-9 border border-border">
+                                                <Link href={`/profile/${m.id}`} className="flex items-center gap-3 overflow-hidden flex-1">
+                                                    <Avatar className="w-9 h-9 border border-border cursor-pointer hover:opacity-80 transition-opacity">
                                                         <AvatarImage src={getImageUrl(m.profileImageUrl)} />
                                                         <AvatarFallback className="bg-primary/10 text-primary text-xs">{m.name.charAt(0)}</AvatarFallback>
                                                     </Avatar>
                                                     <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-card-foreground truncate">{m.name}</p>
+                                                        <p className="text-sm font-medium text-card-foreground truncate hover:underline">{m.name}</p>
                                                         <p className="text-xs text-muted-foreground truncate">{m.profession}</p>
                                                     </div>
-                                                </div>
+                                                </Link>
                                                 
                                                 {/* Connect Button (disappears immediately when clicked) */}
                                                 <Button 
