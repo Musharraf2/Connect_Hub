@@ -203,10 +203,10 @@ export default function MessagesPage() {
         <div className="min-h-screen bg-background">
             <Header user={currentUser} />
 
-            <div className="container mx-auto py-4 h-[calc(100vh-88px)]">
-                <Card className="h-full flex overflow-hidden border-2 border-border/50 shadow-xl">
+            <div className="container mx-auto py-4 h-[calc(100vh-88px)] max-w-full">
+                <Card className="h-full flex flex-row overflow-hidden border-2 border-border/50 shadow-xl">
                     {/* Left Sidebar - Conversations List */}
-                    <div className="w-full md:w-96 border-r border-border flex flex-col">
+                    <div className="w-96 min-w-[384px] border-r border-border flex flex-col shrink-0">
                         {/* Search Bar */}
                         <div className="p-4 border-b border-border">
                             <div className="relative">
