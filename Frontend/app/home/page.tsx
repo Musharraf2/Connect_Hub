@@ -47,7 +47,8 @@ import {
     addComment,
     uploadPostImage,
     updateProfile,
-    UserProfileResponse
+    UserProfileResponse,
+    getUnreadMessageCount
 } from "@/lib/api";
 
 // Cropping
@@ -64,6 +65,7 @@ interface CurrentUser {
     avatar: string;
     community: string;
     pendingRequests?: number;
+    unreadMessageCount?: number;
 }
 
 interface ProfileData {
@@ -178,7 +180,8 @@ export default function HomePage() {
                         fetchPendingRequests(user.id),
                         fetchSentPendingRequests(user.id),
                         fetchAcceptedConnections(user.id),
-                        fetchPosts(user.profession, user.id)
+                        fetchPosts(user.profession, user.id),
+                        fetchUnreadMessageCount(user.id)
                     ]);
                 } catch (err) {
                     console.error("Failed data fetch", err);
@@ -257,6 +260,13 @@ export default function HomePage() {
             setPosts(p);
         } catch (e) { console.error(e); } 
         finally { setPostsLoading(false); }
+    };
+
+    const fetchUnreadMessageCount = async (userId: number) => {
+        try {
+            const count = await getUnreadMessageCount(userId);
+            setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+        } catch (e) { console.error(e); }
     };
 
     // --- Handlers ---

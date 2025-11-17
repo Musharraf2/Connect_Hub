@@ -38,7 +38,8 @@ import {
   getUserProfile,
   updateProfile,
   getAcceptedConnections,
-  getUsersByProfession
+  getUsersByProfession,
+  getUnreadMessageCount
 } from "@/lib/api"
 
 // --- LOCAL TYPE EXTENSIONS ---
@@ -53,10 +54,12 @@ interface ExtendedConnection {
 }
 
 interface CurrentUser {
+    id?: number;
     name: string;
     avatar: string;
     community: string;
     pendingRequests?: number;
+    unreadMessageCount?: number;
 }
 
 interface ProfileData {
@@ -96,10 +99,12 @@ export default function DashboardPage() {
       const user: LoginResponse = JSON.parse(userDataString);
 
       setCurrentUser({
+        id: user.id,
         name: user.name,
         community: user.profession,
         avatar: "/placeholder.svg",
         pendingRequests: 0,
+        unreadMessageCount: 0,
       });
 
       const loadInitialData = async (userId: number, userProfession: string) => {
@@ -123,7 +128,8 @@ export default function DashboardPage() {
             fetchPendingRequests(userId),
             fetchSentPendingRequests(userId),
             fetchAcceptedConnections(userId),
-            fetchUsersByProfession(userProfession)
+            fetchUsersByProfession(userProfession),
+            fetchUnreadMessageCount(userId)
           ]);
           
         } catch (err) {
@@ -183,6 +189,15 @@ export default function DashboardPage() {
       setProfileData((prev) => prev ? { ...prev, connections: conns.length } : null);
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const fetchUnreadMessageCount = async (userId: number) => {
+    try {
+      const count = await getUnreadMessageCount(userId);
+      setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+    } catch (e) {
+      console.error(e);
     }
   };
 

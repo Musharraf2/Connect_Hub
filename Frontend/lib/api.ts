@@ -381,3 +381,85 @@ export const deleteNotification = async (notificationId: number): Promise<string
     const data = await response.json();
     return data.message;
 };
+
+
+// --- MESSAGES ---
+
+export interface MessageRequest {
+    senderId: number;
+    receiverId: number;
+    content: string;
+}
+
+export interface MessageResponse {
+    id: number;
+    senderId: number;
+    senderName: string;
+    senderProfileImageUrl?: string;
+    receiverId: number;
+    receiverName: string;
+    receiverProfileImageUrl?: string;
+    content: string;
+    timestamp: string;
+    isRead: boolean;
+}
+
+export interface ConversationResponse {
+    userId: number;
+    userName: string;
+    userProfileImageUrl?: string;
+    lastMessage: string;
+    lastMessageTime: string | null;
+    unreadCount: number;
+    isOnline: boolean;
+}
+
+export const sendMessage = async (message: MessageRequest): Promise<MessageResponse> => {
+    const response = await fetch(`${BASE}/messages/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+    });
+    if (!response.ok) throw new Error('Failed to send message');
+    return await response.json();
+};
+
+export const getConversation = async (userId1: number, userId2: number): Promise<MessageResponse[]> => {
+    const response = await fetch(`${BASE}/messages/conversation?userId1=${userId1}&userId2=${userId2}`);
+    if (!response.ok) throw new Error('Failed to fetch conversation');
+    return await response.json();
+};
+
+export const getConversations = async (userId: number): Promise<ConversationResponse[]> => {
+    console.log(`[API] Fetching conversations for user ${userId} from ${BASE}/messages/conversations/${userId}`);
+    const response = await fetch(`${BASE}/messages/conversations/${userId}`);
+    console.log(`[API] Response status: ${response.status}`);
+    
+    if (response.status === 204) {
+        console.log('[API] No content - returning empty array');
+        return [];
+    }
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[API] Error response: ${errorText}`);
+        throw new Error(errorText || 'Failed to fetch conversations');
+    }
+    
+    const data = await response.json();
+    console.log(`[API] Successfully fetched ${data.length} conversations`);
+    return data;
+};
+
+export const markMessagesAsRead = async (receiverId: number, senderId: number): Promise<void> => {
+    const response = await fetch(`${BASE}/messages/mark-read?receiverId=${receiverId}&senderId=${senderId}`, {
+        method: 'PUT',
+    });
+    if (!response.ok) throw new Error('Failed to mark messages as read');
+};
+
+export const getUnreadMessageCount = async (userId: number): Promise<number> => {
+    const response = await fetch(`${BASE}/messages/unread-count/${userId}`);
+    if (!response.ok) return 0;
+    return await response.json();
+};
