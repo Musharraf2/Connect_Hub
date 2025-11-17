@@ -1,31 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react" // Import hooks
-import { useRouter } from "next/navigation" // Import router
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import toast from "react-hot-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getUserProfile,
   UserProfileResponse,
-  UserProfileDetailResponse,
   updateProfile,
-  ProfileUpdatePayload,
-  uploadProfileImage,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { Textarea } from "@/components/ui/textarea" 
-import { ImageUpload } from "@/components/image-upload"
 import {
   MapPin,
   Calendar,
   Users,
-  MessageCircle,
-  Settings,
-  Edit,
+  Edit3,
   BookOpen,
   Music,
   Stethoscope,
@@ -35,16 +29,15 @@ import {
   Award,
   Save,
   X,
-  Edit3,
-  Camera,
+  GraduationCap,
+  Github,
+  ExternalLink,
+  FolderGit2,
 } from "lucide-react"
 import Link from "next/link"
-import { LoginResponse } from "@/app/login/page" // Import session type
-import { motion } from "framer-motion"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
 
-
-// This is our MOCKED data. We will merge session data into this.
+// --- MOCK DATA ---
 const profileMockData = {
   id: 1,
   name: "Mock User",
@@ -69,47 +62,53 @@ const profileMockData = {
   projects: [
     {
       title: "AI Study Buddy",
-      description: "An AI-powered study companion that helps students organize their learning",
+      description: "An AI-powered study companion that helps students organize their learning paths using NLP.",
       tech: ["Python", "TensorFlow", "React"],
+      link: "#",
+      github: "#"
     },
     {
       title: "Campus Connect",
-      description: "A social platform for university students to find study groups",
+      description: "A social platform for university students to find study groups and local events.",
       tech: ["Node.js", "MongoDB", "React Native"],
+      link: "#",
+      github: "#"
     },
+    {
+        title: "Portfolio V2",
+        description: "A modern portfolio website built with Next.js and Tailwind CSS.",
+        tech: ["Next.js", "Tailwind", "Framer Motion"],
+        link: "#",
+        github: "#"
+      },
   ],
 }
 
-// Define the full user type
-// Define the full user type based on our new API response
+// --- TYPES ---
 type CurrentUser = {
   id: number;
   name: string;
   email: string;
-  phone: string; // from mock
+  phone: string;
   profession: string;
   community: string;
-  avatar: string; // from mock
-  coverImage: string; // from mock
+  avatar: string;
   location: string;
-  joinDate: string; // from mock
-  connections: number; // from mock
-  pendingRequests: number; // from mock
+  joinDate: string;
+  connections: number;
+  pendingRequests: number;
   bio: string;
-  
-  // REAL DATA FROM API
   university: string;
   major: string;
   year: string;
   gpa: string;
-  skills: string[]; // We will map the Skill[] objects to string[]
-  interests: string[]; // We will map the Interest[] objects to string[]
-
-  // from mock
+  skills: string[];
+  interests: string[];
   achievements: string[];
-  projects: { title: string; description: string; tech: string[]; }[];
+  projects: { title: string; description: string; tech: string[]; link?: string; github?: string }[];
 };
 
+// --- THEME CONFIG ---
 const communityIcons = {
   student: BookOpen,
   teacher: Users,
@@ -118,12 +117,28 @@ const communityIcons = {
   dancer: Zap,
 }
 
-const communityColors = {
-  student: "bg-gradient-to-r from-blue-500 to-blue-600 text-white border-transparent shadow-sm",
-  teacher: "bg-gradient-to-r from-green-500 to-green-600 text-white border-transparent shadow-sm",
-  musician: "bg-gradient-to-r from-purple-500 to-purple-600 text-white border-transparent shadow-sm",
-  doctor: "bg-gradient-to-r from-red-500 to-red-600 text-white border-transparent shadow-sm",
-  dancer: "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-transparent shadow-sm",
+// Themes adapted for Light and Dark modes
+const communityThemes = {
+  student: { 
+    badge: "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
+    icon: "text-blue-600 dark:text-blue-400"
+  },
+  teacher: { 
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
+    icon: "text-emerald-600 dark:text-emerald-400"
+  },
+  musician: { 
+    badge: "bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800",
+    icon: "text-purple-600 dark:text-purple-400"
+  },
+  doctor: { 
+    badge: "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800",
+    icon: "text-rose-600 dark:text-rose-400"
+  },
+  dancer: { 
+    badge: "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+    icon: "text-amber-600 dark:text-amber-400"
+  },
 }
 
 const recentActivity = [
@@ -132,409 +147,396 @@ const recentActivity = [
   { id: 3, type: "message", message: "New message from Emily Rodriguez", time: "2 days ago" },
 ]
 
+// --- URL HELPER ---
+const getImageUrl = (url: string | null | undefined) => {
+    if (!url) return "/placeholder.svg";
+    if (url.startsWith("http")) return url;
+    return `http://localhost:8080${url}`;
+};
+
 export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
-  
 
- useEffect(() => {
+  // Bio Edit State
+  const [isEditingBio, setIsEditingBio] = useState(false)
+  const [bioText, setBioText] = useState("")
+  const [tempBioText, setTempBioText] = useState("")
+
+  useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
     if (!userDataString) {
       router.push('/login');
-      return; // Stop execution
+      return;
     }
 
     const sessionUser: UserProfileResponse = JSON.parse(userDataString);
     if (!sessionUser?.id) {
         router.push('/login');
-        return; // Stop execution
+        return;
     }
 
-    // Fetch the REAL profile data
     (async () => {
       try {
-        // 1. Fetch the most up-to-date profile from the database
         const profile = await getUserProfile(sessionUser.id);
-
-        // 2. Merge real data with mock data (for fields you haven't built yet)
-        setCurrentUser({
-          ...profileMockData, // Use mock for projects, achievements, etc.
+        const mergedUser = {
+          ...profileMockData, 
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          profession: profile.profession,
+          community: profile.profession,
+          location: profile.location ?? "Location not set",
+          bio: profile.aboutMe ?? "No bio yet. Click edit to tell your story.",
+          avatar: getImageUrl(profile.profileImageUrl),
           
-          // --- REAL USER DATA ---
-          id: profile.id,
-          name: profile.name,
-          email: profile.email,
-          profession: profile.profession,
-          community: profile.profession,
-          location: profile.location ?? "No location set",
-          bio: profile.aboutMe ?? "No bio set",
-          avatar: profile.profileImageUrl || "/placeholder.svg?height=120&width=120",
+          university: profile.academicInfo?.university ?? "N/A",
+          major: profile.academicInfo?.major ?? "N/A",
+          year: profile.academicInfo?.year ?? "N/A",
+          gpa: profile.academicInfo?.gpa ?? "N/A",
 
-          // --- REAL ACADEMIC DATA ---
-          university: profile.academicInfo?.university ?? "Not specified",
-          major: profile.academicInfo?.major ?? "Not specified",
-          year: profile.academicInfo?.year ?? "Not specified",
-          gpa: profile.academicInfo?.gpa ?? "Not specified",
-
-          // --- REAL SKILLS & INTERESTS ---
-          // Map the {id, skill} objects to simple strings
           skills: profile.skills.map(s => s.skill),
-          interests: profile.interests.map(i => i.interest),
+          interests: profile.interests.map(i => i.interest),
 
-          // Now this will work perfectly
-          connections: profile.connectionsCount ?? 0,
-          pendingRequests: profile.pendingRequestsCount ?? 0,
-        });
+          connections: profile.connectionsCount ?? 0,
+          pendingRequests: profile.pendingRequestsCount ?? 0,
+        };
+
+        setCurrentUser(mergedUser);
+        setBioText(mergedUser.bio);
+        setTempBioText(mergedUser.bio);
 
       } catch (error) {
         console.error("Failed to fetch profile", error);
-        toast.error("Could not load profile. Logging out.");
-        router.push('/login'); // Failed to load, send to login
+        toast.error("Could not load profile.");
       } finally {
         setAuthLoading(false);
       }
     })();
-
   }, [router]);
-  // --- Bio Edit State & Handlers ---
-  const [isEditingBio, setIsEditingBio] = useState(false)
-  const [bioText, setBioText] = useState(currentUser?.bio || "") // Use currentUser
-  const [tempBioText, setTempBioText] = useState(currentUser?.bio || "")
 
-  useEffect(() => {
-      if (currentUser) {
-          setBioText(currentUser.bio);
-          setTempBioText(currentUser.bio);
-      }
-  }, [currentUser]);
-
- const handleSaveBio = async () => { // Make it async
+ const handleSaveBio = async () => {
     if (!currentUser) return;
-
-    // Show a loading toast
     const toastId = toast.loading("Saving bio...");
-    
-    const payload: ProfileUpdatePayload = {
-      aboutMe: tempBioText, // Only send the new bio
-    };
-
     try {
-      // Call the API
-      const updatedUser = await updateProfile(currentUser.id, payload);
-
-      // Update the main currentUser state
+      const updatedUser = await updateProfile(currentUser.id, { aboutMe: tempBioText });
       setCurrentUser({ ...currentUser, bio: updatedUser.aboutMe ?? "" });
-
-      // Update the local bio text state
       setBioText(updatedUser.aboutMe ?? "");
-
-      // Update session storage so it persists after a refresh
-      sessionStorage.setItem("user", JSON.stringify(updatedUser));
-
+      const sVal = sessionStorage.getItem('user');
+      if(sVal) {
+          const u = JSON.parse(sVal);
+          sessionStorage.setItem("user", JSON.stringify({...u, aboutMe: updatedUser.aboutMe}));
+      }
       toast.success("Bio updated!", { id: toastId });
     } catch (error) {
-      console.error("Failed to save bio", error);
       toast.error("Could not save bio.", { id: toastId });
     } finally {
       setIsEditingBio(false);
     }
   };
 
-  const handleCancelBio = () => {
-      setTempBioText(bioText)
-      setIsEditingBio(false)
-  }
-  // --- End Bio Edit State ---
-
- 
-
   if (authLoading || !currentUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Loading...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  const CommunityIcon = communityIcons[currentUser.community as keyof typeof communityIcons] || Users // Added default icon
-  const communityColorClass = communityColors[currentUser.community as keyof typeof communityColors] || "bg-gradient-to-r from-gray-500 to-gray-600 text-white border-transparent shadow-sm" // Added default color
+  const commKey = currentUser.community.toLowerCase() as keyof typeof communityThemes;
+  const theme = communityThemes[commKey] || communityThemes.student;
+  const CommunityIcon = communityIcons[commKey as keyof typeof communityIcons] || Users;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50 dark:bg-background transition-colors duration-300">
       <Header user={currentUser} />
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Profile Header */}
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
+        
+        {/* --- HERO SECTION --- */}
         <FadeInUp>
-          <Card className="mb-8 bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-            <div className="relative">
-              {/* Cover Image */}
-              <div className="h-48 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-t-3xl"></div>
+          <div className="relative mb-10">
+            {/* Cover Image */}
+            <div className="h-64 w-full rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-900 dark:to-zinc-800 relative overflow-hidden border border-gray-200 dark:border-border">
+                 {/* Optional pattern overlay */}
+                <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+            </div>
 
-              {/* Profile Info */}
-              <div className="relative px-6 pb-6">
-                <div className="flex flex-col md:flex-row md:items-end md:space-x-6 -mt-16">
-                  <div className="relative mb-4 md:mb-0">
-                    <Avatar className="w-32 h-32 border-4 border-background">
-                      <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-                      <AvatarFallback className="text-2xl">
-                        {currentUser.name.split(" ").map((n) => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
+            {/* Profile Info Overlay */}
+            <div className="px-6 relative -mt-20">
+                <div className="flex flex-col md:flex-row items-end gap-6">
+                  
+                  {/* BIG AVATAR */}
+                  <div className="relative group">
+                    <div className="rounded-full bg-white dark:bg-card p-1.5 shadow-sm">
+                        <Avatar className="w-48 h-48 border-2 border-gray-100 dark:border-border shadow-inner">
+                            <AvatarImage src={currentUser.avatar} alt={currentUser.name} className="object-cover"/>
+                            <AvatarFallback className="text-5xl bg-gray-50 dark:bg-muted text-gray-300 dark:text-muted-foreground">{currentUser.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                    </div>
+                    {/* Community Badge */}
+                    <div className={`absolute bottom-4 right-4 p-2.5 rounded-full bg-white dark:bg-card shadow-md border border-gray-100 dark:border-border ${theme.icon}`}>
+                        <CommunityIcon className="w-5 h-5" />
+                    </div>
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h1 className="text-3xl font-serif font-bold text-foreground mb-2">{currentUser.name}</h1>
-                        <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-4">
-                          <div className="flex items-center space-x-1">
-                            <MapPin className="w-4 h-4" />
-                            <span>{currentUser.location}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>Joined {currentUser.joinDate}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Users className="w-4 h-4" />
-                            <span>{currentUser.connections} connections</span>
-                          </div>
+                  {/* Text Info */}
+                  <div className="flex-1 pb-2 w-full md:w-auto text-center md:text-left">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-4xl font-bold text-gray-900 dark:text-foreground tracking-tight">{currentUser.name}</h1>
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-2 text-gray-600 dark:text-muted-foreground">
+                                <span className="font-medium text-lg text-foreground">{currentUser.profession.charAt(0).toUpperCase() + currentUser.profession.slice(1)}</span>
+                                <span className="text-gray-300 dark:text-gray-700 hidden md:inline">•</span>
+                                <span className="flex items-center gap-1 text-sm">
+                                    <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500" /> {currentUser.location}
+                                </span>
+                                <span className="text-gray-300 dark:text-gray-700 hidden md:inline">•</span>
+                                <span className="flex items-center gap-1 text-sm">
+                                    <Users className="w-4 h-4 text-gray-400 dark:text-gray-500" /> 
+                                    <span className="font-semibold text-gray-900 dark:text-foreground">{currentUser.connections}</span> connections
+                                </span>
+                            </div>
                         </div>
-                        <Badge className={`${communityColorClass} font-medium mb-4`}>
-                          <CommunityIcon className="w-4 h-4 mr-1" />
-                          {currentUser.community.charAt(0).toUpperCase() + currentUser.community.slice(1)} Community
-                        </Badge>
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <Button variant="outline">
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          Message
-                        </Button>
-                        <Button asChild>
-                          <Link href="/profile/edit">
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Profile
-                          </Link>
-                        </Button>
-                      </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-center gap-3 mt-2 md:mt-0">
+                             <Button asChild variant="outline" className="rounded-full border-gray-300 dark:border-border hover:bg-gray-50 dark:hover:bg-muted hover:text-foreground bg-white dark:bg-card text-foreground shadow-sm">
+                                <Link href="/profile/edit">
+                                    <Edit3 className="w-4 h-4 mr-2" /> Edit Profile
+                                </Link>
+                            </Button>
+                            <Button className="rounded-full shadow-sm bg-gray-900 hover:bg-gray-800 dark:bg-primary dark:hover:bg-primary/90 text-white dark:text-primary-foreground">
+                                Share Profile
+                            </Button>
+                        </div>
                     </div>
                   </div>
                 </div>
-              </div>
             </div>
-          </Card>
+          </div>
         </FadeInUp>
 
-        {/* Main Grid Layout */}
+        {/* --- MAIN CONTENT GRID --- */}
         <div className="grid lg:grid-cols-3 gap-8">
           
-          {/* Main Content (Scrolling) */}
-          <section className="lg:col-span-2 space-y-6">
-            <FadeInUp delay={0.1}>
-              <Tabs defaultValue="about" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="about">About</TabsTrigger>
-                  <TabsTrigger value="projects">Projects</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="about" className="space-y-6">
-                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="font-serif">About</CardTitle>
+          {/* Left Sidebar */}
+          <aside className="space-y-6 lg:col-span-1">
+             {/* About / Bio */}
+             <FadeInUp delay={0.1}>
+                <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                    <CardHeader className="pb-3 flex flex-row items-center justify-between border-b border-gray-50/50 dark:border-border/50">
+                        <CardTitle className="text-lg font-semibold text-foreground">About</CardTitle>
+                        {!isEditingBio && (
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditingBio(true)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                <Edit3 className="w-4 h-4" />
+                            </Button>
+                        )}
                     </CardHeader>
-                    <CardContent>
-                      {/* --- This is the section that was broken --- */}
-                      {isEditingBio ? (
-                          <div className="space-y-2">
-                              <Textarea
-                                  value={tempBioText}
-                                  onChange={(e) => setTempBioText(e.target.value)}
-                                  placeholder="Write something about yourself..."
-                                  className="min-h-[80px] text-sm"
-                              />
-                              <div className="flex space-x-2">
-                                  <Button size="sm" onClick={handleSaveBio} className="flex-1">
-                                      <Save className="w-3 h-3 mr-1" /> Save
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={handleCancelBio} className="flex-1 bg-transparent">
-                                      <X className="w-3 h-3 mr-1" /> Cancel
-                                  </Button>
-                              </div>
-                          </div>
-                      ) : (
-                        <div className="flex items-start justify-between">
-                          <p className="text-muted-foreground leading-relaxed mr-4">{bioText}</p>
-                          <Button variant="ghost" size="sm" onClick={() => setIsEditingBio(true)} className="h-6 w-6 p-0 shrink-0">
-                              <Edit3 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      )}
-                      {/* --- End of broken section fix --- */}
+                    <CardContent className="pt-4">
+                        {isEditingBio ? (
+                            <div className="space-y-3">
+                                <Textarea
+                                    value={tempBioText}
+                                    onChange={(e) => setTempBioText(e.target.value)}
+                                    className="min-h-[120px] text-sm bg-white dark:bg-muted/30 border-border focus:border-primary"
+                                />
+                                <div className="flex gap-2">
+                                    <Button size="sm" onClick={handleSaveBio} className="flex-1">Save</Button>
+                                    <Button size="sm" variant="outline" onClick={() => setIsEditingBio(false)} className="flex-1">Cancel</Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                {bioText}
+                            </p>
+                        )}
                     </CardContent>
-                  </Card>
+                </Card>
+             </FadeInUp>
 
-                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="font-serif">Academic Information</CardTitle>
+             {/* Contact Info */}
+             <FadeInUp delay={0.2}>
+                <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                    <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
+                        <CardTitle className="text-lg font-semibold text-foreground">Contact Info</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="font-semibold text-foreground mb-1">University</h4>
-                          <p className="text-muted-foreground">{currentUser.university}</p>
+                    <CardContent className="pt-4 space-y-4">
+                        <div className="flex items-center gap-3 text-sm">
+                            <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
+                                <Mail className="w-4 h-4" />
+                            </div>
+                            <span className="text-muted-foreground truncate">{currentUser.email}</span>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-foreground mb-1">Major</h4>
-                          <p className="text-muted-foreground">{currentUser.major}</p>
+                        <div className="flex items-center gap-3 text-sm">
+                            <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
+                                <Phone className="w-4 h-4" />
+                            </div>
+                            <span className="text-muted-foreground">{currentUser.phone}</span>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-foreground mb-1">Year</h4>
-                          <p className="text-muted-foreground">{currentUser.year}</p>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-foreground mb-1">GPA</h4>
-                          <p className="text-muted-foreground">{currentUser.gpa}</p>
-                        </div>
-                      </div>
                     </CardContent>
-                  </Card>
+                </Card>
+             </FadeInUp>
 
-                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="font-serif">Skills</CardTitle>
+             {/* Skills */}
+             <FadeInUp delay={0.3}>
+                <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                    <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
+                        <CardTitle className="text-lg font-semibold text-foreground">Skills</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <StaggerContainer stagger={0.05} className="flex flex-wrap gap-2">
-                        {currentUser.skills.map((skill, index) => (
-                          <StaggerItem key={index}>
-                            <Badge variant="secondary">
-                              {skill}
-                            </Badge>
-                          </StaggerItem>
-                        ))}
-                      </StaggerContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="font-serif">Interests</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <StaggerContainer stagger={0.05} className="flex flex-wrap gap-2">
-                        {currentUser.interests.map((interest, index) => (
-                          <StaggerItem key={index}>
-                            <Badge variant="outline">
-                              {interest}
-                            </Badge>
-                          </StaggerItem>
-                        ))}
-                      </StaggerContainer>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="projects" className="space-y-6">
-                  <StaggerContainer stagger={0.1} className="space-y-6">
-                    {currentUser.projects.map((project, index) => (
-                      <StaggerItem key={index}>
-                        <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                          <CardHeader>
-                            <CardTitle className="font-serif">{project.title}</CardTitle>
-                            <CardDescription>{project.description}</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-wrap gap-2">
-                              {project.tech.map((tech, techIndex) => (
-                                <Badge key={techIndex} variant="secondary">
-                                  {tech}
+                    <CardContent className="pt-4">
+                        <div className="flex flex-wrap gap-2">
+                            {currentUser.skills.map((skill, i) => (
+                                <Badge key={i} variant="secondary" className="bg-gray-100 dark:bg-muted text-foreground hover:bg-gray-200 dark:hover:bg-muted/80 border-transparent font-normal px-3 py-1">
+                                    {skill}
                                 </Badge>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </StaggerItem>
-                    ))}
-                  </StaggerContainer>
-                </TabsContent>
-
-                <TabsContent value="activity" className="space-y-6">
-                  <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                    <CardHeader>
-                      <CardTitle className="font-serif">Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <StaggerContainer stagger={0.1} className="space-y-4">
-                        {recentActivity.map((activity) => (
-                          <StaggerItem key={activity.id}>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                              <div className="w-2 h-2 bg-primary rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-foreground">{activity.message}</p>
-                                <p className="text-sm text-muted-foreground">{activity.time}</p>
-                              </div>
-                            </div>
-                          </StaggerItem>
-                        ))}
-                      </StaggerContainer>
+                            ))}
+                        </div>
                     </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                </Card>
+             </FadeInUp>
+          </aside>
+
+          {/* Right Content */}
+          <section className="lg:col-span-2 space-y-8">
+            <FadeInUp delay={0.2}>
+                <Tabs defaultValue="overview" className="w-full">
+                    <TabsList className="w-full grid grid-cols-3 h-12 bg-gray-100/80 dark:bg-muted/50 p-1 rounded-lg">
+                        <TabsTrigger value="overview" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Overview</TabsTrigger>
+                        <TabsTrigger value="projects" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Projects</TabsTrigger>
+                        <TabsTrigger value="activity" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Activity</TabsTrigger>
+                    </TabsList>
+
+                    <div className="mt-8 space-y-8">
+                        {/* OVERVIEW TAB */}
+                        <TabsContent value="overview" className="space-y-8">
+                            
+                            {/* Education Grid */}
+                            <div>
+                                <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: "University", value: currentUser.university, icon: GraduationCap },
+                                        { label: "Major", value: currentUser.major, icon: BookOpen },
+                                        { label: "Year", value: currentUser.year, icon: Calendar },
+                                        { label: "GPA", value: currentUser.gpa, icon: Award },
+                                    ].map((stat, i) => (
+                                        <Card key={i} className="border border-gray-100 dark:border-border bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
+                                            <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                                                <div className="p-2 rounded-full bg-gray-50 dark:bg-muted text-muted-foreground">
+                                                    <stat.icon className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">{stat.label}</div>
+                                                    <div className="font-bold text-foreground text-sm mt-1 line-clamp-2">{stat.value}</div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Achievements */}
+                            <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                                <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
+                                    <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+                                        <Award className="w-5 h-5 text-yellow-500" /> 
+                                        Achievements & Certifications
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-4">
+                                    <StaggerContainer stagger={0.1} className="grid gap-3">
+                                        {currentUser.achievements.map((achievement, index) => (
+                                            <StaggerItem key={index}>
+                                                <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50 dark:bg-muted/20 border border-gray-100/50 dark:border-border/40">
+                                                    <div className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                                                    <span className="text-sm font-medium text-foreground">{achievement}</span>
+                                                </div>
+                                            </StaggerItem>
+                                        ))}
+                                    </StaggerContainer>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* PROJECTS TAB - IMPROVED UI */}
+                        <TabsContent value="projects">
+                             <div className="grid gap-6 md:grid-cols-2">
+                                {currentUser.projects.map((project, index) => (
+                                    <Card key={index} className="flex flex-col border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 bg-white dark:bg-card group h-full">
+                                        <CardHeader className="pb-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-3 w-fit">
+                                                    <FolderGit2 className="w-6 h-6" />
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                                        <Github className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                                        <ExternalLink className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <CardTitle className="text-xl font-bold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                {project.title}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex-1 pb-4">
+                                            <CardDescription className="text-muted-foreground line-clamp-3 leading-relaxed">
+                                                {project.description}
+                                            </CardDescription>
+                                            <div className="mt-6 flex flex-wrap gap-2">
+                                                {project.tech.map((tech, tIndex) => (
+                                                    <Badge key={tIndex} variant="outline" className="border-gray-200 dark:border-border text-muted-foreground font-normal text-xs px-2 py-0.5">
+                                                        {tech}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter className="pt-0 border-t border-gray-50 dark:border-border/40 mt-auto p-4 bg-gray-50/30 dark:bg-muted/10">
+                                             <Button variant="outline" size="sm" className="w-full border-gray-200 dark:border-border text-foreground hover:bg-white dark:hover:bg-card hover:text-foreground">
+                                                View Details
+                                             </Button>
+                                        </CardFooter>
+                                    </Card>
+                                ))}
+                             </div>
+                        </TabsContent>
+
+                        {/* ACTIVITY TAB */}
+                        <TabsContent value="activity">
+                            <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                                <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
+                                    <CardTitle className="text-lg text-foreground">Recent Activity</CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-2">
+                                     <StaggerContainer stagger={0.1} className="space-y-0">
+                                        {recentActivity.map((activity, i) => (
+                                            <StaggerItem key={i}>
+                                                <div className="flex gap-4 py-4 border-b border-gray-100 dark:border-border/50 last:border-0">
+                                                    <div className={`w-10 h-10 rounded-full bg-gray-50 dark:bg-muted flex items-center justify-center shrink-0 border border-gray-100 dark:border-border`}>
+                                                        <Zap className="w-4 h-4 text-muted-foreground" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-foreground">{activity.message}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                                                    </div>
+                                                </div>
+                                            </StaggerItem>
+                                        ))}
+                                    </StaggerContainer>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </div>
+                </Tabs>
             </FadeInUp>
           </section>
 
-          {/* Sidebar (Sticky) */}
-          <aside className="hidden lg:block lg:col-span-1">
-            <div className="sticky top-8 space-y-6">
-              <FadeInUp delay={0.2}>
-                <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="font-serif">Contact Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <Mail className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{currentUser.email}</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Phone className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{currentUser.phone}</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <MapPin className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{currentUser.location}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="font-serif">Achievements</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <StaggerContainer stagger={0.1} className="space-y-3">
-                      {currentUser.achievements.map((achievement, index) => (
-                        <StaggerItem key={index}>
-                          <div className="flex items-center space-x-3">
-                            <Award className="w-4 h-4 text-primary" />
-                            <span className="text-sm">{achievement}</span>
-                          </div>
-                        </StaggerItem>
-                      ))}
-                    </StaggerContainer>
-                  </CardContent>
-                </Card>
-              </FadeInUp>
-            </div>
-          </aside>
         </div>
       </main>
-      {/* Footer is Removed */}
     </div>
   )
 }
