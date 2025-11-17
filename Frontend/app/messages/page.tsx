@@ -15,13 +15,13 @@ import {
     getMessageHistory,
     sendMessage,
     markMessagesAsRead,
-    getUnreadMessageCount,
     ChatUserResponse,
     MessageResponse,
 } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { useUnreadMessages } from "@/lib/UnreadMessagesContext";
 
 interface CurrentUser {
     id: number;
@@ -33,6 +33,7 @@ interface CurrentUser {
 
 export default function MessagesPage() {
     const router = useRouter();
+    const { unreadCount, decrementUnreadCount } = useUnreadMessages();
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
     const [chatUsers, setChatUsers] = useState<ChatUserResponse[]>([]);
     const [selectedUser, setSelectedUser] = useState<ChatUserResponse | null>(null);
@@ -58,6 +59,11 @@ export default function MessagesPage() {
         selectedUserRef.current = selectedUser;
     }, [selectedUser]);
 
+    // Update currentUser when global unreadCount changes
+    useEffect(() => {
+        setCurrentUser((prev) => prev ? { ...prev, unreadMessages: unreadCount } : null);
+    }, [unreadCount]);
+
     // Initialize user and load data
     useEffect(() => {
         let cleanupFn: (() => void) | undefined;
@@ -73,9 +79,6 @@ export default function MessagesPage() {
 
             try {
                 const user: LoginResponse = JSON.parse(userDataString);
-
-                // Fetch unread count initially
-                const unreadCount = await getUnreadMessageCount(user.id);
 
                 setCurrentUser({
                     id: user.id,
@@ -148,20 +151,17 @@ export default function MessagesPage() {
                     setMessages((prev) => [...prev, receivedMessage]);
                     
                     // If the chat is open and we're receiving a message, don't increment unread count
-                    // The messages will be marked as read automatically
-                } else if (isReceivingMessage) {
-                    // If chat is not open, increment total unread count
-                    setCurrentUser((prev) => 
-                        prev ? { 
-                            ...prev, 
-                            unreadMessages: (prev.unreadMessages || 0) + 1 
-                        } : null
-                    );
+                    // The global context will handle this, but we should decrement since we're reading it live
+                    if (isReceivingMessage) {
+                        // Decrement immediately since we're viewing the message
+                        decrementUnreadCount(1);
+                    }
                 }
+                // Note: If chat is not open, the global WebSocket context will increment the unread count
 
-                // Update chat users list to reflect new message
-                setChatUsers((prev) =>
-                    prev.map((user) => {
+                // Update chat users list to reflect new message and sort by most recent
+                setChatUsers((prev) => {
+                    const updatedUsers = prev.map((user) => {
                         if (user.id === receivedMessage.senderId) {
                             // Only increment unread count if this chat is not currently open
                             const shouldIncrementUnread = !currentSelectedUser || currentSelectedUser.id !== user.id;
@@ -169,11 +169,19 @@ export default function MessagesPage() {
                                 ...user,
                                 lastMessage: receivedMessage.content,
                                 unreadCount: shouldIncrementUnread ? user.unreadCount + 1 : user.unreadCount,
+                                lastMessageTime: new Date(receivedMessage.timestamp).getTime(),
                             };
                         }
                         return user;
-                    })
-                );
+                    });
+                    
+                    // Sort by most recent message (users with recent messages at top)
+                    return updatedUsers.sort((a, b) => {
+                        const timeA = (a as any).lastMessageTime || 0;
+                        const timeB = (b as any).lastMessageTime || 0;
+                        return timeB - timeA;
+                    });
+                });
             });
         };
 
@@ -213,14 +221,9 @@ export default function MessagesPage() {
                 prev.map((u) => (u.id === user.id ? { ...u, unreadCount: 0 } : u))
             );
 
-            // Decrement total unread count in header
+            // Decrement total unread count using global context
             if (unreadForThisUser > 0) {
-                setCurrentUser((prev) => 
-                    prev ? { 
-                        ...prev, 
-                        unreadMessages: Math.max(0, (prev.unreadMessages || 0) - unreadForThisUser) 
-                    } : null
-                );
+                decrementUnreadCount(unreadForThisUser);
             }
         } catch (error) {
             console.error("Failed to load message history:", error);
@@ -245,14 +248,21 @@ export default function MessagesPage() {
             setMessages((prev) => [...prev, sentMessage]);
             setMessageText("");
 
-            // Update last message in chat users
-            setChatUsers((prev) =>
-                prev.map((user) =>
+            // Update last message in chat users and move to top
+            setChatUsers((prev) => {
+                const updatedUsers = prev.map((user) =>
                     user.id === selectedUser.id
-                        ? { ...user, lastMessage: sentMessage.content }
+                        ? { ...user, lastMessage: sentMessage.content, lastMessageTime: new Date(sentMessage.timestamp).getTime() }
                         : user
-                )
-            );
+                );
+                
+                // Sort by most recent message
+                return updatedUsers.sort((a, b) => {
+                    const timeA = (a as any).lastMessageTime || 0;
+                    const timeB = (b as any).lastMessageTime || 0;
+                    return timeB - timeA;
+                });
+            });
         } catch (error) {
             console.error("Failed to send message:", error);
             toast.error("Failed to send message");

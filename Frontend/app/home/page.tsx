@@ -22,7 +22,6 @@ import {
     addComment,
     uploadPostImage,
     getUserProfile,
-    getUnreadMessageCount,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -49,8 +48,7 @@ import { UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, Trash2, Image a
 import { FadeInUp, StaggerContainer } from "@/components/animations";
 import toast from "react-hot-toast";
 import Image from "next/image";
-import { Client } from "@stomp/stompjs";
-import SockJS from "sockjs-client";
+import { useUnreadMessages } from "@/lib/UnreadMessagesContext";
 
 // ---------------- Types local to this component ----------------
 interface CurrentUser {
@@ -72,6 +70,7 @@ interface ProfileData {
 }
 
 export default function HomePage() {
+    const { unreadCount } = useUnreadMessages();
     const [members, setMembers] = useState<UserProfileResponse[]>([]);
     const [membersLoading, setMembersLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -120,7 +119,7 @@ export default function HomePage() {
                 community: user.profession,
                 avatar: "/placeholder.svg", // You can update this later
                 pendingRequests: 0,
-                unreadMessages: 0,
+                unreadMessages: unreadCount,
             });
 
             // 2. Create an async function to fetch all data
@@ -135,8 +134,7 @@ export default function HomePage() {
                         fetchPendingRequests(user.id),
                         fetchSentPendingRequests(user.id),
                         fetchAcceptedConnections(user.id),
-                        fetchPosts(user.profession, user.id),
-                        fetchUnreadMessageCount(user.id)
+                        fetchPosts(user.profession, user.id)
                     ]);
                 } catch (err) {
                     console.error("Failed during data fetch:", err);
@@ -150,9 +148,6 @@ export default function HomePage() {
             // Call the data fetching function
             loadAllData();
 
-            // Setup WebSocket for real-time unread message updates
-            setupUnreadMessagesWebSocket(user.id);
-
         } catch (error) {
             console.error("Failed to parse user data or load initial data:", error);
             // If data is bad, clear it and send back to login
@@ -162,6 +157,10 @@ export default function HomePage() {
         }
     }, [router]); // Add 'router' as a dependency
 
+    // Update currentUser unreadMessages when global unreadCount changes
+    useEffect(() => {
+        setCurrentUser((prev) => prev ? { ...prev, unreadMessages: unreadCount } : null);
+    }, [unreadCount]);
     
     const fetchUserProfile = async (userId: number) => {
         try {
@@ -257,47 +256,6 @@ export default function HomePage() {
         } finally {
             setPostsLoading(false);
         }
-    };
-
-    const fetchUnreadMessageCount = async (userId: number) => {
-        try {
-            const count = await getUnreadMessageCount(userId);
-            setCurrentUser((prev) => (prev ? { ...prev, unreadMessages: count } : null));
-        } catch (error) {
-            console.error("Failed to fetch unread message count:", error);
-        }
-    };
-
-    const setupUnreadMessagesWebSocket = (userId: number) => {
-        const socket = new SockJS("http://localhost:8080/ws");
-        const stompClient = new Client({
-            webSocketFactory: () => socket as any,
-            reconnectDelay: 5000,
-            heartbeatIncoming: 4000,
-            heartbeatOutgoing: 4000,
-        });
-
-        stompClient.onConnect = () => {
-            console.log("Unread Messages WebSocket connected");
-
-            // Subscribe to personal message queue for real-time updates
-            stompClient.subscribe(`/user/${userId}/queue/messages`, () => {
-                console.log("New message received, updating unread count");
-                // Increment unread count when new message arrives
-                setCurrentUser((prev) => 
-                    prev ? { ...prev, unreadMessages: (prev.unreadMessages || 0) + 1 } : null
-                );
-            });
-        };
-
-        stompClient.onStompError = (frame) => {
-            console.error("Unread Messages WebSocket error:", frame);
-        };
-
-        stompClient.activate();
-
-        // Note: cleanup is not added here as it would require storing the client in a ref
-        // and cleaning up on component unmount
     };
 
     // ---------------- Post handlers ----------------

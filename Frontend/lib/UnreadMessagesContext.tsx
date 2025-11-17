@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { getUnreadMessageCount } from "@/lib/api";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
@@ -16,6 +16,7 @@ const UnreadMessagesContext = createContext<UnreadMessagesContextType | undefine
 export function UnreadMessagesProvider({ children }: { children: React.ReactNode }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [userId, setUserId] = useState<number | null>(null);
+    const stompClientRef = useRef<Client | null>(null);
 
     // Fetch unread count from server
     const refreshUnreadCount = useCallback(async () => {
@@ -28,6 +29,11 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             console.error("Failed to fetch unread message count:", error);
         }
     }, [userId]);
+
+    // Decrement unread count
+    const decrementUnreadCount = useCallback((amount: number) => {
+        setUnreadCount((prev) => Math.max(0, prev - amount));
+    }, []);
 
     // Setup WebSocket connection for real-time updates
     useEffect(() => {
@@ -52,35 +58,36 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             });
 
             stompClient.onConnect = () => {
-                console.log("UnreadMessages WebSocket connected");
+                console.log("Global UnreadMessages WebSocket connected");
 
                 // Subscribe to personal message queue
                 stompClient.subscribe(`/user/${user.id}/queue/messages`, (message) => {
-                    console.log("New message received, updating unread count");
-                    // Increment unread count when new message arrives
-                    setUnreadCount((prev) => prev + 1);
+                    console.log("Global context received new message notification");
+                    const receivedMessage = JSON.parse(message.body);
+                    
+                    // Only increment if we're the receiver
+                    if (receivedMessage.receiverId === user.id) {
+                        setUnreadCount((prev) => prev + 1);
+                    }
                 });
             };
 
             stompClient.onStompError = (frame) => {
-                console.error("UnreadMessages WebSocket error:", frame);
+                console.error("Global UnreadMessages WebSocket error:", frame);
             };
 
             stompClient.activate();
+            stompClientRef.current = stompClient;
 
             // Cleanup
             return () => {
-                if (stompClient) {
-                    stompClient.deactivate();
+                if (stompClientRef.current) {
+                    stompClientRef.current.deactivate();
                 }
             };
         } catch (error) {
-            console.error("Failed to setup unread messages tracking:", error);
+            console.error("Failed to setup global unread messages tracking:", error);
         }
-    }, []);
-
-    const decrementUnreadCount = useCallback((amount: number) => {
-        setUnreadCount((prev) => Math.max(0, prev - amount));
     }, []);
 
     return (
