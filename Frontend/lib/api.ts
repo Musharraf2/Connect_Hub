@@ -634,4 +634,112 @@ export const deleteNotification = async (notificationId: number): Promise<string
         console.error("Failed to delete notification:", error);
         throw error;
     }
+}
+
+// ==================== MESSAGE TYPES ====================
+
+export interface MessageRequest {
+    senderId: number;
+    receiverId: number;
+    content: string;
+}
+
+export interface MessageUserInfo {
+    id: number;
+    name: string;
+    email: string;
+    profession: string;
+    profileImageUrl?: string;
+}
+
+export interface MessageResponse {
+    id: number;
+    sender: MessageUserInfo;
+    receiver: MessageUserInfo;
+    content: string;
+    timestamp: string;
+    isRead: boolean;
+}
+
+export interface ConversationSummaryUserInfo {
+    id: number;
+    name: string;
+    profession: string;
+    profileImageUrl?: string;
+}
+
+export interface ConversationSummary {
+    user: ConversationSummaryUserInfo;
+    lastMessage: string;
+    lastMessageTime: string | null;
+    unreadCount: number;
+}
+
+// ==================== MESSAGE FUNCTIONS ====================
+
+export const sendMessage = async (request: MessageRequest): Promise<MessageResponse> => {
+    try {
+        const response = await fetch(`${BASE}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to send message: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to send message:", error);
+        throw error;
+    }
+};
+
+export const getConversation = async (userId1: number, userId2: number): Promise<MessageResponse[]> => {
+    try {
+        const response = await fetch(`${BASE}/messages/conversation/${userId1}/${userId2}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get conversation: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to get conversation:", error);
+        throw error;
+    }
+};
+
+export const getConversationList = async (userId: number): Promise<ConversationSummary[]> => {
+    try {
+        const response = await fetch(`${BASE}/messages/conversations/${userId}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get conversation list: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to get conversation list:", error);
+        throw error;
+    }
+};
+
+export const markMessagesAsRead = async (receiverId: number, senderId: number): Promise<void> => {
+    try {
+        const response = await fetch(`${BASE}/messages/read/${receiverId}/${senderId}`, {
+            method: 'PUT',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to mark messages as read: ${response.status}`);
+        }
+    } catch (error) {
+        console.error("Failed to mark messages as read:", error);
+        throw error;
+    }
+};
 };
