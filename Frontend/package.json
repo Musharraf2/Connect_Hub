@@ -19,6 +19,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@stomp/stompjs": "^7.2.1",
     "axios": "^1.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -32,6 +33,7 @@
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.6.0",
     "react-image-crop": "^11.0.10",
+    "sockjs-client": "^1.6.1",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {

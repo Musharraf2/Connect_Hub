@@ -41,6 +41,7 @@ interface HeaderProps {
         community: string
         avatar: string
         pendingRequests?: number
+        unreadMessageCount?: number
     }
 }
 
@@ -92,7 +93,8 @@ export function Header({ user }: HeaderProps) {
         {
             name: "Messages",
             href: "/messages",
-            icon: MessageCircle
+            icon: MessageCircle,
+            badge: user.unreadMessageCount
         },
         {
             name: "Notifications",
