@@ -484,7 +484,8 @@ export default function HomePage() {
         url: 'http://localhost:8080/ws',
         topics: wsTopics,
         onMessage: handleWebSocketMessage,
-        enabled: !!currentUser && !authLoading
+        enabled: !!currentUser && !authLoading,
+        userId: currentUser?.id
     });
 
     if (authLoading || !currentUser || !profileData) return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
@@ -696,7 +697,9 @@ export default function HomePage() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {members
-                                        // FIX: Filter only for users where status is 'none' (not connected AND not pending)
+                                        // Sort by ID descending (newest users first)
+                                        .sort((a, b) => b.id - a.id)
+                                        // Filter only for users where status is 'none' (not connected AND not pending)
                                         .filter(m => getConnectionStatus(m.id).status === "none")
                                         .slice(0, 5)
                                         .map(m => (
@@ -723,7 +726,6 @@ export default function HomePage() {
                                                 </Button>
                                             </div>
                                         ))}
-                                    <Button variant="link" className="w-full text-xs text-muted-foreground h-auto p-0 hover:text-primary">View all recommendations</Button>
                                 </CardContent>
                             </Card>
                         </FadeInUp>

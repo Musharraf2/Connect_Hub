@@ -7,16 +7,19 @@ interface UseWebSocketOptions {
   topics: string[];
   onMessage: (topic: string, message: any) => void;
   enabled?: boolean;
+  userId?: number;
 }
 
-export const useWebSocket = ({ url, topics, onMessage, enabled = true }: UseWebSocketOptions) => {
+export const useWebSocket = ({ url, topics, onMessage, enabled = true, userId }: UseWebSocketOptions) => {
   const clientRef = useRef<Client | null>(null);
   const subscriptionsRef = useRef<{ [key: string]: any }>({});
 
   const connect = useCallback(() => {
     if (!enabled || clientRef.current?.connected) return;
 
-    const socket = new SockJS(url);
+    // Append userId to URL if provided
+    const wsUrl = userId ? `${url}?userId=${userId}` : url;
+    const socket = new SockJS(wsUrl);
     const client = new Client({
       webSocketFactory: () => socket as any,
       debug: (str) => {
@@ -55,7 +58,7 @@ export const useWebSocket = ({ url, topics, onMessage, enabled = true }: UseWebS
 
     client.activate();
     clientRef.current = client;
-  }, [url, topics, onMessage, enabled]);
+  }, [url, topics, onMessage, enabled, userId]);
 
   const disconnect = useCallback(() => {
     if (clientRef.current) {

@@ -95,7 +95,7 @@ export default function MessagesPage() {
         if (!currentUser?.id) return;
 
         const client = new Client({
-            webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
+            webSocketFactory: () => new SockJS(`http://localhost:8080/ws?userId=${currentUser.id}`),
             debug: (str) => {
                 console.log("STOMP: " + str);
             },
