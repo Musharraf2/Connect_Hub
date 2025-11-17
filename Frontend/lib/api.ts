@@ -181,6 +181,9 @@ export const loginUser = async (loginData: LoginRequestType): Promise<LoginRespo
     });
 
     if (!response.ok) {
+        if (response.status === 400) {
+            throw new Error('Wrong credentials');
+        }
         const errorText = await response.text();
         throw new Error(errorText || 'Login failed');
     }

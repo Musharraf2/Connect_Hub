@@ -580,8 +580,7 @@ export default function HomePage() {
                                             <div className="flex items-start justify-between">
                                                 <div className="flex gap-3">
                                                     <Avatar className="w-10 h-10 border border-border">
-                                                        {/* FIX: Use getImageUrl for post author */}
-                                                        <AvatarImage src={getImageUrl((post.user as any).profileImageUrl)} />
+                                                        <AvatarImage src={getImageUrl(post.user.profileImageUrl)} />
                                                         <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
                                                     </Avatar>
                                                     <div>
@@ -636,8 +635,7 @@ export default function HomePage() {
                                                     {post.comments.map(c => (
                                                         <div key={c.id} className="flex gap-2 text-sm">
                                                             <Avatar className="w-6 h-6 mt-1">
-                                                                {/* FIX: Use getImageUrl for commenter */}
-                                                                <AvatarImage src={getImageUrl((c.user as any).profileImageUrl)} />
+                                                                <AvatarImage src={getImageUrl(c.user.profileImageUrl)} />
                                                                 <AvatarFallback className="text-[10px]">{c.user.name.charAt(0)}</AvatarFallback>
                                                             </Avatar>
                                                             <div className="bg-card p-2 px-3 rounded-lg shadow-sm border border-border flex-1">
@@ -689,8 +687,7 @@ export default function HomePage() {
                                             <div key={m.id} className="flex items-center justify-between group">
                                                 <div className="flex items-center gap-3 overflow-hidden">
                                                     <Avatar className="w-9 h-9 border border-border">
-                                                        {/* FIX: Use getImageUrl for suggestions */}
-                                                        <AvatarImage src={getImageUrl((m as any).profileImageUrl)} />
+                                                        <AvatarImage src={getImageUrl(m.profileImageUrl)} />
                                                         <AvatarFallback className="bg-primary/10 text-primary text-xs">{m.name.charAt(0)}</AvatarFallback>
                                                     </Avatar>
                                                     <div className="min-w-0">

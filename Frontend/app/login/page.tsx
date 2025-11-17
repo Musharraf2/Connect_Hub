@@ -61,11 +61,16 @@ export default function LoginPage() {
                 sessionStorage.setItem('user', JSON.stringify(response));
                 router.push('/home');
             } else {
-                toast.error("Invalid email or password!");
+                toast.error("Wrong credentials. Please check your email and password.");
             }
         } catch (err: unknown) {
             console.error("Login failed:", err);
-            toast.error("Login failed. The server may be down.");
+            // Check if it's a credential error
+            if (err instanceof Error && err.message === 'Wrong credentials') {
+                toast.error("Wrong credentials. Please check your email and password.");
+            } else {
+                toast.error("Login failed. The server may be down.");
+            }
         }
     };
 
