@@ -4,6 +4,8 @@ import com.community.profession_connect.model.Connection;
 import com.community.profession_connect.model.ConnectionStatus;
 import com.community.profession_connect.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,4 +43,10 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
             User requester,
             ConnectionStatus status2
     );
+
+    // Get all users that are connected (accepted) with the given user
+    @Query("SELECT CASE WHEN c.requester.id = :userId THEN c.receiver ELSE c.requester END " +
+           "FROM Connection c WHERE (c.requester.id = :userId OR c.receiver.id = :userId) " +
+           "AND c.status = 'ACCEPTED'")
+    List<User> findAcceptedConnectionUsers(@Param("userId") Long userId);
 }
