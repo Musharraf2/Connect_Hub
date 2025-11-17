@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 // Iconss
 import { 
@@ -440,6 +441,38 @@ export default function HomePage() {
             toast.error("Failed to cancel");
         }
     };
+
+    const handleWebSocketMessage = useCallback((topic: string, message: any) => {
+        // Handle new posts
+        if (topic.includes('/posts/') && !topic.includes('/update')) {
+            setPosts(prev => [message, ...prev]);
+            toast.success("New post from your community!");
+        }
+        // Handle post updates (likes/comments)
+        else if (topic.includes('/update')) {
+            setPosts(prev => prev.map(p => p.id === message.id ? message : p));
+        }
+        // Handle connection requests
+        else if (topic.includes('/connections/')) {
+            if (currentUser?.id) {
+                fetchPendingRequests(currentUser.id);
+            }
+        }
+    }, [currentUser?.id]);
+
+    // WebSocket connection
+    const wsTopics = currentUser?.community ? [
+        `/topic/posts/${currentUser.community}`,
+        `/topic/posts/${currentUser.community}/update`,
+        `/topic/connections/${currentUser.id}`
+    ] : [];
+
+    useWebSocket({
+        url: 'http://localhost:8080/ws',
+        topics: wsTopics,
+        onMessage: handleWebSocketMessage,
+        enabled: !!currentUser && !authLoading
+    });
 
     if (authLoading || !currentUser || !profileData) return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
 
