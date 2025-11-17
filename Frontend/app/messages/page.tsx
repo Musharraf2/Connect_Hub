@@ -52,6 +52,7 @@ export default function MessagesPage() {
     const [loading, setLoading] = useState(true);
     const [stompClient, setStompClient] = useState<Client | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const selectedConversationRef = useRef<ConversationResponse | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
 
     // Scroll to bottom of messages
@@ -108,16 +109,19 @@ export default function MessagesPage() {
             // Subscribe to personal message queue
             client.subscribe(`/queue/messages/${currentUser.id}`, (message) => {
                 const newMessage: MessageResponse = JSON.parse(message.body);
+                console.log("[WebSocket] Received message:", newMessage);
                 
                 // Update messages if conversation is selected
-                if (selectedConversation && 
-                    (newMessage.senderId === selectedConversation.userId || 
-                     newMessage.receiverId === selectedConversation.userId)) {
+                const currentConversation = selectedConversationRef.current;
+                if (currentConversation && 
+                    (newMessage.senderId === currentConversation.userId || 
+                     newMessage.receiverId === currentConversation.userId)) {
+                    console.log("[WebSocket] Adding message to conversation");
                     setMessages((prev) => [...prev, newMessage]);
                     
                     // Mark as read if sender is the selected conversation
-                    if (newMessage.senderId === selectedConversation.userId) {
-                        markMessagesAsRead(currentUser.id!, selectedConversation.userId);
+                    if (newMessage.senderId === currentConversation.userId) {
+                        markMessagesAsRead(currentUser.id!, currentConversation.userId);
                     }
                 }
                 
@@ -175,6 +179,7 @@ export default function MessagesPage() {
         if (!currentUser?.id) return;
         
         setSelectedConversation(conversation);
+        selectedConversationRef.current = conversation; // Update ref for WebSocket handler
         
         try {
             const msgs = await getConversation(currentUser.id, conversation.userId);
@@ -201,12 +206,15 @@ export default function MessagesPage() {
                 content: messageInput.trim(),
             };
 
+            console.log("[Send] Sending message:", messageRequest);
+            
             // Send via REST API (which also sends via WebSocket)
-            await sendMessage(messageRequest);
+            const response = await sendMessage(messageRequest);
+            console.log("[Send] Message sent, response:", response);
             
             setMessageInput("");
         } catch (error) {
-            console.error("Failed to send message:", error);
+            console.error("[Send] Failed to send message:", error);
             toast.error("Failed to send message");
         }
     };
