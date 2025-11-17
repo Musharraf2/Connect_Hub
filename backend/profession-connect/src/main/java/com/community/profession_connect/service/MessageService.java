@@ -3,6 +3,7 @@ package com.community.profession_connect.service;
 import com.community.profession_connect.dto.ConversationResponse;
 import com.community.profession_connect.dto.MessageRequest;
 import com.community.profession_connect.dto.MessageResponse;
+import com.community.profession_connect.model.ConnectionStatus;
 import com.community.profession_connect.model.Message;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.repository.ConnectionRepository;
@@ -69,7 +70,7 @@ public class MessageService {
     public List<ConversationResponse> getConversations(Long userId) {
         try {
             // Get all accepted connections for the user
-            List<User> connectedUsers = connectionRepository.findAcceptedConnectionUsers(userId);
+            List<User> connectedUsers = connectionRepository.findAcceptedConnectionUsers(userId, ConnectionStatus.ACCEPTED);
             
             if (connectedUsers.isEmpty()) {
                 System.out.println("No connected users found for user " + userId);
