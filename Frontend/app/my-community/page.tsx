@@ -21,7 +21,7 @@ import {
   Briefcase
 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
-import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import { FadeInUp, StaggerContainer, StaggerItem, PageTransition } from "@/components/animations"
 import { 
   LoginResponse, 
   Connection,
@@ -296,12 +296,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-300">
-      <Header user={{...currentUser, pendingRequests: pendingRequests.length}} />
+    <PageTransition>
+      <div className="min-h-screen bg-background transition-colors duration-300">
+        <Header user={{...currentUser, pendingRequests: pendingRequests.length}} />
 
-      <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4">
-        
-        {/* Left Sidebar */}
+        <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4">
+          
+          {/* Left Sidebar */}
         <aside className="hidden lg:block lg:col-span-1">
           <div className="sticky top-24 space-y-6">
             <FadeInUp>
@@ -580,5 +581,6 @@ export default function DashboardPage() {
         </section>
       </main>
     </div>
+    </PageTransition>
   )
 }

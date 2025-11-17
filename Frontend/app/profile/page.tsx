@@ -28,7 +28,7 @@ import {
   Edit3,
 } from "lucide-react"
 import Link from "next/link"
-import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
+import { FadeInUp, StaggerContainer, StaggerItem, PageTransition } from "@/components/animations"
 
 // --- MOCK DATA ---
 const profileMockData = {
@@ -224,12 +224,13 @@ export default function ProfilePage() {
   const CommunityIcon = communityIcons[commKey as keyof typeof communityIcons] || Users;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-background transition-colors duration-300">
-      <Header user={currentUser} />
+    <PageTransition>
+      <div className="min-h-screen bg-gray-50 dark:bg-background transition-colors duration-300">
+        <Header user={currentUser} />
 
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
-        
-        {/* --- HERO SECTION --- */}
+        <main className="container mx-auto px-4 py-8 max-w-6xl">
+          
+          {/* --- HERO SECTION --- */}
         <FadeInUp>
           <div className="relative mb-10">
             {/* Cover Image */}
@@ -281,12 +282,12 @@ export default function ProfilePage() {
                         
                         {/* Action Buttons */}
                         <div className="flex items-center justify-center gap-3 mt-2 md:mt-0">
-                             <Button asChild variant="outline" className="rounded-full border-gray-300 dark:border-border hover:bg-gray-50 dark:hover:bg-muted hover:text-foreground bg-white dark:bg-card text-foreground shadow-sm">
+                             <Button asChild variant="outline" className="rounded-full border-gray-300 dark:border-border hover:bg-gray-50 dark:hover:bg-muted hover:text-foreground bg-white dark:bg-card text-foreground shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95">
                                 <Link href="/profile/edit">
                                     <Edit3 className="w-4 h-4 mr-2" /> Edit Profile
                                 </Link>
                             </Button>
-                            <Button className="rounded-full shadow-sm bg-gray-900 hover:bg-gray-800 dark:bg-primary dark:hover:bg-primary/90 text-white dark:text-primary-foreground">
+                            <Button className="rounded-full shadow-sm bg-gray-900 hover:bg-gray-800 dark:bg-primary dark:hover:bg-primary/90 text-white dark:text-primary-foreground hover:shadow-md transition-all hover:scale-105 active:scale-95">
                                 Share Profile
                             </Button>
                         </div>
@@ -415,5 +416,6 @@ export default function ProfilePage() {
         </div>
       </main>
     </div>
+    </PageTransition>
   )
 }

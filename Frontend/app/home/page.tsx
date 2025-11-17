@@ -28,6 +28,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { FadeInUp, StaggerContainer } from "@/components/animations";
+import { PostSkeleton, ProfileCardSkeleton, SuggestionSkeleton } from "@/components/loading-skeletons";
 
 // API Imports
 import {
@@ -559,8 +560,19 @@ export default function HomePage() {
 
                     {/* Posts Feed */}
                     <div className="space-y-5">
-                        <StaggerContainer stagger={0.1}>
-                            {posts.map((post) => {
+                        {postsLoading ? (
+                            <>
+                                <PostSkeleton />
+                                <PostSkeleton />
+                                <PostSkeleton />
+                            </>
+                        ) : posts.length === 0 ? (
+                            <Card className="border-border shadow-sm bg-card p-8 text-center">
+                                <p className="text-muted-foreground">No posts yet. Be the first to share something!</p>
+                            </Card>
+                        ) : (
+                            <StaggerContainer stagger={0.1}>
+                                {posts.map((post) => {
                                 const isOwn = currentUser?.id === post.user.id;
                                 return (
                                     <Card key={post.id} className="border-border shadow-sm bg-card hover:shadow-md transition-all duration-300 mb-4 overflow-hidden">
@@ -598,22 +610,22 @@ export default function HomePage() {
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
-                                                    className={`gap-2 hover:bg-red-500/10 transition-colors ${post.likedByCurrentUser ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
+                                                    className={`gap-2 hover:bg-red-500/10 transition-all active:scale-95 ${post.likedByCurrentUser ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
                                                     onClick={() => handleToggleLike(post.id)}
                                                 >
-                                                    <Heart className={`w-4 h-4 ${post.likedByCurrentUser ? "fill-current" : ""}`} />
+                                                    <Heart className={`w-4 h-4 transition-transform ${post.likedByCurrentUser ? "fill-current scale-110" : ""}`} />
                                                     <span className="text-xs font-medium">{post.likesCount || "Like"}</span>
                                                 </Button>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm" 
-                                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500"
+                                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 transition-all active:scale-95"
                                                     onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
                                                 >
                                                     <MessageSquare className="w-4 h-4" />
                                                     <span className="text-xs font-medium">{post.commentsCount || "Comment"}</span>
                                                 </Button>
-                                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:bg-muted">
+                                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:bg-muted transition-all active:scale-95">
                                                     <Send className="w-4 h-4" />
                                                     <span className="text-xs font-medium">Share</span>
                                                 </Button>
@@ -656,6 +668,7 @@ export default function HomePage() {
                                 );
                             })}
                         </StaggerContainer>
+                        )}
                     </div>
                 </section>
 
