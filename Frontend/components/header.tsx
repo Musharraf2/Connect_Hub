@@ -87,7 +87,7 @@ export function Header({ user }: HeaderProps) {
     const navItems = user ? [
         {
             name: "My Community", // Renamed from Dashboard
-            href: "/dashboard",
+            href: "/my-community",
             icon: Home
         },
         {
