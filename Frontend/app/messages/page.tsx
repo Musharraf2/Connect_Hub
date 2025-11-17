@@ -39,7 +39,6 @@ export default function MessagesPage() {
     const [messageInput, setMessageInput] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
-    const [stompClient, setStompClient] = useState<Client | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Scroll to bottom of messages
@@ -118,7 +117,6 @@ export default function MessagesPage() {
         });
 
         client.activate();
-        setStompClient(client);
 
         return () => {
             if (client.active) {

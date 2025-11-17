@@ -742,4 +742,3 @@ export const markMessagesAsRead = async (receiverId: number, senderId: number): 
         throw error;
     }
 };
-};
