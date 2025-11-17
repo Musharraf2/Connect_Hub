@@ -271,8 +271,17 @@ export default function MessagesPage() {
                         <div className="flex-1 overflow-y-auto">
                             {filteredConversations.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">
-                                    <p>No conversations yet</p>
-                                    <p className="text-sm mt-2">Connect with others to start messaging!</p>
+                                    <p className="font-medium">No conversations available</p>
+                                    <p className="text-sm mt-2">
+                                        {conversations.length === 0 
+                                            ? "Connect with other users to start messaging!"
+                                            : "No matches found for your search."}
+                                    </p>
+                                    {conversations.length === 0 && (
+                                        <p className="text-xs mt-2 text-muted-foreground/70">
+                                            Go to Dashboard to connect with users in your community.
+                                        </p>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="divide-y divide-border">
