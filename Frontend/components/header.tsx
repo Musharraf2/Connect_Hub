@@ -112,7 +112,7 @@ export function Header({ user }: HeaderProps) {
                 <div className="flex items-center gap-6 lg:gap-8">
                     {/* Logo */}
                     <Link href={user ? "/home" : "/"} className="flex items-center gap-2.5 group">
-                        <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-soft group-hover:shadow-medium transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
+                        <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
                             <Users className="w-5 h-5 text-white" />
                         </div>
                         <span className="hidden sm:inline text-xl font-bold tracking-tight text-gradient">
@@ -132,7 +132,7 @@ export function Header({ user }: HeaderProps) {
                                         className={cn(
                                             "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ease-in-out",
                                             isActive 
-                                                ? "bg-primary/10 text-primary shadow-soft" 
+                                                ? "bg-primary/10 text-primary shadow-sm" 
                                                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
                                         )}
                                     >
@@ -141,7 +141,7 @@ export function Header({ user }: HeaderProps) {
                                         
                                         {/* Notification Badge */}
                                         {item.badge && item.badge > 0 ? (
-                                            <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-gradient-to-br from-destructive to-destructive/80 text-[10px] font-bold text-white shadow-soft">
+                                            <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-gradient-to-br from-destructive to-destructive/80 text-[10px] font-bold text-white shadow-sm">
                                                 {item.badge > 99 ? '99+' : item.badge}
                                             </span>
                                         ) : null}
@@ -177,7 +177,7 @@ export function Header({ user }: HeaderProps) {
                     {user ? (
                         <div className="flex items-center gap-3 pl-3 ml-2 border-l border-border/40">
                             {/* Community Badge */}
-                            <Badge variant="outline" className={`${communityColorClass} border font-medium hidden sm:flex items-center gap-1.5 py-1.5 px-3 capitalize rounded-lg shadow-soft`}>
+                            <Badge variant="outline" className={`${communityColorClass} border font-medium hidden sm:flex items-center gap-1.5 py-1.5 px-3 capitalize rounded-lg shadow-sm`}>
                                 <CommunityIcon className="w-3.5 h-3.5" />
                                 <span className="hidden md:inline">{user.community}</span>
                             </Badge>
@@ -186,7 +186,7 @@ export function Header({ user }: HeaderProps) {
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="flex items-center gap-2 pl-1.5 pr-3 h-auto rounded-full hover:bg-accent transition-all">
-                                        <Avatar className="w-9 h-9 border-2 border-primary/20 shadow-soft">
+                                        <Avatar className="w-9 h-9 border-2 border-primary/20 shadow-sm">
                                             <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                                             <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-xs font-semibold">
                                                 {user.name.slice(0, 2).toUpperCase()}
@@ -198,7 +198,7 @@ export function Header({ user }: HeaderProps) {
                                         <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-64 p-2 shadow-strong">
+                                <DropdownMenuContent align="end" className="w-64 p-2 shadow-lg">
                                     <DropdownMenuLabel className="font-normal p-3">
                                         <div className="flex flex-col space-y-1.5">
                                             <p className="text-sm font-semibold leading-none">{user.name}</p>
@@ -233,7 +233,7 @@ export function Header({ user }: HeaderProps) {
                             <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground rounded-lg">
                                 <Link href="/login">Sign In</Link>
                             </Button>
-                            <Button size="sm" asChild className="font-semibold shadow-soft rounded-lg bg-gradient-to-r from-primary to-secondary hover:shadow-medium hover:scale-105 transition-all">
+                            <Button size="sm" asChild className="font-semibold shadow-sm rounded-lg bg-gradient-to-r from-primary to-secondary hover:shadow-md hover:scale-105 transition-all">
                                 <Link href="/signup">Join Now</Link>
                             </Button>
                         </div>
