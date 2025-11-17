@@ -25,6 +25,7 @@ import {
   Phone,
   Award,
   GraduationCap,
+  Edit3,
 } from "lucide-react"
 import Link from "next/link"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
@@ -86,6 +87,7 @@ type CurrentUser = {
   profession: string;
   community: string;
   avatar: string;
+  coverImage?: string;
   location: string;
   joinDate: string;
   connections: number;
@@ -181,6 +183,7 @@ export default function ProfilePage() {
           location: profile.location ?? "Location not set",
           bio: profile.aboutMe ?? "No bio yet. Click edit to tell your story.",
           avatar: getImageUrl(profile.profileImageUrl),
+          coverImage: getImageUrl(profile.coverImageUrl),
           phoneNumber: profile.phoneNumber ?? "+1 (555) 000-0000",
           
           university: profile.academicInfo?.university ?? "N/A",
@@ -231,8 +234,12 @@ export default function ProfilePage() {
           <div className="relative mb-10">
             {/* Cover Image */}
             <div className="h-64 w-full rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-900 dark:to-zinc-800 relative overflow-hidden border border-gray-200 dark:border-border">
-                 {/* Optional pattern overlay */}
-                <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+                {currentUser.coverImage && currentUser.coverImage !== "/placeholder.svg" ? (
+                    <img src={currentUser.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                ) : (
+                    /* Optional pattern overlay for no image */
+                    <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1]" style={{backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+                )}
             </div>
 
             {/* Profile Info Overlay */}

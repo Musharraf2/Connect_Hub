@@ -16,6 +16,7 @@ import {
   MapPin,
   UserCheck,
   UserX,
+  X,
   Inbox,
   Briefcase
 } from "lucide-react"

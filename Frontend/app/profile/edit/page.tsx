@@ -22,6 +22,7 @@ import {
     getUserProfile,
     updateProfile,
     uploadProfileImage,
+    uploadCoverImage,
 } from "@/lib/api";
 
 import {
@@ -112,7 +113,7 @@ export default function EditProfilePage() {
     const [newInterest, setNewInterest] = useState("");
     const [newAchievement, setNewAchievement] = useState("");
 
-    // Image Upload State
+    // Image Upload State (Profile)
     const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
     const [showImageUploadDialog, setShowImageUploadDialog] = useState(false)
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
@@ -122,6 +123,17 @@ export default function EditProfilePage() {
     const imgRef = useRef<HTMLImageElement>(null)
     const [croppedImageFile, setCroppedImageFile] = useState<File | null>(null);
     const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+
+    // Cover Image Upload State
+    const [isUploadingCoverImage, setIsUploadingCoverImage] = useState(false)
+    const [showCoverImageUploadDialog, setShowCoverImageUploadDialog] = useState(false)
+    const [selectedCoverImageFile, setSelectedCoverImageFile] = useState<File | null>(null)
+    const [coverImagePreview, setCoverImagePreview] = useState<string>("")
+    const [coverCrop, setCoverCrop] = useState<Crop>()
+    const [completedCoverCrop, setCompletedCoverCrop] = useState<Crop>()
+    const coverImgRef = useRef<HTMLImageElement>(null)
+    const [croppedCoverImageFile, setCroppedCoverImageFile] = useState<File | null>(null);
+    const [tempCoverUrl, setTempCoverUrl] = useState<string | null>(null);
 
     const headerUser = useMemo(() => user ? { 
         name: user.name, 
@@ -135,8 +147,10 @@ export default function EditProfilePage() {
         return () => {
             if (imagePreview) URL.revokeObjectURL(imagePreview);
             if (tempAvatarUrl) URL.revokeObjectURL(tempAvatarUrl);
+            if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+            if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
         }
-    }, [imagePreview, tempAvatarUrl]);
+    }, [imagePreview, tempAvatarUrl, coverImagePreview, tempCoverUrl]);
 
     // ----------- Bootstrap -----------
     useEffect(() => {
@@ -238,15 +252,23 @@ const handleSave = async () => {
 
     try {
         let newProfileImageUrl: string | undefined = undefined;
+        let newCoverImageUrl: string | undefined = undefined;
 
-        // 1. Upload new image if exists
+        // 1. Upload new profile image if exists
         if (croppedImageFile) {
-            toast.loading("Uploading image...", { id: toastId });
+            toast.loading("Uploading profile image...", { id: toastId });
             const uploadResult = await uploadProfileImage(user.id, croppedImageFile);
             newProfileImageUrl = uploadResult.profileImageUrl;
         }
 
-        // 2. Update text fields - SANITIZATION STEP
+        // 2. Upload new cover image if exists
+        if (croppedCoverImageFile) {
+            toast.loading("Uploading cover image...", { id: toastId });
+            const uploadResult = await uploadCoverImage(user.id, croppedCoverImageFile);
+            newCoverImageUrl = uploadResult.coverImageUrl;
+        }
+
+        // 3. Update text fields - SANITIZATION STEP
         toast.loading("Updating details...", { id: toastId });
 
         // Helper to convert empty strings to undefined (so backend ignores them instead of crashing)
@@ -268,6 +290,9 @@ const handleSave = async () => {
 
         if (newProfileImageUrl) {
             payload.profileImageUrl = newProfileImageUrl;
+        }
+        if (newCoverImageUrl) {
+            payload.coverImageUrl = newCoverImageUrl;
         }
 
         console.log("Sending Payload:", payload); // Debug: See exactly what is being sent
@@ -296,6 +321,7 @@ const handleSave = async () => {
     } finally {
         setSaving(false);
         setCroppedImageFile(null);
+        setCroppedCoverImageFile(null);
     }
 };
     // ----------- Image Handlers -----------
@@ -335,6 +361,44 @@ const handleSave = async () => {
         }
     }
 
+    // ----------- Cover Image Handlers -----------
+    const handleCoverImageSelect = (file: File) => {
+        setSelectedCoverImageFile(file);
+        if (coverImagePreview) URL.revokeObjectURL(coverImagePreview);
+        setCoverImagePreview(URL.createObjectURL(file));
+    }
+
+    const onCoverImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const { width, height } = e.currentTarget;
+        const aspectRatio = 16 / 9; // Wide aspect for cover
+        setCoverCrop(centerAspectCrop(width, height, aspectRatio));
+        setCompletedCoverCrop(centerAspectCrop(width, height, aspectRatio));
+    }
+
+    const handleCoverCropComplete = async () => {
+        if (!completedCoverCrop || !coverImgRef.current || !selectedCoverImageFile || !user) return;
+        setIsUploadingCoverImage(true);
+        try {
+            const file = await getCroppedImg(coverImgRef.current, completedCoverCrop, selectedCoverImageFile.name);
+            if (file) {
+                setCroppedCoverImageFile(file);
+                const url = URL.createObjectURL(file);
+                if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
+                setTempCoverUrl(url);
+                setUser({ ...user, coverImage: url });
+                setShowCoverImageUploadDialog(false);
+                
+                // Cleanup
+                setCoverImagePreview("");
+                setSelectedCoverImageFile(null);
+            }
+        } catch (e) {
+            toast.error("Failed to crop cover image");
+        } finally {
+            setIsUploadingCoverImage(false);
+        }
+    }
+
     if (loading || !user) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-background flex items-center justify-center">
@@ -365,6 +429,34 @@ const handleSave = async () => {
                     {/* Main Form */}
                     <div className="lg:col-span-2 space-y-6">
                         
+                        {/* Cover Image */}
+                        <FadeInUp delay={0.05}>
+                            <Card className="border border-gray-200 dark:border-border shadow-sm bg-white dark:bg-card overflow-hidden">
+                                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-900 dark:to-zinc-800">
+                                    {user.coverImage && user.coverImage !== "/placeholder.svg" ? (
+                                        <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                                            <div className="text-center">
+                                                <Upload className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">No cover image</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="absolute bottom-4 right-4">
+                                        <Button 
+                                            size="sm" 
+                                            onClick={() => setShowCoverImageUploadDialog(true)}
+                                            className="bg-white/90 dark:bg-black/90 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white shadow-lg"
+                                        >
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            {user.coverImage && user.coverImage !== "/placeholder.svg" ? "Change Cover" : "Add Cover"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </FadeInUp>
+
                         {/* Basic Info */}
                         <FadeInUp delay={0.1}>
                             <Card className="border border-gray-200 dark:border-border shadow-sm bg-white dark:bg-card">
@@ -604,6 +696,50 @@ const handleSave = async () => {
                         <Button variant="ghost" onClick={() => setShowImageUploadDialog(false)}>Cancel</Button>
                         <Button onClick={handleCropComplete} disabled={!completedCrop || isUploadingProfileImage}>
                             {isUploadingProfileImage ? "Saving..." : "Apply & Save"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Cover Image Upload Dialog */}
+            <Dialog open={showCoverImageUploadDialog} onOpenChange={setShowCoverImageUploadDialog}>
+                <DialogContent className="max-w-2xl bg-white dark:bg-card border border-gray-200 dark:border-border">
+                    <DialogHeader>
+                        <DialogTitle>Upload Cover Image</DialogTitle>
+                        <DialogDescription>Choose an image to crop and set as your cover photo (16:9 ratio recommended).</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {!coverImagePreview ? (
+                            <ImageUpload 
+                                onImageSelect={handleCoverImageSelect} 
+                                disabled={isUploadingCoverImage}
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="bg-gray-100 dark:bg-muted p-4 rounded-lg w-full flex justify-center">
+                                    <ReactCrop
+                                        crop={coverCrop}
+                                        onChange={(_, p) => setCoverCrop(p)}
+                                        onComplete={c => setCompletedCoverCrop(c)}
+                                        aspect={16/9}
+                                        className="max-h-[50vh]"
+                                    >
+                                        <img ref={coverImgRef} src={coverImagePreview} onLoad={onCoverImageLoad} alt="Crop Cover" className="max-w-full" />
+                                    </ReactCrop>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    setCoverImagePreview("");
+                                    setSelectedCoverImageFile(null);
+                                }}>
+                                    Choose Different Image
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="ghost" onClick={() => setShowCoverImageUploadDialog(false)}>Cancel</Button>
+                        <Button onClick={handleCoverCropComplete} disabled={!completedCoverCrop || isUploadingCoverImage}>
+                            {isUploadingCoverImage ? "Saving..." : "Apply & Save"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
