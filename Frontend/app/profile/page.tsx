@@ -82,6 +82,7 @@ type CurrentUser = {
   name: string;
   email: string;
   phone: string;
+  phoneNumber: string;
   profession: string;
   community: string;
   avatar: string;
@@ -180,6 +181,7 @@ export default function ProfilePage() {
           location: profile.location ?? "Location not set",
           bio: profile.aboutMe ?? "No bio yet. Click edit to tell your story.",
           avatar: getImageUrl(profile.profileImageUrl),
+          phoneNumber: profile.phoneNumber ?? "+1 (555) 000-0000",
           
           university: profile.academicInfo?.university ?? "N/A",
           major: profile.academicInfo?.major ?? "N/A",
@@ -188,6 +190,7 @@ export default function ProfilePage() {
 
           skills: profile.skills.map(s => s.skill),
           interests: profile.interests.map(i => i.interest),
+          achievements: profile.achievements ?? [],
 
           connections: profile.connectionsCount ?? 0,
           pendingRequests: profile.pendingRequestsCount ?? 0,
@@ -323,7 +326,7 @@ export default function ProfilePage() {
                             <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
                                 <Phone className="w-4 h-4" />
                             </div>
-                            <span className="text-muted-foreground">{currentUser.phone}</span>
+                            <span className="text-muted-foreground">{currentUser.phoneNumber}</span>
                         </div>
                     </CardContent>
                 </Card>

@@ -55,7 +55,10 @@ type EditableUser = {
     gpa?: string;
     skills: string[];
     interests: string[];
+    achievements: string[];
     avatar?: string;
+    coverImage?: string;
+    phoneNumber?: string;
     community: string;
     pendingRequests?: number;
 };
@@ -104,9 +107,10 @@ export default function EditProfilePage() {
     const [saving, setSaving] = useState(false);
     const [user, setUser] = useState<EditableUser | null>(null);
 
-    // Skills & Interests
+    // Skills & Interests & Achievements
     const [newSkill, setNewSkill] = useState("");
     const [newInterest, setNewInterest] = useState("");
+    const [newAchievement, setNewAchievement] = useState("");
 
     // Image Upload State
     const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false)
@@ -164,7 +168,10 @@ export default function EditProfilePage() {
                     gpa: profile.academicInfo?.gpa ?? "",
                     skills: profile.skills.map(s => s.skill),
                     interests: profile.interests.map(i => i.interest),
+                    achievements: profile.achievements ?? [],
                     avatar: getImageUrl(profile.profileImageUrl),
+                    coverImage: getImageUrl(profile.coverImageUrl),
+                    phoneNumber: profile.phoneNumber ?? "",
                     community: profile.profession ?? "",
                     pendingRequests: 0,
                 });
@@ -209,6 +216,19 @@ export default function EditProfilePage() {
         setUser({ ...user, interests: user.interests.filter((x) => x !== i) });
     };
 
+    const addAchievement = () => {
+        if (!user) return;
+        const a = newAchievement.trim();
+        if (!a || user.achievements.includes(a)) return;
+        setUser({ ...user, achievements: [...user.achievements, a] });
+        setNewAchievement("");
+    };
+
+    const removeAchievement = (a: string) => {
+        if (!user) return;
+        setUser({ ...user, achievements: user.achievements.filter((x) => x !== a) });
+    };
+
     // ----------- Save Logic (Sanitized) -----------
 
 const handleSave = async () => {
@@ -236,12 +256,14 @@ const handleSave = async () => {
             name: clean(user.name),
             location: clean(user.location),
             aboutMe: clean(user.aboutMe),
+            phoneNumber: clean(user.phoneNumber),
             university: clean(user.university),
             major: clean(user.major),
             year: clean(user.year),
             gpa: clean(user.gpa), // This fixes the "" vs Number issue
             skills: user.skills,
             interests: user.interests,
+            achievements: user.achievements,
         };
 
         if (newProfileImageUrl) {
@@ -376,6 +398,17 @@ const handleSave = async () => {
                                     </div>
 
                                     <div className="space-y-2">
+                                        <Label htmlFor="phoneNumber">Phone Number</Label>
+                                        <Input 
+                                            id="phoneNumber" 
+                                            value={user.phoneNumber} 
+                                            onChange={(e) => handleField("phoneNumber", e.target.value)} 
+                                            className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border focus:bg-white dark:focus:bg-muted" 
+                                            placeholder="+1 (555) 123-4567"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
                                         <Label htmlFor="bio">Bio</Label>
                                         <Textarea 
                                             id="bio" 
@@ -465,6 +498,27 @@ const handleSave = async () => {
                                                 className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border"
                                             />
                                             <Button onClick={addInterest} size="icon" variant="outline" className="shrink-0"><Plus className="w-4 h-4" /></Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label>Achievements & Certifications</Label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {user.achievements.map((achievement, i) => (
+                                                <Badge key={i} variant="secondary" className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 px-3 py-1 font-normal">
+                                                    {achievement}
+                                                    <button onClick={() => removeAchievement(achievement)} className="ml-2 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input 
+                                                value={newAchievement} 
+                                                onChange={(e) => setNewAchievement(e.target.value)} 
+                                                onKeyDown={(e) => e.key === "Enter" && addAchievement()}
+                                                placeholder="Add an achievement (e.g., Dean's List 2023)" 
+                                                className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border"
+                                            />
+                                            <Button onClick={addAchievement} size="icon" variant="outline" className="shrink-0"><Plus className="w-4 h-4" /></Button>
                                         </div>
                                     </div>
                                 </CardContent>
