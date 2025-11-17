@@ -3,6 +3,7 @@ package com.community.profession_connect.service;
 import com.community.profession_connect.dto.ConversationResponse;
 import com.community.profession_connect.dto.MessageRequest;
 import com.community.profession_connect.dto.MessageResponse;
+import com.community.profession_connect.model.Connection;
 import com.community.profession_connect.model.ConnectionStatus;
 import com.community.profession_connect.model.Message;
 import com.community.profession_connect.model.User;
@@ -70,14 +71,26 @@ public class MessageService {
     public List<ConversationResponse> getConversations(Long userId) {
         try {
             // Get all accepted connections for the user
-            List<User> connectedUsers = connectionRepository.findAcceptedConnectionUsers(userId, ConnectionStatus.ACCEPTED);
+            List<Connection> connections = connectionRepository.findAcceptedConnectionsForUser(userId, ConnectionStatus.ACCEPTED);
             
-            if (connectedUsers.isEmpty()) {
-                System.out.println("No connected users found for user " + userId);
+            if (connections.isEmpty()) {
+                System.out.println("No connections found for user " + userId);
                 return new ArrayList<>();
             }
             
-            System.out.println("Found " + connectedUsers.size() + " connected users for user " + userId);
+            System.out.println("Found " + connections.size() + " connections for user " + userId);
+            
+            // Extract connected users from connections
+            List<User> connectedUsers = new ArrayList<>();
+            for (Connection conn : connections) {
+                if (conn.getRequester().getId().equals(userId)) {
+                    connectedUsers.add(conn.getReceiver());
+                } else {
+                    connectedUsers.add(conn.getRequester());
+                }
+            }
+            
+            System.out.println("Extracted " + connectedUsers.size() + " connected users");
             
             List<ConversationResponse> conversations = new ArrayList<>();
             
