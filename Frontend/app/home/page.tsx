@@ -1,10 +1,35 @@
 "use client";
 
-import { UserProfileResponse } from "@/lib/api";
-import { ProfileUpdatePayload, updateProfile } from "@/lib/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import toast from "react-hot-toast";
+
+// Icons
+import { 
+    UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, 
+    Trash2, Image as ImageIcon, Smile, Send, Loader2
+} from "lucide-react";
+
+// Components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Header } from "@/components/header";
+import { ImageUpload } from "@/components/image-upload";
 import {
-    UserProfile,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { FadeInUp, StaggerContainer } from "@/components/animations";
+
+// API Imports
+import {
     getUsersByProfession,
     LoginResponse,
     Connection,
@@ -21,37 +46,20 @@ import {
     toggleLike,
     addComment,
     uploadPostImage,
-    getUserProfile,
+    updateProfile,
+    UserProfileResponse
 } from "@/lib/api";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
-import { Header } from "@/components/header";
-import { ImageUpload } from "@/components/image-upload";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, Trash2, Image as ImageIcon } from "lucide-react";
-import { FadeInUp, StaggerContainer } from "@/components/animations";
-import toast from "react-hot-toast";
-import Image from "next/image";
 
-// ---------------- Types local to this component ----------------
+// Cropping
+import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+
+// Emoji
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+
+// ---------------- Types ----------------
 interface CurrentUser {
-    id?: number; // Added id for internal use
+    id?: number;
     name: string;
     avatar: string;
     community: string;
@@ -67,64 +75,104 @@ interface ProfileData {
     bio: string;
 }
 
+// --- URL HELPER ---
+const getImageUrl = (url: string | null | undefined) => {
+    if (!url) return "/placeholder.svg";
+    if (url.startsWith("http")) return url;
+    return `http://localhost:8080${url}`;
+};
+
+// ---------------- Helper Functions for Crop ----------------
+function centerAspectCrop(mediaWidth: number, mediaHeight: number, aspect: number): Crop {
+    return centerCrop(
+        makeAspectCrop({ unit: '%', width: 90 }, aspect, mediaWidth, mediaHeight),
+        mediaWidth,
+        mediaHeight
+    );
+}
+
+async function getCroppedImg(image: HTMLImageElement, crop: Crop, fileName: string): Promise<File | null> {
+    const canvas = document.createElement('canvas');
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    canvas.width = Math.floor(crop.width * scaleX);
+    canvas.height = Math.floor(crop.height * scaleY);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(image, crop.x * scaleX, crop.y * scaleY, crop.width * scaleX, crop.height * scaleY, 0, 0, crop.width * scaleX, crop.height * scaleY);
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (!blob) { reject(new Error('Canvas is empty')); return; }
+            const file = new File([blob], fileName, { type: blob.type });
+            resolve(file);
+        }, 'image/jpeg', 0.9);
+    });
+}
+
 export default function HomePage() {
+    const router = useRouter();
+    
+    // Data State
     const [members, setMembers] = useState<UserProfileResponse[]>([]);
-    const [membersLoading, setMembersLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [pendingRequests, setPendingRequests] = useState<Connection[]>([]);
     const [sentPendingRequests, setSentPendingRequests] = useState<Connection[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
-    const router = useRouter();
-
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
     const [profileData, setProfileData] = useState<ProfileData | null>(null);
+    const [posts, setPosts] = useState<PostResponse[]>([]);
+
+    // Loading State
+    const [membersLoading, setMembersLoading] = useState(true);
+    const [postsLoading, setPostsLoading] = useState(true);
     const [authLoading, setAuthLoading] = useState(true);
 
-    // Post-related states
-    const [posts, setPosts] = useState<PostResponse[]>([]);
-    const [postsLoading, setPostsLoading] = useState(true);
+    // Action State
     const [postContent, setPostContent] = useState("");
     const [postImageFile, setPostImageFile] = useState<File | null>(null);
+    const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
     const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false);
     const [isSubmittingPost, setIsSubmittingPost] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [postToDelete, setPostToDelete] = useState<number | null>(null);
     const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null);
     const [commentText, setCommentText] = useState("");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [localSentRequests, setLocalSentRequests] = useState<number[]>([]); // For instant UI updates on connect
 
-    // ---------------- Auth bootstrap ----------------
+    // Cropping & Bio
+    const [isCroppingDialogOpen, setIsCroppingDialogOpen] = useState(false);
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+    const [tempImagePreview, setTempImagePreview] = useState<string>("");
+    const [crop, setCrop] = useState<Crop>();
+    const [completedCrop, setCompletedCrop] = useState<Crop>();
+    const imgRef = useRef<HTMLImageElement>(null);
+    const [isEditingBio, setIsEditingBio] = useState(false);
+    const [bioText, setBioText] = useState("");
+    const [tempBioText, setTempBioText] = useState("");
 
-    // ❗️ THIS IS THE NEWLY ADDED HOOK TO LOAD ALL DATA ❗️
+    // --- Bootstrap ---
     useEffect(() => {
-        // Get the user data stored during login
         const userDataString = sessionStorage.getItem("user");
-        
         if (!userDataString) {
-            // If no user is found in session, redirect to login
-            toast.error("Please log in.");
             router.push("/login");
             return;
         }
 
         try {
             const user: LoginResponse = JSON.parse(userDataString);
-
-            // 1. Set the basic user info immediately for the header
             setCurrentUser({
-                id: user.id, // Store ID for convenience
+                id: user.id,
                 name: user.name,
                 community: user.profession,
-                avatar: "/placeholder.svg", // You can update this later
+                avatar: "/placeholder.svg",
                 pendingRequests: 0,
             });
 
-            // 2. Create an async function to fetch all data
             const loadAllData = async () => {
                 try {
-                    // Fetch the user's full profile first (await it to ensure profileData is set)
                     await fetchUserProfile(user.id);
-                    
-                    // Fetch all other data in parallel for speed
                     await Promise.all([
                         fetchMembers(user.profession),
                         fetchPendingRequests(user.id),
@@ -133,421 +181,334 @@ export default function HomePage() {
                         fetchPosts(user.profession, user.id)
                     ]);
                 } catch (err) {
-                    console.error("Failed during data fetch:", err);
-                    toast.error("Failed to load some page data.");
+                    console.error("Failed data fetch", err);
                 } finally {
-                    // 3. Once all data is loaded (or fails), stop showing the "Loading..." screen
                     setAuthLoading(false);
                 }
             };
-
-            // Call the data fetching function
             loadAllData();
-
         } catch (error) {
-            console.error("Failed to parse user data or load initial data:", error);
-            // If data is bad, clear it and send back to login
             sessionStorage.removeItem("user");
-            toast.error("Session invalid. Please log in again.");
             router.push("/login");
         }
-    }, [router]); // Add 'router' as a dependency
+    }, [router]);
 
-    
+    useEffect(() => {
+        return () => {
+            if (postImagePreview) URL.revokeObjectURL(postImagePreview);
+            if (tempImagePreview) URL.revokeObjectURL(tempImagePreview);
+        };
+    }, [postImagePreview, tempImagePreview]);
+
+    // --- Data Fetchers ---
     const fetchUserProfile = async (userId: number) => {
         try {
             const res = await fetch(`http://localhost:8080/api/users/${userId}`);
-            if (!res.ok) {
-                throw new Error("Failed to fetch profile");
-            }
-            const data: UserProfileDetailResponse = await res.json(); // Use the detailed type
-
-            // --- THIS IS THE FIX ---
-            // Update the currentUser state with the real avatar
-            setCurrentUser((prev) => (
-                prev 
-                ? { ...prev, avatar: data.profileImageUrl || "/placeholder.svg" } 
-                : null
-            ));
+            if (!res.ok) throw new Error("Failed");
+            const data: UserProfileDetailResponse = await res.json();
+            setCurrentUser((prev) => (prev ? { ...prev, avatar: getImageUrl(data.profileImageUrl) } : null));
             setProfileData({
                 name: data.name,
                 email: data.email,
                 profession: data.profession,
-                // Use empty string as default for null/undefined
-                location: data.location || "Not set", 
-                connections: connections.length, // connections will be updated later
+                location: data.location || "Not set",
+                connections: connections.length,
                 bio: data.aboutMe || "No bio yet."
             });
-        } catch (error) {
-            console.error("Failed to load profile:", error);
-            toast.error("Could not load user profile.");
-        }
+            setBioText(data.aboutMe || "No bio yet.");
+            setTempBioText(data.aboutMe || "No bio yet.");
+        } catch (error) { console.error(error); }
     };
 
-
-    // ---------------- Data fetchers ----------------
     const fetchMembers = async (profession: string) => {
-        setMembersLoading(true);
-        setError(null);
         try {
-            const allMembers = await getUsersByProfession(profession);
-            const userDataString = sessionStorage.getItem("user");
-            if (userDataString) {
-                const cu: LoginResponse = JSON.parse(userDataString);
-                const otherMembers = allMembers.filter((m) => m.id !== cu.id);
-                setMembers(otherMembers);
-            } else {
-                setMembers(allMembers);
-            }
-        } catch (err: unknown) {
-            console.error("[fetchMembers] Error:", err);
-            setError(err instanceof Error ? err.message : "Failed to fetch members.");
-        } finally {
-            setMembersLoading(false);
-        }
+            const all = await getUsersByProfession(profession);
+            const sVal = sessionStorage.getItem("user");
+            if (sVal) {
+                const cu: LoginResponse = JSON.parse(sVal);
+                setMembers(all.filter((m) => m.id !== cu.id));
+            } else setMembers(all);
+        } catch (err: any) { console.error(err); } 
+        finally { setMembersLoading(false); }
     };
 
     const fetchPendingRequests = async (userId: number) => {
-        try {
-            const requests = await getPendingRequests(userId);
-            setPendingRequests(requests);
-            setCurrentUser((prev) => (prev ? { ...prev, pendingRequests: requests.length } : null));
-        } catch (error) {
-            console.error("Failed to fetch pending requests:", error);
-        }
+        const reqs = await getPendingRequests(userId);
+        setPendingRequests(reqs);
+        setCurrentUser((prev) => (prev ? { ...prev, pendingRequests: reqs.length } : null));
     };
 
     const fetchSentPendingRequests = async (userId: number) => {
-        try {
-            const requests = await getSentPendingRequests(userId);
-            setSentPendingRequests(requests);
-        } catch (error) {
-            console.error("Failed to fetch sent pending requests:", error);
-        }
+        const reqs = await getSentPendingRequests(userId);
+        setSentPendingRequests(reqs);
     };
 
     const fetchAcceptedConnections = async (userId: number) => {
-        try {
-            const conns = await getAcceptedConnections(userId);
-            setConnections(conns);
-            // Update profileData connections count *after* fetching
-            setProfileData((prev) => (prev ? { ...prev, connections: conns.length } : null));
-        } catch (error) {
-            console.error("Failed to fetch accepted connections:", error);
-        }
+        const conns = await getAcceptedConnections(userId);
+        setConnections(conns);
+        setProfileData((prev) => (prev ? { ...prev, connections: conns.length } : null));
     };
 
     const fetchPosts = async (profession: string, userId: number) => {
-        setPostsLoading(true);
+        // Note: We intentionally don't set loading to true here for background refreshes
+        // to prevent UI flickering
         try {
-            const fetchedPosts = await getPostsByProfession(profession, userId);
-            setPosts(fetchedPosts);
-        } catch (error) {
-            console.error("Failed to fetch posts:", error);
-            toast.error("Failed to load posts");
-        } finally {
-            setPostsLoading(false);
-        }
+            const p = await getPostsByProfession(profession, userId);
+            setPosts(p);
+        } catch (e) { console.error(e); } 
+        finally { setPostsLoading(false); }
     };
 
-    // ---------------- Post handlers ----------------
+    // --- Handlers ---
+    const handleImageSelect = (file: File) => {
+        if (tempImagePreview) URL.revokeObjectURL(tempImagePreview);
+        const url = URL.createObjectURL(file);
+        setTempImageFile(file);
+        setTempImagePreview(url);
+        setIsCroppingDialogOpen(true);
+    };
+
+    const handleApplyCrop = async () => {
+        if (!completedCrop || !imgRef.current || !tempImageFile) return;
+        try {
+            const croppedFile = await getCroppedImg(imgRef.current, completedCrop, tempImageFile.name);
+            if (croppedFile) {
+                setPostImageFile(croppedFile);
+                if (postImagePreview) URL.revokeObjectURL(postImagePreview);
+                setPostImagePreview(URL.createObjectURL(croppedFile));
+                setIsCroppingDialogOpen(false);
+                setTempImageFile(null);
+                setTempImagePreview("");
+            }
+        } catch (e) { toast.error("Crop failed"); }
+    };
+
+    const handleRemovePostImage = () => {
+        setPostImageFile(null);
+        if (postImagePreview) URL.revokeObjectURL(postImagePreview);
+        setPostImagePreview(null);
+    };
+
+    const handleEmojiClick = (emojiData: EmojiClickData) => {
+        setPostContent((prev) => prev + emojiData.emoji);
+    };
+
+    // --- POST CREATION (Auto Refresh Fix) ---
     const handleCreatePost = async () => {
         if (!postContent.trim() && !postImageFile) {
-            toast.error("Post must have content or an image");
-            return;
+            toast.error("Add text or image"); return;
         }
-
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
-
-        const user: LoginResponse = JSON.parse(userDataString);
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
+        
         setIsSubmittingPost(true);
-
         try {
-            // First create the post with text content
             const newPost = await createPost({ content: postContent, userId: user.id });
             
-            // If there's an image, upload it
             if (postImageFile) {
                 await uploadPostImage(newPost.id, postImageFile);
-                // Refetch the post to get the updated version with the image
-                const updatedPosts = await getPostsByProfession(user.profession, user.id);
-                setPosts(updatedPosts);
-            } else {
-                setPosts((prev) => [newPost, ...prev]);
             }
+
+            // REFRESH STRATEGY:
+            // Fetch the entire list again to guarantee the image and timestamps are correct from the server.
+            // This ensures the author's avatar and post image appear without a page reload.
+            await fetchPosts(user.profession, user.id);
             
             setPostContent("");
-            setPostImageFile(null);
+            handleRemovePostImage();
             setIsPostingDialogOpen(false);
-            toast.success("Post created successfully!");
-        } catch (error) {
-            console.error("Failed to create post:", error);
-            toast.error("Failed to create post");
-        } finally {
-            setIsSubmittingPost(false);
+            toast.success("Posted!");
+        } catch (e) { 
+            toast.error("Failed to post"); 
+        } finally { 
+            setIsSubmittingPost(false); 
         }
     };
 
     const handleDeletePost = async () => {
         if (!postToDelete) return;
-
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
-
-        const user: LoginResponse = JSON.parse(userDataString);
-
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
         try {
             await deletePost(postToDelete, user.id);
-            toast.success("Post deleted successfully!");
+            setPosts(prev => prev.filter(p => p.id !== postToDelete)); // Immediate local update
             setDeleteDialogOpen(false);
-            // Update state directly instead of refetching
-            setPosts(prevPosts => prevPosts.filter(post => post.id !== postToDelete));
             setPostToDelete(null);
-        } catch (error) {
-            console.error("Failed to delete post:", error);
-            toast.error("Failed to delete post");
-        }
+            toast.success("Deleted");
+        } catch (e) { toast.error("Delete failed"); }
     };
 
+    // --- LIKES (Auto Refresh Fix) ---
     const handleToggleLike = async (postId: number) => {
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
-
-        const user: LoginResponse = JSON.parse(userDataString);
-
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
         try {
+            // API returns the updated post object
             const updatedPost = await toggleLike(postId, user.id);
-            setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
-        } catch (error) {
-            console.error("Failed to toggle like:", error);
-            toast.error("Failed to update like");
-        }
+            
+            // Replace the old post in our state with the new one from the server
+            setPosts(prevPosts => prevPosts.map(p => p.id === postId ? updatedPost : p));
+        } catch (e) { console.error(e); }
     };
 
+    // --- COMMENTS (Auto Refresh Fix) ---
     const handleAddComment = async (postId: number) => {
-        if (!commentText.trim()) {
-            toast.error("Comment cannot be empty");
-            return;
-        }
-
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
-
-        const user: LoginResponse = JSON.parse(userDataString);
-
+        if (!commentText.trim()) return;
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
+        
         try {
+            // API returns the updated post object containing the new comment
             const updatedPost = await addComment(postId, { content: commentText, userId: user.id });
-            setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+            
+            // Replace the old post in our state with the new one.
+            // This allows the comment to appear instantly with the correct user avatar.
+            setPosts(prevPosts => prevPosts.map(p => p.id === postId ? updatedPost : p));
+            
             setCommentText("");
             setCommentingOnPost(null);
-            toast.success("Comment added!");
-        } catch (error) {
-            console.error("Failed to add comment:", error);
-            toast.error("Failed to add comment");
-        }
+            toast.success("Comment added");
+        } catch (e) { toast.error("Comment failed"); }
     };
 
-    const openDeleteDialog = (postId: number) => {
-        setPostToDelete(postId);
-        setDeleteDialogOpen(true);
-    };
+    const getConnectionStatus = (userId: number) => {
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return { status: "none" };
+        const cu: LoginResponse = JSON.parse(sVal);
+        
+        // Check Local Optimistic State (for instant UI feedback)
+        if (localSentRequests.includes(userId)) return { status: "pending", connectionId: -1 };
 
-    // ---------------- Connections helpers ----------------
-    const getConnectionStatus = (
-        userId: number
-    ): { status: "none" | "pending" | "connected"; connectionId?: number } => {
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return { status: "none" };
-        const cu: LoginResponse = JSON.parse(userDataString);
-
-        const sentRequest = sentPendingRequests.find(
-            (req) => req.requester.id === cu.id && req.receiver.id === userId
+        const sent = sentPendingRequests.find(r => r.requester.id === cu.id && r.receiver.id === userId);
+        if (sent) return { status: "pending", connectionId: sent.id };
+        
+        const connected = connections.some(c => 
+            (c.requester.id === cu.id && c.receiver.id === userId) || (c.receiver.id === cu.id && c.requester.id === userId)
         );
-        if (sentRequest) return { status: "pending", connectionId: sentRequest.id };
-
-        const isConnected = connections.some(
-            (conn) =>
-                (conn.requester.id === cu.id && conn.receiver.id === userId) ||
-                (conn.receiver.id === cu.id && conn.requester.id === userId)
-        );
-        if (isConnected) return { status: "connected" };
+        if (connected) return { status: "connected" };
 
         return { status: "none" };
     };
 
-    const handleSendRequest = async (memberId: number) => {
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
+    // --- CONNECT (Auto Refresh Fix) ---
+    const handleSendRequest = async (mid: number) => {
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
+        
+        // Optimistic Update: Hide immediately
+        setLocalSentRequests(prev => [...prev, mid]);
 
-        const user: LoginResponse = JSON.parse(userDataString);
         try {
-            await sendConnectionRequest(user.id, memberId);
-            fetchSentPendingRequests(user.id);
-            toast.success("Connection request sent");
-        } catch (error) {
-            console.error("Failed to send connection request:", error);
-            toast.error("Failed to send request");
+            await sendConnectionRequest(user.id, mid);
+            // Background Refresh: Get the real state
+            await fetchSentPendingRequests(user.id);
+            toast.success("Sent");
+        } catch (e) {
+            toast.error("Failed to send");
+            // Revert optimistic update if failed
+            setLocalSentRequests(prev => prev.filter(id => id !== mid));
         }
     };
 
-    const handleCancelRequest = async (connectionId: number) => {
-        const userDataString = sessionStorage.getItem("user");
-        if (!userDataString) return;
-
-        const user: LoginResponse = JSON.parse(userDataString);
+    const handleCancelRequest = async (cid: number) => {
+        const sVal = sessionStorage.getItem("user");
+        if (!sVal) return;
+        const user: LoginResponse = JSON.parse(sVal);
         try {
-            await cancelConnectionRequest(connectionId);
-            fetchSentPendingRequests(user.id);
-            toast.success("Request canceled");
-        } catch (error) {
-            console.error("Failed to cancel connection request:", error);
-            toast.error("Failed to cancel request");
+            await cancelConnectionRequest(cid);
+            await fetchSentPendingRequests(user.id);
+            toast.success("Canceled");
+        } catch (e) {
+            toast.error("Failed to cancel");
         }
     };
-
-    // ---------------- Bio edit ----------------
-    const [isEditingBio, setIsEditingBio] = useState(false);
-    const [bioText, setBioText] = useState(profileData?.bio || "");
-    const [tempBioText, setTempBioText] = useState(profileData?.bio || "");
-
-    useEffect(() => {
-        if (profileData) {
-            setBioText(profileData.bio);
-            setTempBioText(profileData.bio);
-        }
-    }, [profileData]);
 
     const handleSaveBio = async () => {
-        const userDataString = sessionStorage.getItem('user');
-        if (!userDataString || !profileData) {
-            toast.error("User session expired.");
-            return;
-        }
-
-        const user: LoginResponse = JSON.parse(userDataString);
-        const trimmedBio = tempBioText.trim();
-
+        const sVal = sessionStorage.getItem('user');
+        if (!sVal) return;
+        const user = JSON.parse(sVal);
         try {
-            const updatedUser = await updateProfile(user.id, { aboutMe: trimmedBio });
-
-            // Ensure we always pass a string to the state setters
-            setBioText(updatedUser.aboutMe ?? "");
-            setTempBioText(updatedUser.aboutMe ?? "");
-            setProfileData(prev => prev ? { ...prev, bio: updatedUser.aboutMe ?? "" } : null);
-
+            const up = await updateProfile(user.id, { aboutMe: tempBioText.trim() });
+            setBioText(up.aboutMe ?? "");
+            setProfileData(prev => prev ? { ...prev, bio: up.aboutMe ?? "" } : null);
             setIsEditingBio(false);
-            toast.success("Bio updated successfully!");
-        } catch (error) {
-            toast.error("Failed to update bio.");
-            console.error(error);
-        }
+            toast.success("Bio updated");
+        } catch (e) { toast.error("Bio failed"); }
     };
 
-    const handleCancelBio = () => {
-        setTempBioText(bioText);
-        setIsEditingBio(false);
-    };
-
-    if (authLoading || !currentUser || !profileData) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <p>Loading...</p>
-            </div>
-        );
-    }
+    if (authLoading || !currentUser || !profileData) return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
             <Header user={currentUser} />
 
-            <main className="container mx-auto grid lg:grid-cols-4 gap-8 py-8">
-                {/* Left Sidebar (Sticky) */}
+            <main className="container mx-auto grid lg:grid-cols-4 gap-6 py-8 px-4">
+                
+                {/* Left Sidebar - User Profile */}
                 <aside className="hidden lg:block lg:col-span-1">
-                    <div className="sticky top-8 space-y-6">
+                    <div className="sticky top-24 space-y-6">
                         <FadeInUp>
-                            <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                                <CardContent className="p-6">
-                                    <div className="text-center pb-4">
-                                        <Avatar className="w-24 h-24 mx-auto mb-4">
-                                            <AvatarImage
-                                                src={currentUser.avatar || "/placeholder.svg"}
-                                                alt={profileData.name}
-                                            />
-                                            <AvatarFallback className="text-xl">
-                                                {profileData.name
-                                                    .split(" ")
-                                                    .map((n) => n[0])
-                                                    .join("")}
-                                            </AvatarFallback>
+                            <Card className="overflow-hidden border-border shadow-sm bg-card hover:shadow-md transition-all duration-200">
+                                <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/10"></div>
+                                <CardContent className="relative pt-0 pb-6 px-6">
+                                    <div className="flex flex-col items-center -mt-10 mb-4">
+                                        <Avatar className="w-20 h-20 border-4 border-card shadow-sm">
+                                            {/* FIX: Use getImageUrl for current user */}
+                                            <AvatarImage src={currentUser.avatar} />
+                                            <AvatarFallback>{profileData.name.charAt(0)}</AvatarFallback>
                                         </Avatar>
-                                        <h2 className="font-serif text-xl font-semibold">{profileData.name}</h2>
-                                        <p className="text-muted-foreground text-sm space-y-1 mt-2">
-                                            <span className="font-medium">{profileData.profession}</span>
-                                            <span className="flex items-center justify-center space-x-1">
-                                                <MapPin className="w-4 h-4" />
-                                                <span>{profileData.location}</span>
-                                            </span>
-                                        </p>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {/* Stats */}
-                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                                            <div className="text-center">
-                                                <div className="font-semibold text-lg">{profileData.connections}</div>
-                                                <div className="text-xs text-muted-foreground">Connections</div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="font-semibold text-lg">
-                                                    {currentUser.pendingRequests}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">Requests</div>
+                                        <div className="text-center mt-3">
+                                            <h2 className="font-serif text-lg font-bold text-card-foreground">{profileData.name}</h2>
+                                            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                                                {profileData.profession}
+                                            </p>
+                                            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground mt-1">
+                                                <MapPin className="w-3 h-3" />
+                                                {profileData.location}
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Bio Section */}
-                                        <div className="space-y-2 pt-4 border-t">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="font-medium text-sm">About Me</h4>
-                                                {!isEditingBio && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setIsEditingBio(true)}
-                                                        className="h-6 w-6 p-0"
-                                                    >
-                                                        <Edit3 className="w-3 h-3" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                            {isEditingBio ? (
-                                                <div className="space-y-2">
-                                                    <Textarea
-                                                        value={tempBioText}
-                                                        onChange={(e) => setTempBioText(e.target.value)}
-                                                        placeholder="Write something about yourself..."
-                                                        className="min-h-[80px] text-sm"
-                                                    />
-                                                    <div className="flex space-x-2">
-                                                        <Button size="sm" onClick={handleSaveBio} className="flex-1">
-                                                            <Save className="w-3 h-3 mr-1" /> Save
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={handleCancelBio}
-                                                            className="flex-1 bg-transparent"
-                                                        >
-                                                            <X className="w-3 h-3 mr-1" /> Cancel
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                                    {bioText}
-                                                </p>
+                                    <div className="grid grid-cols-2 gap-2 py-4 border-t border-border">
+                                        <div className="text-center p-2 hover:bg-muted rounded-lg transition-colors">
+                                            <div className="font-bold text-card-foreground">{profileData.connections}</div>
+                                            <div className="text-xs text-muted-foreground font-medium">Connections</div>
+                                        </div>
+                                        <div className="text-center p-2 hover:bg-muted rounded-lg transition-colors">
+                                            <div className="font-bold text-card-foreground">{currentUser.pendingRequests}</div>
+                                            <div className="text-xs text-muted-foreground font-medium">Requests</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-border">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">About</h4>
+                                            {!isEditingBio && (
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => setIsEditingBio(true)}>
+                                                    <Edit3 className="w-3 h-3" />
+                                                </Button>
                                             )}
                                         </div>
+                                        {isEditingBio ? (
+                                            <div className="space-y-2">
+                                                <Textarea 
+                                                    value={tempBioText} 
+                                                    onChange={e => setTempBioText(e.target.value)} 
+                                                    className="text-sm min-h-[80px] resize-none bg-muted border-border focus:bg-card text-foreground"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <Button size="sm" className="h-7 text-xs flex-1" onClick={handleSaveBio}>Save</Button>
+                                                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => setIsEditingBio(false)}>Cancel</Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{bioText}</p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -555,291 +516,170 @@ export default function HomePage() {
                     </div>
                 </aside>
 
-                {/* Middle Section (This is what scrolls) */}
+                {/* Middle Section - Feed */}
                 <section className="w-full lg:col-span-2 space-y-6">
-                    {/* Create Post Card */}
+                    
+                    {/* Post Trigger Card */}
                     <FadeInUp delay={0.1}>
-                        <Card className="border-2 border-border/50 shadow-lg">
-                            <CardHeader className="flex-row items-center space-x-4 pb-4">
-                                <Avatar className="w-12 h-12">
-                                    <AvatarImage
-                                        src={currentUser.avatar || "/placeholder.svg"}
-                                        alt={profileData.name}
-                                    />
-                                    <AvatarFallback>
-                                        {profileData.name
-                                            .split(" ")
-                                            .map((n) => n[0])
-                                            .join("")}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div
-                                    onClick={() => setIsPostingDialogOpen(true)}
-                                    className="flex-1 bg-muted rounded-full py-3 px-4 text-muted-foreground cursor-pointer hover:bg-muted/80 transition-all duration-200 border-2 border-transparent hover:border-primary/20"
-                                >
-                                    {`What's on your mind, ${profileData.name.split(" ")[0]}?`}
+                        <Card className="border-border shadow-sm bg-card overflow-hidden">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="w-10 h-10 cursor-pointer hover:opacity-90 transition-opacity">
+                                        <AvatarImage src={currentUser.avatar} />
+                                        <AvatarFallback>{profileData.name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <button
+                                        onClick={() => setIsPostingDialogOpen(true)}
+                                        className="flex-1 text-left bg-muted hover:bg-muted/80 text-muted-foreground text-sm py-3 px-4 rounded-full transition-all duration-200 font-medium border border-transparent hover:border-border"
+                                    >
+                                        Start a post, {profileData.name.split(" ")[0]}...
+                                    </button>
                                 </div>
-                            </CardHeader>
-                            <CardContent className="flex justify-around pt-0">
-                                <Button
-                                    variant="ghost"
-                                    className="flex-1"
-                                    onClick={() => setIsPostingDialogOpen(true)}
-                                >
-                                    <MessageSquare className="w-5 h-5 mr-2" /> Create Post
-                                </Button>
                             </CardContent>
                         </Card>
                     </FadeInUp>
 
-                    <h3 className="font-serif text-xl font-semibold pt-4">Recent Activity</h3>
-
-                    {/* Loading State */}
-                    {postsLoading && (
-                        <div className="text-center py-8">
-                            <p className="text-muted-foreground">Loading posts...</p>
-                        </div>
-                    )}
-
-                    {/* Empty State */}
-                    {!postsLoading && posts.length === 0 && (
-                        <Card className="border-2 border-border/50 shadow-lg">
-                            <CardContent className="py-8 text-center">
-                                <p className="text-muted-foreground">
-                                    No posts yet. Be the first to share something!
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     {/* Posts Feed */}
-                    <StaggerContainer stagger={0.1} className="space-y-6">
-                        {!postsLoading &&
-                            posts.map((post) => {
-                                const userDataString = sessionStorage.getItem("user");
-                                const currentUserId = userDataString ? JSON.parse(userDataString).id : null;
-                                const isOwnPost = currentUserId === post.user.id;
-                                const timeAgo = new Date(post.createdAt).toLocaleString();
-
+                    <div className="space-y-5">
+                        <StaggerContainer stagger={0.1}>
+                            {posts.map((post) => {
+                                const isOwn = currentUser?.id === post.user.id;
                                 return (
-                                    <div key={post.id}>
-                                        <Card className="border-2 border-border/50 shadow-lg hover:shadow-xl transition-all duration-200">
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center space-x-3">
-                                                        <Avatar>
-                                                            <AvatarImage
-                                                                src={`/placeholder.svg?text=${post.user.name
-                                                                    .split(" ")
-                                                                    .map((n) => n[0])
-                                                                    .join("")}`}
-                                                                alt={post.user.name}
-                                                            />
-                                                            <AvatarFallback>
-                                                                {post.user.name
-                                                                    .split(" ")
-                                                                    .map((n) => n[0])
-                                                                    .join("")}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <h4 className="font-semibold">{post.user.name}</h4>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {post.user.profession} • {timeAgo}
-                                                            </p>
-                                                        </div>
+                                    <Card key={post.id} className="border-border shadow-sm bg-card hover:shadow-md transition-all duration-300 mb-4 overflow-hidden">
+                                        <CardHeader className="p-4 pb-2">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex gap-3">
+                                                    <Avatar className="w-10 h-10 border border-border">
+                                                        {/* FIX: Use getImageUrl for post author */}
+                                                        <AvatarImage src={getImageUrl((post.user as any).profileImageUrl)} />
+                                                        <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">{post.user.name}</h3>
+                                                        <p className="text-xs text-muted-foreground line-clamp-1">{post.user.profession}</p>
+                                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5">{new Date(post.createdAt).toLocaleDateString()} • <span className="font-medium">Global</span></p>
                                                     </div>
-                                                    {isOwnPost && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => openDeleteDialog(post.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-500" />
-                                                        </Button>
-                                                    )}
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <p className="text-muted-foreground leading-relaxed">{post.content}</p>
-                                                
-                                                {/* Display post image if present */}
-                                                {post.imageUrl && (
-                                                    <div className="relative w-full h-96 rounded-lg overflow-hidden border-2 border-border">
-                                                        <Image
-                                                            src={post.imageUrl}
-                                                            alt="Post image"
-                                                            fill
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
+                                                {isOwn && (
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => { setPostToDelete(post.id); setDeleteDialogOpen(true); }}>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
                                                 )}
-                                                
-                                                <div className="flex items-center justify-between text-muted-foreground pt-4 border-t">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleToggleLike(post.id)}
-                                                        className={post.likedByCurrentUser ? "text-red-500" : ""}
-                                                    >
-                                                        <Heart
-                                                            className={`w-4 h-4 mr-2 ${post.likedByCurrentUser ? "fill-current" : ""}`}
-                                                        />
-                                                        {post.likesCount} {post.likesCount === 1 ? "Like" : "Likes"}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setCommentingOnPost(
-                                                                commentingOnPost === post.id ? null : post.id
-                                                            )
-                                                        }
-                                                    >
-                                                        <MessageSquare className="w-4 h-4 mr-2" />
-                                                        {post.commentsCount} {post.commentsCount === 1 ? "Comment" : "Comments"}
-                                                    </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="p-4 pt-2">
+                                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-3">{post.content}</p>
+                                            
+                                            {post.imageUrl && (
+                                                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-muted border border-border">
+                                                    <Image src={post.imageUrl} alt="Post content" fill className="object-cover" />
                                                 </div>
+                                            )}
 
-                                                {/* Comments Section */}
-                                                {post.comments.length > 0 && (
-                                                    <div className="space-y-3 pt-4 border-t">
-                                                        {post.comments.map((comment) => (
-                                                            <div key={comment.id} className="flex space-x-3">
-                                                                <Avatar className="w-8 h-8">
-                                                                    <AvatarFallback className="text-xs">
-                                                                        {comment.user.name
-                                                                            .split(" ")
-                                                                            .map((n) => n[0])
-                                                                            .join("")}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
-                                                                <div className="flex-1 bg-muted rounded-lg p-3">
-                                                                    <p className="font-semibold text-sm">{comment.user.name}</p>
-                                                                    <p className="text-sm text-muted-foreground">{comment.content}</p>
-                                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                                        {new Date(comment.createdAt).toLocaleString()}
-                                                                    </p>
-                                                                </div>
+                                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className={`gap-2 hover:bg-red-500/10 transition-colors ${post.likedByCurrentUser ? "text-red-500 hover:text-red-600" : "text-muted-foreground"}`}
+                                                    onClick={() => handleToggleLike(post.id)}
+                                                >
+                                                    <Heart className={`w-4 h-4 ${post.likedByCurrentUser ? "fill-current" : ""}`} />
+                                                    <span className="text-xs font-medium">{post.likesCount || "Like"}</span>
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500"
+                                                    onClick={() => setCommentingOnPost(commentingOnPost === post.id ? null : post.id)}
+                                                >
+                                                    <MessageSquare className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">{post.commentsCount || "Comment"}</span>
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:bg-muted">
+                                                    <Send className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">Share</span>
+                                                </Button>
+                                            </div>
+
+                                            {post.comments.length > 0 && (
+                                                <div className="bg-muted/50 rounded-xl p-3 mt-3 space-y-3 border border-border">
+                                                    {post.comments.map(c => (
+                                                        <div key={c.id} className="flex gap-2 text-sm">
+                                                            <Avatar className="w-6 h-6 mt-1">
+                                                                {/* FIX: Use getImageUrl for commenter */}
+                                                                <AvatarImage src={getImageUrl((c.user as any).profileImageUrl)} />
+                                                                <AvatarFallback className="text-[10px]">{c.user.name.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="bg-card p-2 px-3 rounded-lg shadow-sm border border-border flex-1">
+                                                                <span className="font-semibold text-card-foreground text-xs block mb-0.5">{c.user.name}</span>
+                                                                <span className="text-foreground">{c.content}</span>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {/* Add Comment Input */}
-                                                {commentingOnPost === post.id && (
-                                                    <div className="flex space-x-2 pt-2">
-                                                        <Textarea
-                                                            value={commentText}
-                                                            onChange={(e) => setCommentText(e.target.value)}
-                                                            placeholder="Write a comment..."
-                                                            className="min-h-[60px]"
-                                                        />
-                                                        <div className="flex flex-col space-y-2">
-                                                            <Button size="sm" onClick={() => handleAddComment(post.id)}>
-                                                                Post
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() => {
-                                                                    setCommentingOnPost(null);
-                                                                    setCommentText("");
-                                                                }}
-                                                            >
-                                                                Cancel
-                                                            </Button>
                                                         </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {commentingOnPost === post.id && (
+                                                <div className="flex gap-2 mt-3 animate-in fade-in slide-in-from-top-2">
+                                                    <Avatar className="w-8 h-8"><AvatarImage src={currentUser.avatar} /></Avatar>
+                                                    <div className="flex-1 flex gap-2">
+                                                        <Textarea 
+                                                            value={commentText} 
+                                                            onChange={e => setCommentText(e.target.value)} 
+                                                            placeholder="Add a comment..." 
+                                                            className="min-h-[40px] h-[40px] py-2 resize-none text-sm bg-card border-border text-foreground"
+                                                        />
+                                                        <Button size="sm" onClick={() => handleAddComment(post.id)} className="h-[40px]">Post</Button>
                                                     </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
                                 );
                             })}
-                    </StaggerContainer>
+                        </StaggerContainer>
+                    </div>
                 </section>
 
-                {/* Right Sidebar (Sticky) */}
+                {/* Right Sidebar - Suggestions */}
                 <aside className="hidden lg:block lg:col-span-1">
-                    <div className="sticky top-8 space-y-6">
+                    <div className="sticky top-24">
                         <FadeInUp delay={0.2}>
-                            <Card className="bg-card/50 rounded-3xl border-2 border-border/50 shadow-xl">
-                                <CardHeader>
-                                    <CardTitle className="font-serif text-lg">Who to connect with</CardTitle>
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="font-serif text-base text-card-foreground">People you may know</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
-                                        {membersLoading && (
-                                            <p className="text-sm text-muted-foreground">Loading...</p>
-                                        )}
-
-                                        {!membersLoading && error && (
-                                            <p className="text-red-500 text-sm">Error loading members.</p>
-                                        )}
-
-                                        {!membersLoading && !error && members.length === 0 && (
-                                            <p className="text-sm text-muted-foreground">
-                                                No new members in your community right now.
-                                            </p>
-                                        )}
-
-                                        {!membersLoading && !error && members.length > 0 &&
-                                            members
-                                                .filter((member) => {
-                                                    const { status } = getConnectionStatus(member.id);
-                                                    return status !== "connected";
-                                                })
-                                                .slice(0, 5)
-                                                .map((member) => {
-                                                    const connectionStatus = getConnectionStatus(member.id);
-                                                    return (
-                                                        <div key={member.id} className="flex items-center space-x-3">
-                                                            <Avatar className="w-10 h-10">
-                                                                <AvatarImage src={"/placeholder.svg"} alt={member.name} />
-                                                                <AvatarFallback>
-                                                                    {member.name
-                                                                        .split(" ")
-                                                                        .map((n) => n[0])
-                                                                        .join("")}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="font-medium text-sm truncate">{member.name}</h4>
-                                                                <p className="text-xs text-muted-foreground truncate">
-                                                                    {member.profession}
-                                                                </p>
-                                                            </div>
-
-                                                            {connectionStatus.status === "none" && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="bg-transparent"
-                                                                    onClick={() => handleSendRequest(member.id)}
-                                                                >
-                                                                    <UserPlus className="w-4 h-4" />
-                                                                </Button>
-                                                            )}
-                                                            {connectionStatus.status === "pending" && connectionStatus.connectionId && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="bg-transparent"
-                                                                    onClick={() => handleCancelRequest(connectionStatus.connectionId!)}
-                                                                >
-                                                                    <X className="w-4 h-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                    </div>
-
-                                    <Button variant="link" size="sm" className="w-full mt-4">
-                                        See all
-                                    </Button>
+                                <CardContent className="space-y-4">
+                                    {members
+                                        // FIX: Filter only for users where status is 'none' (not connected AND not pending)
+                                        .filter(m => getConnectionStatus(m.id).status === "none")
+                                        .slice(0, 5)
+                                        .map(m => (
+                                            <div key={m.id} className="flex items-center justify-between group">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <Avatar className="w-9 h-9 border border-border">
+                                                        {/* FIX: Use getImageUrl for suggestions */}
+                                                        <AvatarImage src={getImageUrl((m as any).profileImageUrl)} />
+                                                        <AvatarFallback className="bg-primary/10 text-primary text-xs">{m.name.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium text-card-foreground truncate">{m.name}</p>
+                                                        <p className="text-xs text-muted-foreground truncate">{m.profession}</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Connect Button (disappears immediately when clicked) */}
+                                                <Button 
+                                                    size="icon" 
+                                                    variant="outline" 
+                                                    className="h-8 w-8 rounded-full shrink-0 hover:border-primary hover:text-primary bg-transparent hover:bg-primary/5 border-border text-muted-foreground" 
+                                                    onClick={() => handleSendRequest(m.id)}
+                                                >
+                                                    <UserPlus className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    <Button variant="link" className="w-full text-xs text-muted-foreground h-auto p-0 hover:text-primary">View all recommendations</Button>
                                 </CardContent>
                             </Card>
                         </FadeInUp>
@@ -847,81 +687,156 @@ export default function HomePage() {
                 </aside>
             </main>
 
+            {/* --- DIALOGS --- */}
+
             {/* Create Post Dialog */}
             <Dialog open={isPostingDialogOpen} onOpenChange={(open) => {
                 setIsPostingDialogOpen(open);
                 if (!open) {
                     setPostContent("");
-                    setPostImageFile(null);
+                    handleRemovePostImage();
+                    setShowEmojiPicker(false);
                 }
             }}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create a Post</DialogTitle>
-                        <DialogDescription>
-                            Share your thoughts with your professional community.
-                        </DialogDescription>
+                <DialogContent className="sm:max-w-[550px] p-0 gap-0 bg-card border-border overflow-visible">
+                    <DialogHeader className="p-4 border-b border-border">
+                        <DialogTitle className="text-lg font-semibold text-card-foreground">Create a post</DialogTitle>
                     </DialogHeader>
-                    <Textarea
-                        value={postContent}
-                        onChange={(e) => setPostContent(e.target.value)}
-                        placeholder="What's on your mind?"
-                        className="min-h-[150px]"
-                    />
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                            <ImageIcon className="w-4 h-4" />
-                            Add an image (optional)
-                        </label>
-                        <ImageUpload
-                            onImageSelect={setPostImageFile}
-                            onImageRemove={() => setPostImageFile(null)}
-                            disabled={isSubmittingPost}
+                    
+                    <div className="p-4 space-y-4">
+                        <div className="flex gap-3 mb-2">
+                            <Avatar className="w-10 h-10">
+                                <AvatarImage src={currentUser.avatar} />
+                                <AvatarFallback>{profileData.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h4 className="font-semibold text-sm text-card-foreground">{profileData.name}</h4>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground border border-border rounded-full px-2 py-0.5 w-fit mt-0.5">
+                                    <span>Anyone</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Textarea
+                            value={postContent}
+                            onChange={(e) => setPostContent(e.target.value)}
+                            placeholder="What do you want to talk about?"
+                            className="min-h-[150px] border-none focus-visible:ring-0 text-base resize-none p-0 placeholder:text-muted-foreground/50 bg-transparent text-foreground"
                         />
+
+                        {/* Post Image Preview */}
+                        {postImagePreview && (
+                            <div className="relative rounded-lg overflow-hidden border border-border bg-muted">
+                                <img src={postImagePreview} alt="Preview" className="w-full max-h-[300px] object-contain" />
+                                <button 
+                                    onClick={handleRemovePostImage}
+                                    className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 transition"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Emoji Picker */}
+                        {showEmojiPicker && (
+                            <div className="absolute bottom-16 right-4 z-50 shadow-2xl rounded-xl border border-border bg-card">
+                                <div className="flex justify-end p-2 border-b border-border">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowEmojiPicker(false)}
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                                <EmojiPicker 
+                                    onEmojiClick={handleEmojiClick} 
+                                    theme={Theme.AUTO}
+                                    height={350}
+                                    width={300}
+                                    lazyLoadEmojis={true}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-4 border-t border-border bg-muted/20 flex items-center justify-between">
+                        <div className="flex gap-2">
+                            <div className="relative inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted text-muted-foreground transition-colors cursor-pointer">
+                                <ImageIcon className="w-5 h-5" />
+                                <ImageUpload 
+                                    onImageSelect={handleImageSelect} 
+                                    onImageRemove={handleRemovePostImage}
+                                    className="absolute inset-0 z-10 opacity-0 cursor-pointer w-full h-full" 
+                                    disabled={isSubmittingPost}
+                                />
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className={`rounded-full ${showEmojiPicker ? 'bg-muted text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            >
+                                <Smile className="w-5 h-5" />
+                            </Button>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => setIsPostingDialogOpen(false)} className="text-muted-foreground">Cancel</Button>
+                            <Button 
+                                onClick={handleCreatePost} 
+                                disabled={isSubmittingPost || (!postContent.trim() && !postImageFile)}
+                                className="rounded-full px-6"
+                            >
+                                {isSubmittingPost ? "Posting..." : "Post"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Crop Dialog */}
+            <Dialog open={isCroppingDialogOpen} onOpenChange={setIsCroppingDialogOpen}>
+                <DialogContent className="sm:max-w-xl bg-card border-border">
+                    <DialogHeader>
+                        <DialogTitle className="text-card-foreground">Crop Image</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">Adjust the aspect ratio for your post.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col items-center justify-center bg-muted p-4 rounded-lg">
+                        {tempImagePreview && (
+                            <ReactCrop
+                                crop={crop}
+                                onChange={(_, p) => setCrop(p)}
+                                onComplete={c => setCompletedCrop(c)}
+                                aspect={16/9}
+                                className="max-h-[60vh]"
+                            >
+                                <img ref={imgRef} src={tempImagePreview} alt="Crop" onLoad={e => {
+                                    const { width, height } = e.currentTarget;
+                                    const c = centerAspectCrop(width, height, 16/9);
+                                    setCrop(c); setCompletedCrop(c);
+                                }} />
+                            </ReactCrop>
+                        )}
                     </div>
                     <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsPostingDialogOpen(false);
-                                setPostContent("");
-                                setPostImageFile(null);
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={handleCreatePost} 
-                            disabled={isSubmittingPost || (!postContent.trim() && !postImageFile)}
-                        >
-                            {isSubmittingPost ? "Posting..." : "Post"}
-                        </Button>
+                        <Button variant="outline" onClick={() => { setIsCroppingDialogOpen(false); setTempImageFile(null); }} className="text-foreground border-border">Cancel</Button>
+                        <Button onClick={handleApplyCrop}>Apply Crop</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
+            {/* Delete Confirm Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-sm bg-card border-border">
                     <DialogHeader>
-                        <DialogTitle>Delete Post</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete this post? This action cannot be undone.
-                        </DialogDescription>
+                        <DialogTitle className="text-card-foreground">Delete Post?</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">This cannot be undone.</DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setDeleteDialogOpen(false);
-                                setPostToDelete(null);
-                            }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={handleDeletePost}>
-                            Delete
-                        </Button>
+                    <DialogFooter className="flex gap-2 sm:justify-end">
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="text-foreground border-border">Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeletePost}>Delete</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
