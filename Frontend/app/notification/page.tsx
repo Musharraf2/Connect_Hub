@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heart, MessageSquare, UserPlus, Trash2, CheckCheck, Bell } from "lucide-react";
 import toast from "react-hot-toast";
+import { Header } from "@/components/header";
+import { getUnreadMessageCount } from "@/lib/api";
 
 // API Types
 interface NotificationDTO {
@@ -37,6 +39,7 @@ interface CurrentUser {
     avatar: string;
     community: string;
     pendingRequests?: number;
+    unreadMessageCount?: number;
 }
 
 // API Functions (inline to avoid import issues)
@@ -106,9 +109,11 @@ export default function NotificationsPage() {
                 community: user.profession,
                 avatar: "/placeholder.svg",
                 pendingRequests: 0,
+                unreadMessageCount: 0,
             });
 
             fetchNotifications(user.id);
+            fetchUnreadCount(user.id);
         } catch (error) {
             console.error("Failed to parse user data:", error);
             sessionStorage.removeItem("user");
@@ -133,6 +138,15 @@ export default function NotificationsPage() {
             toast.error(errorMessage);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchUnreadCount = async (userId: number) => {
+        try {
+            const count = await getUnreadMessageCount(userId);
+            setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -236,24 +250,7 @@ export default function NotificationsPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <div className="border-b">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold">Connect Hub</h1>
-                        <div className="flex items-center gap-4">
-                            <Button variant="ghost" onClick={() => router.push("/home")}>
-                                Home
-                            </Button>
-                            <Button variant="ghost" onClick={() => router.push("/connections")}>
-                                Connections
-                            </Button>
-                            <Button variant="ghost" onClick={() => router.push("/profile")}>
-                                Profile
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <Header user={currentUser} />
 
             <main className="container mx-auto max-w-3xl py-8 px-4">
                 <div className="flex items-center justify-between mb-6">
