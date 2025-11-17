@@ -157,6 +157,7 @@ export default function MessagesPage() {
             setUnreadCount(totalUnread);
         } catch (error) {
             console.error("Failed to load conversations:", error);
+            toast.error("Unable to load conversations. Please make sure the backend is running.");
         } finally {
             setLoading(false);
         }

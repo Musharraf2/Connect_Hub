@@ -67,52 +67,64 @@ public class MessageService {
     }
 
     public List<ConversationResponse> getConversations(Long userId) {
-        // Get all accepted connections for the user
-        List<User> connectedUsers = connectionRepository.findAcceptedConnectionUsers(userId);
-        
-        List<ConversationResponse> conversations = new ArrayList<>();
-        
-        for (User user : connectedUsers) {
-            List<Message> lastMessages = messageRepository.findLastMessageBetweenUsers(userId, user.getId());
+        try {
+            // Get all accepted connections for the user
+            List<User> connectedUsers = connectionRepository.findAcceptedConnectionUsers(userId);
             
-            if (!lastMessages.isEmpty()) {
-                Message lastMessage = lastMessages.get(0);
-                Long unreadCount = messageRepository.countUnreadMessagesFrom(userId, user.getId());
-                
-                ConversationResponse conversation = new ConversationResponse();
-                conversation.setUserId(user.getId());
-                conversation.setUserName(user.getName());
-                conversation.setUserProfileImageUrl(user.getProfileImageUrl());
-                conversation.setLastMessage(lastMessage.getContent());
-                conversation.setLastMessageTime(lastMessage.getTimestamp());
-                conversation.setUnreadCount(unreadCount);
-                conversation.setOnline(false); // Will be updated via WebSocket
-                
-                conversations.add(conversation);
-            } else {
-                // User is connected but no messages yet
-                ConversationResponse conversation = new ConversationResponse();
-                conversation.setUserId(user.getId());
-                conversation.setUserName(user.getName());
-                conversation.setUserProfileImageUrl(user.getProfileImageUrl());
-                conversation.setLastMessage("");
-                conversation.setLastMessageTime(null);
-                conversation.setUnreadCount(0L);
-                conversation.setOnline(false);
-                
-                conversations.add(conversation);
+            List<ConversationResponse> conversations = new ArrayList<>();
+            
+            for (User user : connectedUsers) {
+                try {
+                    List<Message> lastMessages = messageRepository.findLastMessageBetweenUsers(userId, user.getId());
+                    
+                    if (!lastMessages.isEmpty()) {
+                        Message lastMessage = lastMessages.get(0);
+                        Long unreadCount = messageRepository.countUnreadMessagesFrom(userId, user.getId());
+                        
+                        ConversationResponse conversation = new ConversationResponse();
+                        conversation.setUserId(user.getId());
+                        conversation.setUserName(user.getName());
+                        conversation.setUserProfileImageUrl(user.getProfileImageUrl());
+                        conversation.setLastMessage(lastMessage.getContent());
+                        conversation.setLastMessageTime(lastMessage.getTimestamp());
+                        conversation.setUnreadCount(unreadCount);
+                        conversation.setOnline(false); // Will be updated via WebSocket
+                        
+                        conversations.add(conversation);
+                    } else {
+                        // User is connected but no messages yet
+                        ConversationResponse conversation = new ConversationResponse();
+                        conversation.setUserId(user.getId());
+                        conversation.setUserName(user.getName());
+                        conversation.setUserProfileImageUrl(user.getProfileImageUrl());
+                        conversation.setLastMessage("");
+                        conversation.setLastMessageTime(null);
+                        conversation.setUnreadCount(0L);
+                        conversation.setOnline(false);
+                        
+                        conversations.add(conversation);
+                    }
+                } catch (Exception e) {
+                    // Log error but continue with other conversations
+                    System.err.println("Error fetching conversation for user " + user.getId() + ": " + e.getMessage());
+                }
             }
+            
+            // Sort by last message time, nulls last
+            conversations.sort((c1, c2) -> {
+                if (c1.getLastMessageTime() == null && c2.getLastMessageTime() == null) return 0;
+                if (c1.getLastMessageTime() == null) return 1;
+                if (c2.getLastMessageTime() == null) return -1;
+                return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
+            });
+            
+            return conversations;
+        } catch (Exception e) {
+            System.err.println("Error fetching conversations for user " + userId + ": " + e.getMessage());
+            e.printStackTrace();
+            // Return empty list instead of throwing exception
+            return new ArrayList<>();
         }
-        
-        // Sort by last message time, nulls last
-        conversations.sort((c1, c2) -> {
-            if (c1.getLastMessageTime() == null && c2.getLastMessageTime() == null) return 0;
-            if (c1.getLastMessageTime() == null) return 1;
-            if (c2.getLastMessageTime() == null) return -1;
-            return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
-        });
-        
-        return conversations;
     }
 
     private MessageResponse convertToMessageResponse(Message message) {

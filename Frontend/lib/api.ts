@@ -432,7 +432,11 @@ export const getConversation = async (userId1: number, userId2: number): Promise
 
 export const getConversations = async (userId: number): Promise<ConversationResponse[]> => {
     const response = await fetch(`${BASE}/messages/conversations/${userId}`);
-    if (!response.ok) throw new Error('Failed to fetch conversations');
+    if (response.status === 204) return []; // No content - empty conversations
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch conversations');
+    }
     return await response.json();
 };
 
