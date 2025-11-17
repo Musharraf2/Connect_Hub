@@ -105,6 +105,7 @@ export default function MessagesPage() {
         };
     }, [router]);
 
+    //new
     // Load chat users (connections)
     const loadChatUsers = async (userId: number) => {
         try {
