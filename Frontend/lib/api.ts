@@ -431,13 +431,24 @@ export const getConversation = async (userId1: number, userId2: number): Promise
 };
 
 export const getConversations = async (userId: number): Promise<ConversationResponse[]> => {
+    console.log(`[API] Fetching conversations for user ${userId} from ${BASE}/messages/conversations/${userId}`);
     const response = await fetch(`${BASE}/messages/conversations/${userId}`);
-    if (response.status === 204) return []; // No content - empty conversations
+    console.log(`[API] Response status: ${response.status}`);
+    
+    if (response.status === 204) {
+        console.log('[API] No content - returning empty array');
+        return [];
+    }
+    
     if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[API] Error response: ${errorText}`);
         throw new Error(errorText || 'Failed to fetch conversations');
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log(`[API] Successfully fetched ${data.length} conversations`);
+    return data;
 };
 
 export const markMessagesAsRead = async (receiverId: number, senderId: number): Promise<void> => {

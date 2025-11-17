@@ -148,16 +148,24 @@ export default function MessagesPage() {
     }, [currentUser?.id]);
 
     const loadConversations = async (userId: number) => {
+        console.log('[Messages] Loading conversations for user:', userId);
         try {
             const convos = await getConversations(userId);
+            console.log('[Messages] Conversations loaded:', convos.length, 'conversations');
+            console.log('[Messages] Conversations data:', convos);
             setConversations(convos);
             
             // Calculate total unread count
             const totalUnread = convos.reduce((sum, c) => sum + c.unreadCount, 0);
             setUnreadCount(totalUnread);
+            
+            if (convos.length === 0) {
+                console.warn('[Messages] No conversations found. User may have no connections.');
+                toast.info("No conversations yet. Connect with others on the Dashboard to start messaging.");
+            }
         } catch (error) {
-            console.error("Failed to load conversations:", error);
-            toast.error("Unable to load conversations. Please make sure the backend is running.");
+            console.error("[Messages] Failed to load conversations:", error);
+            toast.error("Unable to load conversations. Please check that the backend is running on port 8080.");
         } finally {
             setLoading(false);
         }

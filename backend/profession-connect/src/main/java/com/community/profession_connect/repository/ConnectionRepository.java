@@ -47,6 +47,6 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
     // Get all users that are connected (accepted) with the given user
     @Query("SELECT CASE WHEN c.requester.id = :userId THEN c.receiver ELSE c.requester END " +
            "FROM Connection c WHERE (c.requester.id = :userId OR c.receiver.id = :userId) " +
-           "AND c.status = 'ACCEPTED'")
+           "AND c.status = com.community.profession_connect.model.ConnectionStatus.ACCEPTED")
     List<User> findAcceptedConnectionUsers(@Param("userId") Long userId);
 }
