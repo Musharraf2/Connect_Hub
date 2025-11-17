@@ -41,4 +41,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
             User requester,
             ConnectionStatus status2
     );
+
+    // Find all connections where user is either requester or receiver
+    List<Connection> findByRequesterOrReceiver(User requester, User receiver);
 }
