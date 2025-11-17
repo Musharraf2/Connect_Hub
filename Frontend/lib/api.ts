@@ -635,3 +635,103 @@ export const deleteNotification = async (notificationId: number): Promise<string
         throw error;
     }
 };
+
+// ================== MESSAGE API ==================
+
+export interface MessageRequest {
+    senderId: number;
+    receiverId: number;
+    content: string;
+}
+
+export interface MessageResponse {
+    id: number;
+    senderId: number;
+    senderName: string;
+    receiverId: number;
+    receiverName: string;
+    content: string;
+    timestamp: string;
+    isRead: boolean;
+}
+
+export interface ChatUserResponse {
+    id: number;
+    name: string;
+    email: string;
+    profession: string;
+    profileImageUrl: string | null;
+    lastMessage: string | null;
+    unreadCount: number;
+}
+
+// Send a message (REST endpoint)
+export const sendMessage = async (request: MessageRequest): Promise<MessageResponse> => {
+    try {
+        const response = await fetch(`${BASE}/messages/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send message');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error sending message:', error);
+        throw error;
+    }
+};
+
+// Get message history between two users
+export const getMessageHistory = async (userId1: number, userId2: number): Promise<MessageResponse[]> => {
+    try {
+        const response = await fetch(`${BASE}/messages/history/${userId1}/${userId2}`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch message history');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching message history:', error);
+        throw error;
+    }
+};
+
+// Get all chat users (connections) for a user
+export const getChatUsers = async (userId: number): Promise<ChatUserResponse[]> => {
+    try {
+        const response = await fetch(`${BASE}/messages/chat-users/${userId}`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch chat users');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching chat users:', error);
+        throw error;
+    }
+};
+
+// Mark messages as read
+export const markMessagesAsRead = async (receiverId: number, senderId: number): Promise<void> => {
+    try {
+        const response = await fetch(`${BASE}/messages/mark-read?receiverId=${receiverId}&senderId=${senderId}`, {
+            method: 'PUT',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to mark messages as read');
+        }
+    } catch (error) {
+        console.error('Error marking messages as read:', error);
+        throw error;
+    }
+};
+};
