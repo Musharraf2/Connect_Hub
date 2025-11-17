@@ -16,9 +16,6 @@ import {
   MapPin,
   UserCheck,
   UserX,
-  Edit3, 
-  Save,
-  X,
   Inbox,
   Briefcase
 } from "lucide-react"
@@ -36,7 +33,6 @@ import {
   getSentPendingRequests,
   cancelConnectionRequest,
   getUserProfile,
-  updateProfile,
   getAcceptedConnections,
   getUsersByProfession,
   getUnreadMessageCount
@@ -201,36 +197,6 @@ export default function DashboardPage() {
     }
   };
 
-  // --- Bio Edit ---
-  const [isEditingBio, setIsEditingBio] = useState(false)
-  const [bioText, setBioText] = useState(profileData?.bio || "")
-  const [tempBioText, setTempBioText] = useState(profileData?.bio || "")
-
-  useEffect(() => {
-      if (profileData) {
-          setBioText(profileData.bio);
-          setTempBioText(profileData.bio);
-      }
-  }, [profileData]);
-
-  const handleSaveBio = async () => {
-      const userDataString = sessionStorage.getItem('user');
-      if (!userDataString || !profileData) return;
-      
-      const user: LoginResponse = JSON.parse(userDataString);
-      try {
-          const updatedUser = await updateProfile(user.id, { aboutMe: tempBioText.trim() });
-          const newBio = updatedUser.aboutMe ?? "";
-          setBioText(newBio);
-          setTempBioText(newBio);
-          setProfileData(prev => prev ? { ...prev, bio: newBio } : null);
-          setIsEditingBio(false);
-          toast.success("Bio updated!");
-      } catch (error) {
-          toast.error("Failed to update bio.");
-      }
-  };
-
   // --- Connection Handlers ---
   const handleSendRequest = async (memberId: number) => {
     const userDataString = sessionStorage.getItem('user');
@@ -369,34 +335,10 @@ export default function DashboardPage() {
                       <div className="space-y-3">
                           <div className="flex items-center justify-between">
                               <h4 className="font-semibold text-sm text-foreground/80 uppercase tracking-wider">About</h4>
-                              {!isEditingBio && (
-                                  <Button variant="ghost" size="icon" onClick={() => setIsEditingBio(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
-                                      <Edit3 className="w-3.5 h-3.5" />
-                                  </Button>
-                              )}
                           </div>
-                          {isEditingBio ? (
-                              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                                  <Textarea
-                                      value={tempBioText}
-                                      onChange={(e) => setTempBioText(e.target.value)}
-                                      placeholder="Tell us about yourself..."
-                                      className="min-h-[100px] text-sm bg-muted/50 border-border focus:border-primary resize-none"
-                                  />
-                                  <div className="flex gap-2">
-                                      <Button size="sm" onClick={handleSaveBio} className="flex-1 h-8">
-                                          <Save className="w-3 h-3 mr-1.5" /> Save
-                                      </Button>
-                                      <Button size="sm" variant="outline" onClick={() => setIsEditingBio(false)} className="flex-1 h-8 bg-transparent">
-                                          <X className="w-3 h-3 mr-1.5" /> Cancel
-                                      </Button>
-                                  </div>
-                              </div>
-                          ) : (
-                              <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-lg border border-border/50">
-                                  {bioText}
-                              </p>
-                          )}
+                          <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-lg border border-border/50">
+                              {profileData?.bio || "No bio yet."}
+                          </p>
                       </div>
                   </CardContent>
               </Card>

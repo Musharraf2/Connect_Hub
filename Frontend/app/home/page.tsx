@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 
 // Iconss
 import { 
-    UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, 
+    UserPlus, MapPin, X, Heart, MessageSquare, 
     Trash2, Image as ImageIcon, Smile, Send, Loader2
 } from "lucide-react";
 
@@ -46,7 +46,6 @@ import {
     toggleLike,
     addComment,
     uploadPostImage,
-    updateProfile,
     UserProfileResponse,
     getUnreadMessageCount
 } from "@/lib/api";
@@ -143,16 +142,14 @@ export default function HomePage() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [localSentRequests, setLocalSentRequests] = useState<number[]>([]); // For instant UI updates on connect
 
-    // Cropping & Bio
+    // Cropping
     const [isCroppingDialogOpen, setIsCroppingDialogOpen] = useState(false);
     const [tempImageFile, setTempImageFile] = useState<File | null>(null);
     const [tempImagePreview, setTempImagePreview] = useState<string>("");
     const [crop, setCrop] = useState<Crop>();
     const [completedCrop, setCompletedCrop] = useState<Crop>();
     const imgRef = useRef<HTMLImageElement>(null);
-    const [isEditingBio, setIsEditingBio] = useState(false);
     const [bioText, setBioText] = useState("");
-    const [tempBioText, setTempBioText] = useState("");
 
     // --- Bootstrap ---
     useEffect(() => {
@@ -219,7 +216,6 @@ export default function HomePage() {
                 bio: data.aboutMe || "No bio yet."
             });
             setBioText(data.aboutMe || "No bio yet.");
-            setTempBioText(data.aboutMe || "No bio yet.");
         } catch (error) { console.error(error); }
     };
 
@@ -438,19 +434,6 @@ export default function HomePage() {
         }
     };
 
-    const handleSaveBio = async () => {
-        const sVal = sessionStorage.getItem('user');
-        if (!sVal) return;
-        const user = JSON.parse(sVal);
-        try {
-            const up = await updateProfile(user.id, { aboutMe: tempBioText.trim() });
-            setBioText(up.aboutMe ?? "");
-            setProfileData(prev => prev ? { ...prev, bio: up.aboutMe ?? "" } : null);
-            setIsEditingBio(false);
-            toast.success("Bio updated");
-        } catch (e) { toast.error("Bio failed"); }
-    };
-
     if (authLoading || !currentUser || !profileData) return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
 
     return (
@@ -498,27 +481,8 @@ export default function HomePage() {
                                     <div className="pt-4 border-t border-border">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">About</h4>
-                                            {!isEditingBio && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => setIsEditingBio(true)}>
-                                                    <Edit3 className="w-3 h-3" />
-                                                </Button>
-                                            )}
                                         </div>
-                                        {isEditingBio ? (
-                                            <div className="space-y-2">
-                                                <Textarea 
-                                                    value={tempBioText} 
-                                                    onChange={e => setTempBioText(e.target.value)} 
-                                                    className="text-sm min-h-[80px] resize-none bg-muted border-border focus:bg-card text-foreground"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <Button size="sm" className="h-7 text-xs flex-1" onClick={handleSaveBio}>Save</Button>
-                                                    <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => setIsEditingBio(false)}>Cancel</Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{bioText}</p>
-                                        )}
+                                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{bioText}</p>
                                     </div>
                                 </CardContent>
                             </Card>

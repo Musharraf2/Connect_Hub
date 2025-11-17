@@ -9,18 +9,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getUserProfile,
   UserProfileResponse,
-  updateProfile,
   getUnreadMessageCount,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
-import { Textarea } from "@/components/ui/textarea" 
 import {
   MapPin,
   Calendar,
   Users,
-  Edit3,
   BookOpen,
   Music,
   Stethoscope,
@@ -28,12 +24,7 @@ import {
   Mail,
   Phone,
   Award,
-  Save,
-  X,
   GraduationCap,
-  Github,
-  ExternalLink,
-  FolderGit2,
 } from "lucide-react"
 import Link from "next/link"
 import { FadeInUp, StaggerContainer, StaggerItem } from "@/components/animations"
@@ -161,11 +152,6 @@ export default function ProfilePage() {
   const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
 
-  // Bio Edit State
-  const [isEditingBio, setIsEditingBio] = useState(false)
-  const [bioText, setBioText] = useState("")
-  const [tempBioText, setTempBioText] = useState("")
-
   useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
     if (!userDataString) {
@@ -209,8 +195,6 @@ export default function ProfilePage() {
         };
 
         setCurrentUser(mergedUser);
-        setBioText(mergedUser.bio);
-        setTempBioText(mergedUser.bio);
 
       } catch (error) {
         console.error("Failed to fetch profile", error);
@@ -220,26 +204,6 @@ export default function ProfilePage() {
       }
     })();
   }, [router]);
-
- const handleSaveBio = async () => {
-    if (!currentUser) return;
-    const toastId = toast.loading("Saving bio...");
-    try {
-      const updatedUser = await updateProfile(currentUser.id, { aboutMe: tempBioText });
-      setCurrentUser({ ...currentUser, bio: updatedUser.aboutMe ?? "" });
-      setBioText(updatedUser.aboutMe ?? "");
-      const sVal = sessionStorage.getItem('user');
-      if(sVal) {
-          const u = JSON.parse(sVal);
-          sessionStorage.setItem("user", JSON.stringify({...u, aboutMe: updatedUser.aboutMe}));
-      }
-      toast.success("Bio updated!", { id: toastId });
-    } catch (error) {
-      toast.error("Could not save bio.", { id: toastId });
-    } finally {
-      setIsEditingBio(false);
-    }
-  };
 
   if (authLoading || !currentUser) {
     return (
@@ -331,32 +295,13 @@ export default function ProfilePage() {
              {/* About / Bio */}
              <FadeInUp delay={0.1}>
                 <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                    <CardHeader className="pb-3 flex flex-row items-center justify-between border-b border-gray-50/50 dark:border-border/50">
+                    <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
                         <CardTitle className="text-lg font-semibold text-foreground">About</CardTitle>
-                        {!isEditingBio && (
-                            <Button variant="ghost" size="icon" onClick={() => setIsEditingBio(true)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                <Edit3 className="w-4 h-4" />
-                            </Button>
-                        )}
                     </CardHeader>
                     <CardContent className="pt-4">
-                        {isEditingBio ? (
-                            <div className="space-y-3">
-                                <Textarea
-                                    value={tempBioText}
-                                    onChange={(e) => setTempBioText(e.target.value)}
-                                    className="min-h-[120px] text-sm bg-white dark:bg-muted/30 border-border focus:border-primary"
-                                />
-                                <div className="flex gap-2">
-                                    <Button size="sm" onClick={handleSaveBio} className="flex-1">Save</Button>
-                                    <Button size="sm" variant="outline" onClick={() => setIsEditingBio(false)} className="flex-1">Cancel</Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                                {bioText}
-                            </p>
-                        )}
+                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {currentUser.bio}
+                        </p>
                     </CardContent>
                 </Card>
              </FadeInUp>
@@ -406,21 +351,11 @@ export default function ProfilePage() {
           {/* Right Content */}
           <section className="lg:col-span-2 space-y-8">
             <FadeInUp delay={0.2}>
-                <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="w-full grid grid-cols-3 h-12 bg-gray-100/80 dark:bg-muted/50 p-1 rounded-lg">
-                        <TabsTrigger value="overview" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Overview</TabsTrigger>
-                        <TabsTrigger value="projects" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Projects</TabsTrigger>
-                        <TabsTrigger value="activity" className="rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm text-muted-foreground">Activity</TabsTrigger>
-                    </TabsList>
-
-                    <div className="mt-8 space-y-8">
-                        {/* OVERVIEW TAB */}
-                        <TabsContent value="overview" className="space-y-8">
-                            
-                            {/* Education Grid */}
-                            <div>
-                                <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="w-full space-y-8">
+                    {/* Education Grid */}
+                    <div>
+                        <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {[
                                         { label: "University", value: currentUser.university, icon: GraduationCap },
                                         { label: "Major", value: currentUser.major, icon: BookOpen },
@@ -463,81 +398,8 @@ export default function ProfilePage() {
                                     </StaggerContainer>
                                 </CardContent>
                             </Card>
-                        </TabsContent>
-
-                        {/* PROJECTS TAB - IMPROVED UI */}
-                        <TabsContent value="projects">
-                             <div className="grid gap-6 md:grid-cols-2">
-                                {currentUser.projects.map((project, index) => (
-                                    <Card key={index} className="flex flex-col border border-gray-200 dark:border-border shadow-sm hover:shadow-lg transition-all duration-300 bg-white dark:bg-card group h-full">
-                                        <CardHeader className="pb-3">
-                                            <div className="flex justify-between items-start">
-                                                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 mb-3 w-fit">
-                                                    <FolderGit2 className="w-6 h-6" />
-                                                </div>
-                                                <div className="flex gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                                        <Github className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                                        <ExternalLink className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <CardTitle className="text-xl font-bold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                                {project.title}
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="flex-1 pb-4">
-                                            <CardDescription className="text-muted-foreground line-clamp-3 leading-relaxed">
-                                                {project.description}
-                                            </CardDescription>
-                                            <div className="mt-6 flex flex-wrap gap-2">
-                                                {project.tech.map((tech, tIndex) => (
-                                                    <Badge key={tIndex} variant="outline" className="border-gray-200 dark:border-border text-muted-foreground font-normal text-xs px-2 py-0.5">
-                                                        {tech}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                        <CardFooter className="pt-0 border-t border-gray-50 dark:border-border/40 mt-auto p-4 bg-gray-50/30 dark:bg-muted/10">
-                                             <Button variant="outline" size="sm" className="w-full border-gray-200 dark:border-border text-foreground hover:bg-white dark:hover:bg-card hover:text-foreground">
-                                                View Details
-                                             </Button>
-                                        </CardFooter>
-                                    </Card>
-                                ))}
-                             </div>
-                        </TabsContent>
-
-                        {/* ACTIVITY TAB */}
-                        <TabsContent value="activity">
-                            <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                                <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
-                                    <CardTitle className="text-lg text-foreground">Recent Activity</CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-2">
-                                     <StaggerContainer stagger={0.1} className="space-y-0">
-                                        {recentActivity.map((activity, i) => (
-                                            <StaggerItem key={i}>
-                                                <div className="flex gap-4 py-4 border-b border-gray-100 dark:border-border/50 last:border-0">
-                                                    <div className={`w-10 h-10 rounded-full bg-gray-50 dark:bg-muted flex items-center justify-center shrink-0 border border-gray-100 dark:border-border`}>
-                                                        <Zap className="w-4 h-4 text-muted-foreground" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-foreground">{activity.message}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-                                                    </div>
-                                                </div>
-                                            </StaggerItem>
-                                        ))}
-                                    </StaggerContainer>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </div>
-                </Tabs>
-            </FadeInUp>
+                        </div>
+                    </FadeInUp>
           </section>
 
         </div>

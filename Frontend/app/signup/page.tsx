@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Combobox } from "@/components/ui/combobox"
 // We no longer need RadioGroup or the community icons
-import { ArrowLeft, Users } from "lucide-react"
+import { ArrowLeft, Users, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
@@ -55,6 +55,8 @@ export default function SignupPage() {
     // We no longer need 'step' or 'selectedCommunity'
     const router = useRouter()
     const [profession, setProfession] = useState<string>("")
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
     return (
         <div className="min-h-screen flex">
@@ -144,44 +146,90 @@ export default function SignupPage() {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="password">Password</Label>
-                                    <Input id="password" type="password" placeholder="Create a strong password" className="bg-input" />
+                                    <div className="relative">
+                                        <Input 
+                                            id="password" 
+                                            type={showPassword ? "text" : "password"} 
+                                            placeholder="Create a strong password" 
+                                            className="bg-input pr-10" 
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="confirmPassword">Confirm Password</Label>
-                                    <Input
-                                        id="confirmPassword"
-                                        type="password"
-                                        placeholder="Confirm your password"
-                                        className="bg-input"
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="confirmPassword"
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            placeholder="Confirm your password"
+                                            className="bg-input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <Button
                                     className="w-full"
                                     size="lg"
                                     onClick={async () => {
                                         try {
+                                            const firstName = (document.getElementById("firstName") as HTMLInputElement).value;
+                                            const lastName = (document.getElementById("lastName") as HTMLInputElement).value;
+                                            const email = (document.getElementById("email") as HTMLInputElement).value;
+                                            const password = (document.getElementById("password") as HTMLInputElement).value;
+                                            const confirmPassword = (document.getElementById("confirmPassword") as HTMLInputElement).value;
+                                            
                                             // Find the selected profession label from the value
                                             const selectedProfession = PROFESSIONS.find(p => p.value === profession)?.label || "";
                                             
-                                            const userData = {
-                                                name: (document.getElementById("firstName") as HTMLInputElement).value + " " + (document.getElementById("lastName") as HTMLInputElement).value,
-                                                email: (document.getElementById("email") as HTMLInputElement).value,
-                                                // Get profession from the state
-                                                profession: selectedProfession,
-                                                password: (document.getElementById("password") as HTMLInputElement).value,
-                                            };
-                                            
-                                            if (!userData.name.trim() || !userData.email || !userData.password || !userData.profession) {
-                                                toast.error("Please fill in all fields.");
+                                            // Validation
+                                            if (!firstName.trim() || !lastName.trim()) {
+                                                toast.error("Please enter your first and last name");
                                                 return;
                                             }
 
-                                            // Add password confirmation check
-                                            const confirmPassword = (document.getElementById("confirmPassword") as HTMLInputElement).value;
-                                            if (userData.password !== confirmPassword) {
-                                                toast.error("Passwords do not match.");
+                                            // Email validation
+                                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                                            if (!emailRegex.test(email)) {
+                                                toast.error("Please enter a valid email address");
                                                 return;
                                             }
+
+                                            if (!selectedProfession) {
+                                                toast.error("Please select your profession");
+                                                return;
+                                            }
+
+                                            // Password validation
+                                            if (password.length < 6) {
+                                                toast.error("Password must be at least 6 characters long");
+                                                return;
+                                            }
+
+                                            // Password confirmation check
+                                            if (password !== confirmPassword) {
+                                                toast.error("Passwords do not match");
+                                                return;
+                                            }
+
+                                            const userData = {
+                                                name: firstName + " " + lastName,
+                                                email: email,
+                                                profession: selectedProfession,
+                                                password: password,
+                                            };
 
                                             const responseMessage = await signupUser(userData);
 
