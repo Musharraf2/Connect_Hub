@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import { Send, Search, Circle } from "lucide-react";
 
 // Components
+//le kar dia
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
