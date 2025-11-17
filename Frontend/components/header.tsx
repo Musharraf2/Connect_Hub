@@ -18,7 +18,6 @@ import {
     Home,
     MessageCircle,
     User,
-    Settings,
     LogOut,
     Moon,
     Sun,
@@ -211,12 +210,6 @@ export function Header({ user }: HeaderProps) {
                                         <Link href="/profile">
                                             <User className="w-4 h-4 mr-2 opacity-70" />
                                             Profile
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild className="cursor-pointer">
-                                        <Link href="/settings">
-                                            <Settings className="w-4 h-4 mr-2 opacity-70" />
-                                            Settings
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
