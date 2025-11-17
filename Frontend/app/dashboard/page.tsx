@@ -54,6 +54,7 @@ interface CurrentUser {
     id?: number;
     name: string;
     avatar: string;
+    coverImage?: string;
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
@@ -66,6 +67,7 @@ interface ProfileData {
     location: string;
     connections: number;
     bio: string;
+    coverImage?: string;
 }
 
 // --- URL HELPER ---
@@ -109,7 +111,11 @@ export default function DashboardPage() {
           const profile: UserProfileDetailResponse = await getUserProfile(userId);
 
           setCurrentUser((prev) => (
-            prev ? { ...prev, avatar: getImageUrl(profile.profileImageUrl) } : null
+            prev ? { 
+              ...prev, 
+              avatar: getImageUrl(profile.profileImageUrl),
+              coverImage: getImageUrl(profile.coverImageUrl)
+            } : null
           ));
           
           setProfileData({
@@ -118,7 +124,8 @@ export default function DashboardPage() {
             profession: profile.profession,
             location: profile.location || "Not set", 
             connections: 0, 
-            bio: profile.aboutMe || "No bio yet."
+            bio: profile.aboutMe || "No bio yet.",
+            coverImage: getImageUrl(profile.coverImageUrl)
           });
           
           await Promise.all([
@@ -299,7 +306,11 @@ export default function DashboardPage() {
           <div className="sticky top-24 space-y-6">
             <FadeInUp>
               <Card className="bg-card border-border shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                  <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20" />
+                  <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20 relative">
+                      {profileData.coverImage && profileData.coverImage !== "/placeholder.svg" && (
+                          <img src={profileData.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                      )}
+                  </div>
                   <CardContent className="p-6 pt-0 relative">
                       <div className="flex justify-center -mt-12 mb-4">
                           <Avatar className="w-24 h-24 border-4 border-card shadow-sm">

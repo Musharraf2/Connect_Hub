@@ -62,6 +62,7 @@ interface CurrentUser {
     id?: number;
     name: string;
     avatar: string;
+    coverImage?: string;
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
@@ -74,6 +75,7 @@ interface ProfileData {
     location: string;
     connections: number;
     bio: string;
+    coverImage?: string;
 }
 
 // --- URL HELPER ---
@@ -206,14 +208,19 @@ export default function HomePage() {
             const res = await fetch(`http://localhost:8080/api/users/${userId}`);
             if (!res.ok) throw new Error("Failed");
             const data: UserProfileDetailResponse = await res.json();
-            setCurrentUser((prev) => (prev ? { ...prev, avatar: getImageUrl(data.profileImageUrl) } : null));
+            setCurrentUser((prev) => (prev ? { 
+                ...prev, 
+                avatar: getImageUrl(data.profileImageUrl),
+                coverImage: getImageUrl(data.coverImageUrl)
+            } : null));
             setProfileData({
                 name: data.name,
                 email: data.email,
                 profession: data.profession,
                 location: data.location || "Not set",
                 connections: connections.length,
-                bio: data.aboutMe || "No bio yet."
+                bio: data.aboutMe || "No bio yet.",
+                coverImage: getImageUrl(data.coverImageUrl)
             });
             setBioText(data.aboutMe || "No bio yet.");
         } catch (error) { console.error(error); }
@@ -447,7 +454,11 @@ export default function HomePage() {
                     <div className="sticky top-24 space-y-6">
                         <FadeInUp>
                             <Card className="overflow-hidden border-border shadow-sm bg-card hover:shadow-md transition-all duration-200">
-                                <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/10"></div>
+                                <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/10 relative">
+                                    {profileData.coverImage && profileData.coverImage !== "/placeholder.svg" && (
+                                        <img src={profileData.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
                                 <CardContent className="relative pt-0 pb-6 px-6">
                                     <div className="flex flex-col items-center -mt-10 mb-4">
                                         <Avatar className="w-20 h-20 border-4 border-card shadow-sm">
