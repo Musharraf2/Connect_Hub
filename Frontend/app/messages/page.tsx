@@ -42,6 +42,7 @@ export default function MessagesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const stompClientRef = useRef<Client | null>(null);
+    const selectedUserRef = useRef<ChatUserResponse | null>(null);
 
     // Scroll to bottom of messages
     const scrollToBottom = () => {
@@ -51,6 +52,11 @@ export default function MessagesPage() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Update ref when selectedUser changes
+    useEffect(() => {
+        selectedUserRef.current = selectedUser;
+    }, [selectedUser]);
 
     // Initialize user and load data
     useEffect(() => {
@@ -130,13 +136,19 @@ export default function MessagesPage() {
                 // Check if this is a message the user is receiving (not sending)
                 const isReceivingMessage = receivedMessage.receiverId === userId;
 
+                // Use ref to get current selectedUser value
+                const currentSelectedUser = selectedUserRef.current;
+
                 // Update messages if the chat is currently open
                 if (
-                    selectedUser &&
-                    (receivedMessage.senderId === selectedUser.id ||
-                        receivedMessage.receiverId === selectedUser.id)
+                    currentSelectedUser &&
+                    (receivedMessage.senderId === currentSelectedUser.id ||
+                        receivedMessage.receiverId === currentSelectedUser.id)
                 ) {
                     setMessages((prev) => [...prev, receivedMessage]);
+                    
+                    // If the chat is open and we're receiving a message, don't increment unread count
+                    // The messages will be marked as read automatically
                 } else if (isReceivingMessage) {
                     // If chat is not open, increment total unread count
                     setCurrentUser((prev) => 
@@ -151,10 +163,12 @@ export default function MessagesPage() {
                 setChatUsers((prev) =>
                     prev.map((user) => {
                         if (user.id === receivedMessage.senderId) {
+                            // Only increment unread count if this chat is not currently open
+                            const shouldIncrementUnread = !currentSelectedUser || currentSelectedUser.id !== user.id;
                             return {
                                 ...user,
                                 lastMessage: receivedMessage.content,
-                                unreadCount: user.unreadCount + 1,
+                                unreadCount: shouldIncrementUnread ? user.unreadCount + 1 : user.unreadCount,
                             };
                         }
                         return user;
