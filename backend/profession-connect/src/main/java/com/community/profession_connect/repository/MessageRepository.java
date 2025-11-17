@@ -3,6 +3,7 @@ package com.community.profession_connect.repository;
 import com.community.profession_connect.model.Message;
 import com.community.profession_connect.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -27,6 +28,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     Message findLastMessageBetweenUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 
     // Mark messages as read
+    @Modifying
     @Query("UPDATE Message m SET m.isRead = true WHERE m.receiver.id = :receiverId AND m.sender.id = :senderId AND m.isRead = false")
     void markMessagesAsRead(@Param("receiverId") Long receiverId, @Param("senderId") Long senderId);
 }
