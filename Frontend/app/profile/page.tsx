@@ -10,6 +10,7 @@ import {
   getUserProfile,
   UserProfileResponse,
   getUnreadMessageCount,
+  getUnreadCount,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/header"
@@ -172,6 +173,7 @@ export default function ProfilePage() {
       try {
         const profile = await getUserProfile(sessionUser.id);
         const unreadCount = await getUnreadMessageCount(sessionUser.id);
+        const notificationCount = await getUnreadCount(sessionUser.id);
         
         const mergedUser = {
           ...profileMockData, 
@@ -198,6 +200,7 @@ export default function ProfilePage() {
           connections: profile.connectionsCount ?? 0,
           pendingRequests: profile.pendingRequestsCount ?? 0,
           unreadMessageCount: unreadCount,
+          unreadNotificationCount: notificationCount,
         };
 
         setCurrentUser(mergedUser);

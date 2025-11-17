@@ -20,10 +20,46 @@ import {
   UserPlus,
   MessageCircle,
   ArrowLeft,
-  Loader2
+  Loader2,
+  BookOpen,
+  Music,
+  Stethoscope,
+  Zap
 } from "lucide-react"
 import Link from "next/link"
-import { FadeInUp, PageTransition } from "@/components/animations"
+import { FadeInUp, StaggerContainer, StaggerItem, PageTransition } from "@/components/animations"
+
+// --- THEME CONFIG (matching main profile page) ---
+const communityIcons = {
+  student: BookOpen,
+  teacher: Users,
+  musician: Music,
+  doctor: Stethoscope,
+  dancer: Zap,
+}
+
+const communityThemes = {
+  student: { 
+    badge: "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
+    icon: "text-blue-600 dark:text-blue-400"
+  },
+  teacher: { 
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
+    icon: "text-emerald-600 dark:text-emerald-400"
+  },
+  musician: { 
+    badge: "bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800",
+    icon: "text-purple-600 dark:text-purple-400"
+  },
+  doctor: { 
+    badge: "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800",
+    icon: "text-red-600 dark:text-red-400"
+  },
+  dancer: { 
+    badge: "bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800",
+    icon: "text-pink-600 dark:text-pink-400"
+  },
+}
 
 type UserProfile = {
   id: number
@@ -184,18 +220,28 @@ export default function UserProfilePage() {
                 )}
               </div>
 
-              {/* Profile Info */}
+              {/* Profile Info Overlay */}
               <div className="px-6 relative -mt-20">
                 <div className="flex flex-col md:flex-row items-end gap-6">
+                  
+                  {/* BIG AVATAR */}
                   <div className="relative group">
                     <div className="rounded-full bg-white dark:bg-card p-1.5 shadow-sm">
                       <Avatar className="w-48 h-48 border-2 border-gray-100 dark:border-border shadow-inner">
-                        <AvatarImage src={profileUser.avatar} />
-                        <AvatarFallback className="text-5xl bg-gray-100 dark:bg-muted">{profileUser.name.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={profileUser.avatar} alt={profileUser.name} className="object-cover"/>
+                        <AvatarFallback className="text-5xl bg-gray-50 dark:bg-muted text-gray-300 dark:text-muted-foreground">{profileUser.name.charAt(0)}</AvatarFallback>
                       </Avatar>
+                    </div>
+                    {/* Community Badge */}
+                    <div className={`absolute bottom-4 right-4 p-2.5 rounded-full bg-white dark:bg-card shadow-md border border-gray-100 dark:border-border ${(communityThemes as any)[profileUser.community.toLowerCase()]?.icon || communityThemes.student.icon}`}>
+                      {(() => {
+                        const CommunityIcon = (communityIcons as any)[profileUser.community.toLowerCase()] || communityIcons.student;
+                        return <CommunityIcon className="w-5 h-5" />;
+                      })()}
                     </div>
                   </div>
 
+                  {/* Text Info */}
                   <div className="flex-1 pb-2 w-full md:w-auto text-center md:text-left">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
@@ -236,18 +282,21 @@ export default function UserProfilePage() {
             </div>
           </FadeInUp>
 
-          {/* Content Grid */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Left Column */}
-            <div className="md:col-span-1 space-y-6">
-              {/* About */}
+          {/* --- MAIN CONTENT GRID --- */}
+          <div className="grid lg:grid-cols-3 gap-8">
+            
+            {/* Left Sidebar */}
+            <aside className="space-y-6 lg:col-span-1">
+              {/* About / Bio */}
               <FadeInUp delay={0.1}>
                 <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
                   <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
                     <CardTitle className="text-lg font-semibold text-foreground">About</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4">
-                    <p className="text-sm text-muted-foreground leading-relaxed">{profileUser.bio}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {profileUser.bio}
+                    </p>
                   </CardContent>
                 </Card>
               </FadeInUp>
@@ -256,14 +305,14 @@ export default function UserProfilePage() {
               <FadeInUp delay={0.2}>
                 <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
                   <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
-                    <CardTitle className="text-lg font-semibold text-foreground">Contact</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-foreground">Contact Info</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
+                  <CardContent className="pt-4 space-y-4">
                     <div className="flex items-center gap-3 text-sm">
                       <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
                         <Mail className="w-4 h-4" />
                       </div>
-                      <span className="text-muted-foreground break-all">{profileUser.email}</span>
+                      <span className="text-muted-foreground truncate">{profileUser.email}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
@@ -274,10 +323,7 @@ export default function UserProfilePage() {
                   </CardContent>
                 </Card>
               </FadeInUp>
-            </div>
 
-            {/* Right Column */}
-            <div className="md:col-span-2 space-y-6">
               {/* Skills */}
               <FadeInUp delay={0.3}>
                 <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
@@ -295,80 +341,80 @@ export default function UserProfilePage() {
                   </CardContent>
                 </Card>
               </FadeInUp>
+            </aside>
 
-              {/* Interests */}
-              <FadeInUp delay={0.4}>
-                <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                  <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
-                    <CardTitle className="text-lg font-semibold text-foreground">Interests</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="flex flex-wrap gap-2">
-                      {profileUser.interests.map((interest, i) => (
-                        <Badge key={i} variant="outline" className="border-gray-200 dark:border-border text-foreground hover:bg-gray-50 dark:hover:bg-muted font-normal px-3 py-1">
-                          {interest}
-                        </Badge>
+            {/* Right Content */}
+            <section className="lg:col-span-2 space-y-8">
+              <FadeInUp delay={0.2}>
+                <div className="w-full space-y-8">
+                  {/* Education Grid */}
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: "University", value: profileUser.university, icon: GraduationCap },
+                        { label: "Major", value: profileUser.major, icon: BookOpen },
+                        { label: "Year", value: profileUser.year, icon: Calendar },
+                        { label: "GPA", value: profileUser.gpa, icon: Award },
+                      ].map((stat, i) => (
+                        <Card key={i} className="border border-gray-100 dark:border-border bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
+                          <CardContent className="p-5 flex flex-col items-center text-center gap-3">
+                            <div className="p-2 rounded-full bg-gray-50 dark:bg-muted text-muted-foreground">
+                              <stat.icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">{stat.label}</div>
+                              <div className="font-bold text-foreground text-sm mt-1 line-clamp-2">{stat.value}</div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-              </FadeInUp>
+                  </div>
 
-              {/* Achievements */}
-              {profileUser.achievements && profileUser.achievements.length > 0 && (
-                <FadeInUp delay={0.5}>
+                  {/* Achievements */}
+                  {profileUser.achievements && profileUser.achievements.length > 0 && (
+                    <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                      <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
+                        <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+                          <Award className="w-5 h-5 text-yellow-500" /> 
+                          Achievements & Certifications
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <StaggerContainer stagger={0.1} className="grid gap-3">
+                          {profileUser.achievements.map((achievement, index) => (
+                            <StaggerItem key={index}>
+                              <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50 dark:bg-muted/20 border border-gray-100/50 dark:border-border/40">
+                                <div className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                                <span className="text-sm font-medium text-foreground">{achievement}</span>
+                              </div>
+                            </StaggerItem>
+                          ))}
+                        </StaggerContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Interests - keeping this as it's useful info */}
                   <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
                     <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
-                      <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <Award className="w-5 h-5 text-yellow-500" />
-                        Achievements
-                      </CardTitle>
+                      <CardTitle className="text-lg font-semibold text-foreground">Interests</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4">
                       <div className="flex flex-wrap gap-2">
-                        {profileUser.achievements.map((achievement, i) => (
-                          <Badge key={i} className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 font-normal px-3 py-1">
-                            {achievement}
+                        {profileUser.interests.map((interest, i) => (
+                          <Badge key={i} variant="outline" className="border-gray-200 dark:border-border text-foreground hover:bg-gray-50 dark:hover:bg-muted font-normal px-3 py-1">
+                            {interest}
                           </Badge>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
-                </FadeInUp>
-              )}
-
-              {/* Education */}
-              <FadeInUp delay={0.6}>
-                <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                  <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
-                    <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <GraduationCap className="w-5 h-5" />
-                      Education
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">University</p>
-                        <p className="text-sm font-medium text-foreground">{profileUser.university}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Major</p>
-                        <p className="text-sm font-medium text-foreground">{profileUser.major}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Year</p>
-                        <p className="text-sm font-medium text-foreground">{profileUser.year}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">GPA</p>
-                        <p className="text-sm font-medium text-foreground">{profileUser.gpa}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                </div>
               </FadeInUp>
-            </div>
+            </section>
+
           </div>
         </main>
       </div>

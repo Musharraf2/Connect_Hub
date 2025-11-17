@@ -37,7 +37,8 @@ import {
   getUserProfile,
   getAcceptedConnections,
   getUsersByProfession,
-  getUnreadMessageCount
+  getUnreadMessageCount,
+  getUnreadCount
 } from "@/lib/api"
 
 // --- LOCAL TYPE EXTENSIONS ---
@@ -59,6 +60,7 @@ interface CurrentUser {
     community: string;
     pendingRequests?: number;
     unreadMessageCount?: number;
+    unreadNotificationCount?: number;
 }
 
 interface ProfileData {
@@ -134,7 +136,8 @@ export default function DashboardPage() {
             fetchSentPendingRequests(userId),
             fetchAcceptedConnections(userId),
             fetchUsersByProfession(userProfession),
-            fetchUnreadMessageCount(userId)
+            fetchUnreadMessageCount(userId),
+            fetchUnreadNotificationCount(userId)
           ]);
           
         } catch (err) {
@@ -201,6 +204,15 @@ export default function DashboardPage() {
     try {
       const count = await getUnreadMessageCount(userId);
       setCurrentUser((prev) => (prev ? { ...prev, unreadMessageCount: count } : null));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchUnreadNotificationCount = async (userId: number) => {
+    try {
+      const count = await getUnreadCount(userId);
+      setCurrentUser((prev) => (prev ? { ...prev, unreadNotificationCount: count } : null));
     } catch (e) {
       console.error(e);
     }
