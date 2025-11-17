@@ -19,18 +19,21 @@ public class UserProfileDetailResponse {
     private String location;
     private String aboutMe;
     private String profileImageUrl;
+    private String coverImageUrl;
+    private String phoneNumber;
 
     // Related Data
     private AcademicInfo academicInfo;
     private List<Skill> skills;
     private List<Interest> interests;
+    private List<String> achievements;
 
     // --- ADD THESE NEW FIELDS ---
     private int connectionsCount;
     private int pendingRequestsCount;
 
     // Helper method to build this DTO
-    public static UserProfileDetailResponse from(User user, AcademicInfo academicInfo, List<Skill> skills, List<Interest> interests, int connectionsCount, int pendingRequestsCount) { // <-- 1. ADD ARGS
+    public static UserProfileDetailResponse from(User user, AcademicInfo academicInfo, List<Skill> skills, List<Interest> interests, List<String> achievements, int connectionsCount, int pendingRequestsCount) {
         UserProfileDetailResponse dto = new UserProfileDetailResponse();
 
         dto.setId(user.getId());
@@ -40,10 +43,13 @@ public class UserProfileDetailResponse {
         dto.setLocation(user.getLocation());
         dto.setAboutMe(user.getAboutMe());
         dto.setProfileImageUrl(user.getProfileImageUrl());
+        dto.setCoverImageUrl(user.getCoverImageUrl());
+        dto.setPhoneNumber(user.getPhoneNumber());
 
         dto.setAcademicInfo(academicInfo);
         dto.setSkills(skills);
         dto.setInterests(interests);
+        dto.setAchievements(achievements);
 
         // --- 2. SET NEW FIELDS ---
         dto.setConnectionsCount(connectionsCount);
