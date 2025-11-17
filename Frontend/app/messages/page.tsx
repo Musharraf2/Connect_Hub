@@ -165,7 +165,7 @@ export default function MessagesPage() {
             
             if (convos.length === 0) {
                 console.warn('[Messages] No conversations found. User may have no connections.');
-                toast.info("No conversations yet. Connect with others on the Dashboard to start messaging.");
+                toast("No conversations yet. Connect with others on the Dashboard to start messaging.");
             }
         } catch (error) {
             console.error("[Messages] Failed to load conversations:", error);
