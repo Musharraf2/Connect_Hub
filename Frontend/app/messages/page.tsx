@@ -54,36 +54,46 @@ export default function MessagesPage() {
 
     // Initialize user and load data
     useEffect(() => {
-        const userDataString = sessionStorage.getItem("user");
+        let cleanupFn: (() => void) | undefined;
 
-        if (!userDataString) {
-            toast.error("Please log in.");
-            router.push("/login");
-            return;
-        }
+        const init = async () => {
+            const userDataString = sessionStorage.getItem("user");
 
-        try {
-            const user: LoginResponse = JSON.parse(userDataString);
-            
-            // Fetch unread count initially
-            const unreadCount = await getUnreadMessageCount(user.id);
-            
-            setCurrentUser({
-                id: user.id,
-                name: user.name,
-                community: user.profession,
-                avatar: "/placeholder.svg",
-                unreadMessages: unreadCount,
-            });
+            if (!userDataString) {
+                toast.error("Please log in.");
+                router.push("/login");
+                return;
+            }
 
-            loadChatUsers(user.id);
-            setupWebSocket(user.id);
-        } catch (error) {
-            console.error("Failed to parse user data:", error);
-            sessionStorage.removeItem("user");
-            toast.error("Session invalid. Please log in again.");
-            router.push("/login");
-        }
+            try {
+                const user: LoginResponse = JSON.parse(userDataString);
+
+                // Fetch unread count initially
+                const unreadCount = await getUnreadMessageCount(user.id);
+
+                setCurrentUser({
+                    id: user.id,
+                    name: user.name,
+                    community: user.profession,
+                    avatar: "/placeholder.svg",
+                    unreadMessages: unreadCount,
+                });
+
+                loadChatUsers(user.id);
+                cleanupFn = setupWebSocket(user.id);
+            } catch (error) {
+                console.error("Failed to parse user data:", error);
+                sessionStorage.removeItem("user");
+                toast.error("Session invalid. Please log in again.");
+                router.push("/login");
+            }
+        };
+
+        init();
+
+        return () => {
+            if (cleanupFn) cleanupFn();
+        };
     }, [router]);
 
     // Load chat users (connections)
