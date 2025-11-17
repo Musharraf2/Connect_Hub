@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 
-// Icons
+// Iconss
 import { 
     UserPlus, MapPin, Edit3, Save, X, Heart, MessageSquare, 
     Trash2, Image as ImageIcon, Smile, Send, Loader2
