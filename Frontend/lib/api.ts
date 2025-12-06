@@ -123,6 +123,25 @@ export interface CommentResponse {
     createdAt: string;
 }
 
+export interface CommentResponse {
+    id: number;
+    content: string;
+    user: {
+        id: number;
+        name: string;
+        profileImageUrl?: string;
+    };
+    createdAt: string;
+}
+
+// 🔵 AI note DTO (what backend sends)
+export interface AiNoteDTO {
+    noteText: string;
+    category: string;
+    autoDeleted: boolean;
+    createdAt: string;
+}
+
 export interface PostResponse {
     id: number;
     content: string;
@@ -140,7 +159,12 @@ export interface PostResponse {
     likedByCurrentUser: boolean;
     comments: CommentResponse[];
     imageUrl?: string | null;
+
+    // 🔥 NEW FIELDS for AI moderation / Grok notes
+    deleted?: boolean;        // true when AI marked post as harmful
+    aiNotes?: AiNoteDTO[];    // list of AI notes to show under the post
 }
+
 
 export interface NotificationDTO {
     id: number;

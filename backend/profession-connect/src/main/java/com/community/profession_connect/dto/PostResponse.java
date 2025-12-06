@@ -3,6 +3,7 @@ package com.community.profession_connect.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,7 +20,11 @@ public class PostResponse {
     private Integer commentsCount;
     private boolean likedByCurrentUser;
     private List<CommentResponse> comments;
-    private String imageUrl; // Add image URL field
+    private String imageUrl;
+
+    // 🔥 AI moderation fields
+    private boolean deleted;             // soft delete by AI
+    private List<AiNoteDTO> aiNotes;     // AI notes list
 
     @Data
     @NoArgsConstructor

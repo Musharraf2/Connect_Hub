@@ -1,14 +1,17 @@
 // /backend/profession-connect/src/main/java/com/community/profession_connect/service/PostService.java
 package com.community.profession_connect.service;
 
+import com.community.profession_connect.dto.AiNoteDTO;
 import com.community.profession_connect.dto.CommentRequest;
 import com.community.profession_connect.dto.CommentResponse;
 import com.community.profession_connect.dto.PostRequest;
 import com.community.profession_connect.dto.PostResponse;
+import com.community.profession_connect.model.AiNote;
 import com.community.profession_connect.model.Comment;
 import com.community.profession_connect.model.Post;
 import com.community.profession_connect.model.PostLike;
 import com.community.profession_connect.model.User;
+import com.community.profession_connect.repository.AiNoteRepository;
 import com.community.profession_connect.repository.CommentRepository;
 import com.community.profession_connect.repository.PostLikeRepository;
 import com.community.profession_connect.repository.PostRepository;
@@ -25,6 +28,12 @@ import java.util.stream.Collectors;
 public class PostService {
 
     @Autowired
+    private AiNoteService aiNoteService;
+
+    @Autowired
+    private AiNoteRepository aiNoteRepository;
+
+    @Autowired
     private PostRepository postRepository;
 
     @Autowired
@@ -36,9 +45,10 @@ public class PostService {
     @Autowired
     private PostLikeRepository postLikeRepository;
 
-    // ADD THIS: Inject NotificationService
     @Autowired
     private NotificationService notificationService;
+
+    // ------------------- CREATE POST -------------------
 
     public PostResponse createPost(PostRequest request) {
         Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
@@ -51,17 +61,38 @@ public class PostService {
         post.setUser(user);
         post.setProfession(user.getProfession());
 
+        // 1) Save post first
         post = postRepository.save(post);
 
+        // Make final copy for thread
+// NEW: pass only the ID to the background thread
+        final Long savedPostId = post.getId();
+
+        new Thread(() -> {
+            try {
+                aiNoteService.analyzePost(savedPostId);
+            } catch (Exception e) {
+                System.out.println("[AI] Note Generation Failed: " + e.getMessage());
+            }
+        }).start();
+
+
+        // 3) Return to frontend
         return convertToPostResponse(post, userId);
     }
 
+    // ------------------- FETCH POSTS -------------------
+
     public List<PostResponse> getPostsByProfession(String profession, Long currentUserId) {
-        List<Post> posts = postRepository.findByProfessionOrderByCreatedAtDesc(profession);
+        List<Post> posts = postRepository
+                .findByProfessionAndDeletedFalseOrderByCreatedAtDesc(profession);  // 👈 only visible posts
         return posts.stream()
                 .map(post -> convertToPostResponse(post, currentUserId))
                 .collect(Collectors.toList());
     }
+
+
+    // ------------------- DELETE POST -------------------
 
     @Transactional
     public String deletePost(Long postId, Long userId) {
@@ -78,6 +109,8 @@ public class PostService {
         postRepository.delete(post);
         return "Post deleted successfully";
     }
+
+    // ------------------- LIKE / UNLIKE -------------------
 
     @Transactional
     public PostResponse toggleLike(Long postId, Long userId) {
@@ -118,6 +151,8 @@ public class PostService {
         return convertToPostResponse(post, userId);
     }
 
+    // ------------------- ADD COMMENT -------------------
+
     public PostResponse addComment(CommentRequest request) {
         Long postId = Objects.requireNonNull(request.getPostId(), "Post ID must not be null");
         Long userId = Objects.requireNonNull(request.getUserId(), "User ID must not be null");
@@ -147,6 +182,8 @@ public class PostService {
         return convertToPostResponse(post, userId);
     }
 
+    // ------------------- GET COMMENTS -------------------
+
     public List<CommentResponse> getCommentsByPostId(Long postId) {
         Objects.requireNonNull(postId, "Post ID must not be null");
 
@@ -156,6 +193,8 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
+    // ------------------- MAPPING: Post -> PostResponse -------------------
+
     private PostResponse convertToPostResponse(Post post, Long currentUserId) {
         PostResponse response = new PostResponse();
         response.setId(post.getId());
@@ -164,6 +203,9 @@ public class PostService {
         response.setCreatedAt(post.getCreatedAt());
         response.setLikesCount(post.getLikesCount());
         response.setImageUrl(post.getImageUrl());
+
+        // 🔥 AI moderation flag (soft delete)
+        response.setDeleted(post.isDeleted());
 
         // User info
         PostResponse.UserInfo userInfo = new PostResponse.UserInfo();
@@ -185,8 +227,25 @@ public class PostService {
                 .map(this::convertToCommentResponse)
                 .collect(Collectors.toList()));
 
+// AI Notes mapping
+        List<AiNote> notes = aiNoteRepository.findByPostId(post.getId());
+        response.setAiNotes(
+                notes.stream()
+                        .map(n -> new AiNoteDTO(
+                                n.getNoteText(),      // FIXED
+                                n.getCategory(),
+                                n.isAutoDelete(),
+                                n.getCreatedAt() != null ? n.getCreatedAt().toString() : ""
+                        ))
+                        .collect(Collectors.toList())
+        );
+
+
+
         return response;
     }
+
+    // ------------------- UPDATE IMAGE -------------------
 
     public void updatePostImage(Long postId, String imageUrl) {
         Objects.requireNonNull(postId, "Post ID must not be null");
@@ -197,6 +256,8 @@ public class PostService {
         post.setImageUrl(imageUrl);
         postRepository.save(post);
     }
+
+    // ------------------- MAPPING: Comment -> CommentResponse -------------------
 
     private CommentResponse convertToCommentResponse(Comment comment) {
         CommentResponse response = new CommentResponse();
