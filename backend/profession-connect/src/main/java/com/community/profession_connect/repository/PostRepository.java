@@ -5,5 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
-    List<Post> findByProfessionOrderByCreatedAtDesc(String profession);
+
+    // Only posts that are NOT soft-deleted
+    List<Post> findByProfessionAndDeletedFalseOrderByCreatedAtDesc(String profession);
+
 }
+

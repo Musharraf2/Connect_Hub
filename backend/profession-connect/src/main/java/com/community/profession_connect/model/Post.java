@@ -1,9 +1,9 @@
 package com.community.profession_connect.model;
 
 import jakarta.persistence.*;
-import lombok.*; // Make sure ToString.Exclude and EqualsAndHashCode.Exclude are imported
+import lombok.*;
 import java.time.LocalDateTime;
-import java.util.List; // ❗️ Import List
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -28,40 +28,41 @@ public class Post {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "likes_count")
     private Integer likesCount = 0;
-    
-    private String imageUrl; // URL/path to the post image
 
-    // ⬇️ --- ADD THIS SECTION --- ⬇️
+    private String imageUrl;
+
+    // ---------------- AI SYSTEM FIELDS ----------------
 
     /**
-     * This defines the relationship to the PostLike entity.
-     * cascade = CascadeType.REMOVE: When a Post is deleted, delete all its associated likes.
-     * orphanRemoval = true: Cleans up any likes that are no longer referenced by this post.
+     * When AI marks a post harmful (sexual, hate etc.)
+     * it gets auto-deleted (soft delete)
      */
+    private boolean deleted = false;  // <--- IMPORTANT!
+
+    /**
+     * AI-generated notes (similar to Twitter Grok Notes)
+     */
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<AiNote> aiNotes;
+
+    // ---------------------------------------------------
+
     @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE, orphanRemoval = true)
-    @ToString.Exclude // Prevents infinite loops in Lombok's toString()
-    @EqualsAndHashCode.Exclude // Prevents infinite loops in Lombok's equals/hashCode()
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<PostLike> likes;
 
-    /**
-     * This defines the relationship to the Comment entity.
-     * cascade = CascadeType.REMOVE: When a Post is deleted, delete all its associated comments.
-     */
     @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<Comment> comments;
 
-    // ⬆️ --- END OF ADDED SECTION --- ⬆️
-
-
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        if (likesCount == null) {
-            likesCount = 0;
-        }
+        if (likesCount == null) likesCount = 0;
     }
 }
