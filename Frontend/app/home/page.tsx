@@ -19,7 +19,6 @@ import {
   Trash2,
   Image as ImageIcon,
   Smile,
-  Send,
   Loader2,
 } from "lucide-react";
 
@@ -44,6 +43,7 @@ import {
   ProfileCardSkeleton,
   SuggestionSkeleton,
 } from "@/components/loading-skeletons";
+import { SharePostDialog } from "@/components/share-post-dialog";
 
 // API Imports
 import {
@@ -844,14 +844,10 @@ const handleWebSocketMessage = useCallback(
                               {post.commentsCount || "Comment"}
                             </span>
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-2 text-muted-foreground hover:bg-muted transition-all active:scale-95"
-                          >
-                            <Send className="w-4 h-4" />
-                            <span className="text-xs font-medium">Share</span>
-                          </Button>
+                          <SharePostDialog
+                            postId={post.id}
+                            currentUserId={currentUser.id!}
+                          />
                         </div>
 
                         {post.comments.length > 0 && (
