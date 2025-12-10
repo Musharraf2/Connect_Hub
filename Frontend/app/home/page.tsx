@@ -847,6 +847,7 @@ const handleWebSocketMessage = useCallback(
                           <SharePostDialog
                             postId={post.id}
                             currentUserId={currentUser.id!}
+                            postData={post}
                           />
                         </div>
 

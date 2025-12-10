@@ -19,11 +19,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { getAcceptedConnections, sendMessage, Connection } from "@/lib/api";
+import { getAcceptedConnections, sendMessage, Connection, PostResponse } from "@/lib/api";
 
 interface SharePostDialogProps {
   postId: number;
   currentUserId: number;
+  postData: PostResponse;
   variant?: "ghost" | "default" | "outline";
   size?: "sm" | "default" | "lg" | "icon";
   className?: string;
@@ -38,6 +39,7 @@ const getImageUrl = (url: string | null | undefined) => {
 export function SharePostDialog({
   postId,
   currentUserId,
+  postData,
   variant = "ghost",
   size = "sm",
   className = "",
@@ -105,10 +107,30 @@ export function SharePostDialog({
         ? selectedConnection.receiver 
         : selectedConnection.requester;
 
+      // Format the post content like an embedded post
+      const postAuthor = postData.user.name;
+      const postContent = postData.content;
+      const postLikes = postData.likesCount;
+      const postComments = postData.commentsCount;
+      
+      // Create a rich message with post details
+      let richMessage = `📤 Shared a post by ${postAuthor}\n`;
+      richMessage += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      richMessage += `${postContent}\n\n`;
+      
+      if (postData.imageUrl) {
+        richMessage += `📷 [Image attached]\n\n`;
+      }
+      
+      richMessage += `❤️ ${postLikes} ${postLikes === 1 ? 'like' : 'likes'} • `;
+      richMessage += `💬 ${postComments} ${postComments === 1 ? 'comment' : 'comments'}\n\n`;
+      richMessage += `━━━━━━━━━━━━━━━━━━━━\n`;
+      richMessage += `🔗 View full post: ${postUrl}`;
+
       await sendMessage({
         senderId: currentUserId,
         receiverId: otherUser.id,
-        content: `Check out this post: ${postUrl}`,
+        content: richMessage,
       });
 
       toast.success(`Shared with ${otherUser.name}`);
