@@ -7,7 +7,7 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Circle } from "lucide-react";
+import { Send, Search, Circle, Trash2, Check, CheckCheck } from "lucide-react";
 
 // Components
 //le kar dia
@@ -16,6 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Header } from "@/components/header";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 // API
 import {
@@ -23,6 +31,7 @@ import {
     getConversation,
     sendMessage,
     markMessagesAsRead,
+    deleteMessage,
     ConversationResponse,
     MessageResponse,
     LoginResponse,
@@ -42,6 +51,20 @@ const getImageUrl = (url: string | null | undefined) => {
     return `http://localhost:8080${url}`;
 };
 
+// Helper function to parse message content and extract image URLs
+const parseMessageContent = (content: string): { text: string; imageUrl: string | null } => {
+    const imageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
+    const match = content.match(imageRegex);
+    
+    if (match) {
+        const imageUrl = match[1];
+        const text = content.replace(imageRegex, '').trim();
+        return { text, imageUrl };
+    }
+    
+    return { text: content, imageUrl: null };
+};
+
 export default function MessagesPage() {
     const router = useRouter();
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -55,6 +78,8 @@ export default function MessagesPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const selectedConversationRef = useRef<ConversationResponse | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
 
     // Scroll to bottom of messages
     const scrollToBottom = () => {
@@ -131,8 +156,44 @@ export default function MessagesPage() {
             });
 
             // Subscribe to read receipts
-            client.subscribe(`/queue/read/${currentUser.id}`, () => {
+            client.subscribe(`/queue/read/${currentUser.id}`, (message) => {
+                const otherUserId = parseInt(message.body);
+                console.log("[WebSocket] Messages read by user:", otherUserId);
+                
+                // Update messages to mark as read
+                setMessages((prev) =>
+                    prev.map((msg) =>
+                        msg.senderId === currentUser.id && msg.receiverId === otherUserId
+                            ? { ...msg, isRead: true }
+                            : msg
+                    )
+                );
+                
                 // Reload conversations to update unread counts
+                loadConversations(currentUser.id!);
+            });
+
+            // Subscribe to message deletion events
+            client.subscribe(`/queue/delete/${currentUser.id}`, (message) => {
+                const deletedMessageId = parseInt(message.body);
+                console.log("[WebSocket] Message deleted, ID:", deletedMessageId);
+                console.log("[WebSocket] Current messages count before delete:", messages.length);
+                
+                // Remove message from local state
+                setMessages((prev) => {
+                    const filtered = prev.filter((msg) => msg.id !== deletedMessageId);
+                    console.log("[WebSocket] Messages count after filter:", filtered.length);
+                    return filtered;
+                });
+                
+                // Reload conversations to update last message
+                loadConversations(currentUser.id!);
+            });
+
+            // Subscribe to online status updates
+            client.subscribe(`/topic/online-status`, (message) => {
+                console.log("[WebSocket] Online status update:", message.body);
+                // Reload conversations to update online status
                 loadConversations(currentUser.id!);
             });
         };
@@ -217,6 +278,34 @@ export default function MessagesPage() {
         } catch (error) {
             console.error("[Send] Failed to send message:", error);
             toast.error("Failed to send message");
+        }
+    };
+
+    const handleDeleteMessage = async (messageId: number) => {
+        setMessageToDelete(messageId);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteMessage = async () => {
+        if (!messageToDelete || !currentUser?.id) return;
+
+        try {
+            await deleteMessage(messageToDelete, currentUser.id);
+            
+            // Remove message from local state
+            setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
+            
+            // Reload conversations to update last message
+            if (selectedConversation) {
+                loadConversations(currentUser.id);
+            }
+            
+            setDeleteDialogOpen(false);
+            setMessageToDelete(null);
+            toast.success("Message deleted");
+        } catch (error) {
+            console.error("Failed to delete message:", error);
+            toast.error("Failed to delete message");
         }
     };
 
@@ -381,30 +470,67 @@ export default function MessagesPage() {
                                     <div className="space-y-4">
                                         {messages.map((message) => {
                                             const isSent = message.senderId === currentUser.id;
+                                            const { text, imageUrl } = parseMessageContent(message.content);
+                                            
                                             return (
                                                 <div
                                                     key={message.id}
-                                                    className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+                                                    className={`flex ${isSent ? "justify-end" : "justify-start"} group`}
                                                 >
                                                     <div
-                                                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                                                        className={`max-w-[70%] rounded-lg px-4 py-2 relative ${
                                                             isSent
                                                                 ? "bg-primary text-primary-foreground"
                                                                 : "bg-muted"
                                                         }`}
                                                     >
+                                                        {/* Delete button for sent messages */}
+                                                        {isSent && (
+                                                            <button
+                                                                onClick={() => handleDeleteMessage(message.id)}
+                                                                className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                                title="Delete message"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                                                            </button>
+                                                        )}
+                                                        
                                                         <p className="text-sm whitespace-pre-wrap break-words">
-                                                            {message.content}
+                                                            {text}
                                                         </p>
-                                                        <p
-                                                            className={`text-xs mt-1 ${
-                                                                isSent
-                                                                    ? "text-primary-foreground/70"
-                                                                    : "text-muted-foreground"
-                                                            }`}
-                                                        >
-                                                            {formatMessageTime(message.timestamp)}
-                                                        </p>
+                                                        {imageUrl && (
+                                                            <div className="mt-2 rounded-md overflow-hidden border border-border">
+                                                                <img 
+                                                                    src={imageUrl} 
+                                                                    alt="Shared post" 
+                                                                    className="w-full max-w-xs object-cover"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center justify-between mt-1 gap-2">
+                                                            <p
+                                                                className={`text-xs ${
+                                                                    isSent
+                                                                        ? "text-primary-foreground/70"
+                                                                        : "text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                {formatMessageTime(message.timestamp)}
+                                                            </p>
+                                                            {/* Read indicator for sent messages */}
+                                                            {isSent && (
+                                                                <div className="flex items-center">
+                                                                    {message.isRead ? (
+                                                                        <CheckCheck className="w-3 h-3 text-blue-500" title="Seen" />
+                                                                    ) : (
+                                                                        <Check className="w-3 h-3 text-primary-foreground/50" title="Sent" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
@@ -446,6 +572,33 @@ export default function MessagesPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent className="sm:max-w-md bg-card border-border">
+                    <DialogHeader>
+                        <DialogTitle className="text-card-foreground">Delete Message?</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete this message? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex gap-2 sm:justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDeleteDialogOpen(false);
+                                setMessageToDelete(null);
+                            }}
+                            className="text-foreground border-border"
+                        >
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDeleteMessage}>
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

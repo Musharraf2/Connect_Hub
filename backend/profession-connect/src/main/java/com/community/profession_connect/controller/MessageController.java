@@ -85,4 +85,18 @@ public class MessageController {
         Long count = messageService.getUnreadMessageCount(userId);
         return ResponseEntity.ok(count);
     }
+
+    // Delete a message
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<String> deleteMessage(
+            @PathVariable Long messageId,
+            @RequestParam Long userId) {
+        Long receiverId = messageService.deleteMessage(messageId, userId);
+        
+        // Notify both sender and receiver via WebSocket
+        messagingTemplate.convertAndSend("/queue/delete/" + userId, messageId);
+        messagingTemplate.convertAndSend("/queue/delete/" + receiverId, messageId);
+        
+        return ResponseEntity.ok("Message deleted successfully");
+    }
 }
