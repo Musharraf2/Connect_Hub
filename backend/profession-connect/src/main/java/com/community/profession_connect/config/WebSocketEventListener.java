@@ -3,6 +3,7 @@ package com.community.profession_connect.config;
 import com.community.profession_connect.service.OnlineUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
@@ -16,6 +17,9 @@ public class WebSocketEventListener {
     @Autowired
     private OnlineUserService onlineUserService;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
@@ -24,6 +28,9 @@ public class WebSocketEventListener {
         if (sessionAttributes != null && sessionAttributes.containsKey("userId")) {
             Long userId = (Long) sessionAttributes.get("userId");
             onlineUserService.userConnected(userId);
+            
+            // Broadcast online status change
+            messagingTemplate.convertAndSend("/topic/online-status", "User " + userId + " is now online");
         }
     }
 
@@ -35,6 +42,9 @@ public class WebSocketEventListener {
         if (sessionAttributes != null && sessionAttributes.containsKey("userId")) {
             Long userId = (Long) sessionAttributes.get("userId");
             onlineUserService.userDisconnected(userId);
+            
+            // Broadcast offline status change
+            messagingTemplate.convertAndSend("/topic/online-status", "User " + userId + " is now offline");
         }
     }
 }

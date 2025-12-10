@@ -176,12 +176,24 @@ export default function MessagesPage() {
             // Subscribe to message deletion events
             client.subscribe(`/queue/delete/${currentUser.id}`, (message) => {
                 const deletedMessageId = parseInt(message.body);
-                console.log("[WebSocket] Message deleted:", deletedMessageId);
+                console.log("[WebSocket] Message deleted, ID:", deletedMessageId);
+                console.log("[WebSocket] Current messages count before delete:", messages.length);
                 
                 // Remove message from local state
-                setMessages((prev) => prev.filter((msg) => msg.id !== deletedMessageId));
+                setMessages((prev) => {
+                    const filtered = prev.filter((msg) => msg.id !== deletedMessageId);
+                    console.log("[WebSocket] Messages count after filter:", filtered.length);
+                    return filtered;
+                });
                 
                 // Reload conversations to update last message
+                loadConversations(currentUser.id!);
+            });
+
+            // Subscribe to online status updates
+            client.subscribe(`/topic/online-status`, (message) => {
+                console.log("[WebSocket] Online status update:", message.body);
+                // Reload conversations to update online status
                 loadConversations(currentUser.id!);
             });
         };
