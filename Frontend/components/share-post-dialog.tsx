@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Share2, Copy, MessageCircle, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -49,11 +49,25 @@ export function SharePostDialog({
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [isSending, setIsSending] = useState(false);
 
+  // Generate post URL once
+  const postUrl = `${window.location.origin}/post/${postId}`;
+
+  const fetchConnections = useCallback(async () => {
+    try {
+      const conns = await getAcceptedConnections(currentUserId);
+      setConnections(conns);
+      setFilteredConnections(conns);
+    } catch (error) {
+      console.error("Failed to fetch connections:", error);
+      toast.error("Failed to load connections");
+    }
+  }, [currentUserId]);
+
   useEffect(() => {
     if (isShareDialogOpen) {
       fetchConnections();
     }
-  }, [isShareDialogOpen]);
+  }, [isShareDialogOpen, fetchConnections]);
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -69,21 +83,14 @@ export function SharePostDialog({
     }
   }, [searchQuery, connections, currentUserId]);
 
-  const fetchConnections = async () => {
+  const handleCopyLink = async () => {
     try {
-      const conns = await getAcceptedConnections(currentUserId);
-      setConnections(conns);
-      setFilteredConnections(conns);
+      await navigator.clipboard.writeText(postUrl);
+      toast.success("Link copied to clipboard");
     } catch (error) {
-      console.error("Failed to fetch connections:", error);
-      toast.error("Failed to load connections");
+      console.error("Failed to copy to clipboard:", error);
+      toast.error("Failed to copy link");
     }
-  };
-
-  const handleCopyLink = () => {
-    const postUrl = `${window.location.origin}/post/${postId}`;
-    navigator.clipboard.writeText(postUrl);
-    toast.success("Link copied to clipboard");
   };
 
   const handleSendInMessage = async () => {
@@ -94,7 +101,6 @@ export function SharePostDialog({
 
     setIsSending(true);
     try {
-      const postUrl = `${window.location.origin}/post/${postId}`;
       const otherUser = selectedConnection.requester.id === currentUserId 
         ? selectedConnection.receiver 
         : selectedConnection.requester;
