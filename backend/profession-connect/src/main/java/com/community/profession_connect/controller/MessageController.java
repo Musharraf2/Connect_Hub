@@ -85,4 +85,13 @@ public class MessageController {
         Long count = messageService.getUnreadMessageCount(userId);
         return ResponseEntity.ok(count);
     }
+
+    // Delete a message
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<String> deleteMessage(
+            @PathVariable Long messageId,
+            @RequestParam Long userId) {
+        String message = messageService.deleteMessage(messageId, userId);
+        return ResponseEntity.ok(message);
+    }
 }

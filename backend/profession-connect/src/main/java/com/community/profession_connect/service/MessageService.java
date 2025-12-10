@@ -178,4 +178,18 @@ public class MessageService {
         response.setRead(message.isRead());
         return response;
     }
+
+    @Transactional
+    public String deleteMessage(Long messageId, Long userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+        
+        // Only allow the sender to delete their own message
+        if (!message.getSender().getId().equals(userId)) {
+            throw new RuntimeException("Unauthorized to delete this message");
+        }
+        
+        messageRepository.delete(message);
+        return "Message deleted successfully";
+    }
 }
