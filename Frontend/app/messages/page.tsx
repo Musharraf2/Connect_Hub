@@ -7,7 +7,7 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Circle } from "lucide-react";
+import { Send, Search, Circle, Trash2, Check, CheckCheck } from "lucide-react";
 
 // Components
 //le kar dia
@@ -23,6 +23,7 @@ import {
     getConversation,
     sendMessage,
     markMessagesAsRead,
+    deleteMessage,
     ConversationResponse,
     MessageResponse,
     LoginResponse,
@@ -234,6 +235,27 @@ export default function MessagesPage() {
         }
     };
 
+    const handleDeleteMessage = async (messageId: number) => {
+        if (!currentUser?.id) return;
+
+        try {
+            await deleteMessage(messageId, currentUser.id);
+            
+            // Remove message from local state
+            setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+            
+            // Reload conversations to update last message
+            if (selectedConversation) {
+                loadConversations(currentUser.id);
+            }
+            
+            toast.success("Message deleted");
+        } catch (error) {
+            console.error("Failed to delete message:", error);
+            toast.error("Failed to delete message");
+        }
+    };
+
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -400,15 +422,26 @@ export default function MessagesPage() {
                                             return (
                                                 <div
                                                     key={message.id}
-                                                    className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+                                                    className={`flex ${isSent ? "justify-end" : "justify-start"} group`}
                                                 >
                                                     <div
-                                                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                                                        className={`max-w-[70%] rounded-lg px-4 py-2 relative ${
                                                             isSent
                                                                 ? "bg-primary text-primary-foreground"
                                                                 : "bg-muted"
                                                         }`}
                                                     >
+                                                        {/* Delete button for sent messages */}
+                                                        {isSent && (
+                                                            <button
+                                                                onClick={() => handleDeleteMessage(message.id)}
+                                                                className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                                                                title="Delete message"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                                                            </button>
+                                                        )}
+                                                        
                                                         <p className="text-sm whitespace-pre-wrap break-words">
                                                             {text}
                                                         </p>
@@ -424,15 +457,27 @@ export default function MessagesPage() {
                                                                 />
                                                             </div>
                                                         )}
-                                                        <p
-                                                            className={`text-xs mt-1 ${
-                                                                isSent
-                                                                    ? "text-primary-foreground/70"
-                                                                    : "text-muted-foreground"
-                                                            }`}
-                                                        >
-                                                            {formatMessageTime(message.timestamp)}
-                                                        </p>
+                                                        <div className="flex items-center justify-between mt-1 gap-2">
+                                                            <p
+                                                                className={`text-xs ${
+                                                                    isSent
+                                                                        ? "text-primary-foreground/70"
+                                                                        : "text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                {formatMessageTime(message.timestamp)}
+                                                            </p>
+                                                            {/* Read indicator for sent messages */}
+                                                            {isSent && (
+                                                                <div className="flex items-center">
+                                                                    {message.isRead ? (
+                                                                        <CheckCheck className="w-3 h-3 text-blue-500" title="Seen" />
+                                                                    ) : (
+                                                                        <Check className="w-3 h-3 text-primary-foreground/50" title="Sent" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
