@@ -180,7 +180,7 @@ public class MessageService {
     }
 
     @Transactional
-    public String deleteMessage(Long messageId, Long userId) {
+    public Long deleteMessage(Long messageId, Long userId) {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new RuntimeException("Message not found"));
         
@@ -189,7 +189,8 @@ public class MessageService {
             throw new RuntimeException("Unauthorized to delete this message");
         }
         
+        Long receiverId = message.getReceiver().getId();
         messageRepository.delete(message);
-        return "Message deleted successfully";
+        return receiverId;
     }
 }

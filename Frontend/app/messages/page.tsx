@@ -16,6 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Header } from "@/components/header";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 // API
 import {
@@ -70,6 +78,8 @@ export default function MessagesPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const selectedConversationRef = useRef<ConversationResponse | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
 
     // Scroll to bottom of messages
     const scrollToBottom = () => {
@@ -146,8 +156,32 @@ export default function MessagesPage() {
             });
 
             // Subscribe to read receipts
-            client.subscribe(`/queue/read/${currentUser.id}`, () => {
+            client.subscribe(`/queue/read/${currentUser.id}`, (message) => {
+                const otherUserId = parseInt(message.body);
+                console.log("[WebSocket] Messages read by user:", otherUserId);
+                
+                // Update messages to mark as read
+                setMessages((prev) =>
+                    prev.map((msg) =>
+                        msg.senderId === currentUser.id && msg.receiverId === otherUserId
+                            ? { ...msg, isRead: true }
+                            : msg
+                    )
+                );
+                
                 // Reload conversations to update unread counts
+                loadConversations(currentUser.id!);
+            });
+
+            // Subscribe to message deletion events
+            client.subscribe(`/queue/delete/${currentUser.id}`, (message) => {
+                const deletedMessageId = parseInt(message.body);
+                console.log("[WebSocket] Message deleted:", deletedMessageId);
+                
+                // Remove message from local state
+                setMessages((prev) => prev.filter((msg) => msg.id !== deletedMessageId));
+                
+                // Reload conversations to update last message
                 loadConversations(currentUser.id!);
             });
         };
@@ -236,19 +270,26 @@ export default function MessagesPage() {
     };
 
     const handleDeleteMessage = async (messageId: number) => {
-        if (!currentUser?.id) return;
+        setMessageToDelete(messageId);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteMessage = async () => {
+        if (!messageToDelete || !currentUser?.id) return;
 
         try {
-            await deleteMessage(messageId, currentUser.id);
+            await deleteMessage(messageToDelete, currentUser.id);
             
             // Remove message from local state
-            setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+            setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
             
             // Reload conversations to update last message
             if (selectedConversation) {
                 loadConversations(currentUser.id);
             }
             
+            setDeleteDialogOpen(false);
+            setMessageToDelete(null);
             toast.success("Message deleted");
         } catch (error) {
             console.error("Failed to delete message:", error);
@@ -519,6 +560,33 @@ export default function MessagesPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent className="sm:max-w-md bg-card border-border">
+                    <DialogHeader>
+                        <DialogTitle className="text-card-foreground">Delete Message?</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete this message? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex gap-2 sm:justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDeleteDialogOpen(false);
+                                setMessageToDelete(null);
+                            }}
+                            className="text-foreground border-border"
+                        >
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDeleteMessage}>
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

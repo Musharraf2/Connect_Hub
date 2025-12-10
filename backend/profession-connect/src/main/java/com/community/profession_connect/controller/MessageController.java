@@ -91,7 +91,12 @@ public class MessageController {
     public ResponseEntity<String> deleteMessage(
             @PathVariable Long messageId,
             @RequestParam Long userId) {
-        String message = messageService.deleteMessage(messageId, userId);
-        return ResponseEntity.ok(message);
+        Long receiverId = messageService.deleteMessage(messageId, userId);
+        
+        // Notify both sender and receiver via WebSocket
+        messagingTemplate.convertAndSend("/queue/delete/" + userId, messageId);
+        messagingTemplate.convertAndSend("/queue/delete/" + receiverId, messageId);
+        
+        return ResponseEntity.ok("Message deleted successfully");
     }
 }
