@@ -512,3 +512,10 @@ export const getUnreadMessageCount = async (userId: number): Promise<number> => 
     if (!response.ok) return 0;
     return await response.json();
 };
+
+export const deleteMessage = async (messageId: number, userId: number): Promise<void> => {
+    const response = await fetch(`${BASE}/messages/${messageId}?userId=${userId}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete message');
+};
