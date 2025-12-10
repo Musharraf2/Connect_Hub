@@ -112,14 +112,16 @@ export function SharePostDialog({
       const postContent = postData.content;
       const postLikes = postData.likesCount;
       const postComments = postData.commentsCount;
+      const postImage = postData.imageUrl;
       
       // Create a rich message with post details
       let richMessage = `📤 Shared a post by ${postAuthor}\n`;
       richMessage += `━━━━━━━━━━━━━━━━━━━━\n\n`;
       richMessage += `${postContent}\n\n`;
       
-      if (postData.imageUrl) {
-        richMessage += `📷 [Image attached]\n\n`;
+      // Include the actual image URL so it can be rendered
+      if (postImage) {
+        richMessage += `[SHARED_POST_IMAGE]${postImage}[/SHARED_POST_IMAGE]\n\n`;
       }
       
       richMessage += `❤️ ${postLikes} ${postLikes === 1 ? 'like' : 'likes'} • `;

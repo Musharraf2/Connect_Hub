@@ -42,6 +42,20 @@ const getImageUrl = (url: string | null | undefined) => {
     return `http://localhost:8080${url}`;
 };
 
+// Helper function to parse message content and extract image URLs
+const parseMessageContent = (content: string): { text: string; imageUrl: string | null } => {
+    const imageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
+    const match = content.match(imageRegex);
+    
+    if (match) {
+        const imageUrl = match[1];
+        const text = content.replace(imageRegex, '').trim();
+        return { text, imageUrl };
+    }
+    
+    return { text: content, imageUrl: null };
+};
+
 export default function MessagesPage() {
     const router = useRouter();
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -381,6 +395,8 @@ export default function MessagesPage() {
                                     <div className="space-y-4">
                                         {messages.map((message) => {
                                             const isSent = message.senderId === currentUser.id;
+                                            const { text, imageUrl } = parseMessageContent(message.content);
+                                            
                                             return (
                                                 <div
                                                     key={message.id}
@@ -394,8 +410,20 @@ export default function MessagesPage() {
                                                         }`}
                                                     >
                                                         <p className="text-sm whitespace-pre-wrap break-words">
-                                                            {message.content}
+                                                            {text}
                                                         </p>
+                                                        {imageUrl && (
+                                                            <div className="mt-2 rounded-md overflow-hidden border border-border">
+                                                                <img 
+                                                                    src={imageUrl} 
+                                                                    alt="Shared post" 
+                                                                    className="w-full max-w-xs object-cover"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
                                                         <p
                                                             className={`text-xs mt-1 ${
                                                                 isSent
