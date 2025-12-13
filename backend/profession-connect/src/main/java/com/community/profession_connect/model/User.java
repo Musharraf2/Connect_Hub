@@ -30,11 +30,15 @@ public class User {
     private String coverImageUrl; // URL/path to the cover/background image
     private String phoneNumber; // Phone number
 
+    @Column(columnDefinition = "TEXT")
+    private String professionalDetails; // JSON field for dynamic professional info (e.g., specific fields for Doctors vs. Students)
+
     public void setName(String name) { this.name = name; }
     public void setLocation(String location) { this.location = location; }
     public void setAboutMe(String aboutMe) { this.aboutMe = aboutMe; }
     public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
     public void setCoverImageUrl(String coverImageUrl) { this.coverImageUrl = coverImageUrl; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public void setProfessionalDetails(String professionalDetails) { this.professionalDetails = professionalDetails; }
 
 }

@@ -6,9 +6,25 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import toast from "react-hot-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getUserProfile, getUnreadMessageCount, sendConnectionRequest } from "@/lib/api"
+import { getUserProfile, getUnreadMessageCount, sendConnectionRequest, getPostsByUserId, updatePost, deletePost, toggleLike, addComment, getAcceptedConnections, type PostResponse } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/header"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import {
   MapPin,
   Calendar,
@@ -24,9 +40,19 @@ import {
   BookOpen,
   Music,
   Stethoscope,
-  Zap
+  Zap,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Heart,
+  MessageSquare,
+  Briefcase,
+  Building,
+  Clock,
+  Check
 } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { FadeInUp, StaggerContainer, StaggerItem, PageTransition } from "@/components/animations"
 
 // --- THEME CONFIG (matching main profile page) ---
@@ -82,6 +108,7 @@ type UserProfile = {
   interests: string[]
   achievements: string[]
   connections: number
+  professionalDetails?: any // Parsed JSON object for profession-specific fields
 }
 
 type CurrentUser = {
@@ -99,6 +126,76 @@ const getImageUrl = (url: string | null | undefined) => {
   return `http://localhost:8080${url}`
 }
 
+// Icon mapping for common field types
+const getIconForField = (fieldKey: string) => {
+  const key = fieldKey.toLowerCase()
+  if (key.includes('hospital') || key.includes('clinic') || key.includes('company') || key.includes('organization') || key.includes('institution') || key.includes('school') || key.includes('studio')) return Building
+  if (key.includes('experience') || key.includes('years')) return Clock
+  if (key.includes('specialization') || key.includes('specialty') || key.includes('subject') || key.includes('genre') || key.includes('style') || key.includes('type')) return Briefcase
+  if (key.includes('license') || key.includes('certification') || key.includes('award') || key.includes('achievement')) return Award
+  if (key.includes('university') || key.includes('college') || key.includes('education')) return GraduationCap
+  if (key.includes('major') || key.includes('degree') || key.includes('course')) return BookOpen
+  if (key.includes('year') || key.includes('date')) return Calendar
+  if (key.includes('skill') || key.includes('expertise')) return Zap
+  if (key.includes('location') || key.includes('address')) return MapPin
+  if (key.includes('phone') || key.includes('contact')) return Phone
+  if (key.includes('email')) return Mail
+  return Briefcase // Default icon
+}
+
+// Format field label for display (convert camelCase/snake_case to Title Case)
+const formatFieldLabel = (key: string) => {
+  return key
+    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+    .trim()
+}
+
+// Helper function to get profession-specific fields dynamically
+const getProfessionFields = (profession: string, profileUser: UserProfile) => {
+  const professionLower = profession.toLowerCase()
+  
+  // For students, always show academic info
+  if (professionLower === 'student') {
+    return [
+      { label: "University", value: profileUser.university, icon: GraduationCap },
+      { label: "Major", value: profileUser.major, icon: BookOpen },
+      { label: "Year", value: profileUser.year, icon: Calendar },
+      { label: "GPA", value: profileUser.gpa, icon: Award },
+    ]
+  }
+  
+  // For all other professions, dynamically build fields from professionalDetails
+  const fields: { label: string; value: string; icon: any }[] = []
+  
+  if (profileUser.professionalDetails && typeof profileUser.professionalDetails === 'object') {
+    // Convert professionalDetails object to array of field objects
+    Object.entries(profileUser.professionalDetails).forEach(([key, value]) => {
+      if (value && value !== 'N/A' && value !== '') {
+        fields.push({
+          label: formatFieldLabel(key),
+          value: String(value),
+          icon: getIconForField(key)
+        })
+      }
+    })
+  }
+  
+  // If no professional details, show generic placeholder fields
+  if (fields.length === 0) {
+    return [
+      { label: "Organization", value: "N/A", icon: Building },
+      { label: "Specialization", value: "N/A", icon: Briefcase },
+      { label: "Experience", value: "N/A", icon: Clock },
+      { label: "Certification", value: "N/A", icon: Award },
+    ]
+  }
+  
+  // Limit to 4 most important fields for clean UI
+  return fields.slice(0, 4)
+}
+
 export default function UserProfilePage() {
   const router = useRouter()
   const params = useParams()
@@ -106,8 +203,17 @@ export default function UserProfilePage() {
 
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [profileUser, setProfileUser] = useState<UserProfile | null>(null)
+  const [posts, setPosts] = useState<PostResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [postsLoading, setPostsLoading] = useState(true)
   const [sendingRequest, setSendingRequest] = useState(false)
+  const [editingPost, setEditingPost] = useState<number | null>(null)
+  const [editContent, setEditContent] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [postToDelete, setPostToDelete] = useState<number | null>(null)
+  const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null)
+  const [commentText, setCommentText] = useState("")
+  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -157,8 +263,32 @@ export default function UserProfilePage() {
             skills: profile.skills.map(s => s.skill),
             interests: profile.interests.map(i => i.interest),
             achievements: profile.achievements ?? [],
-            connections: profile.connectionsCount ?? 0
+            connections: profile.connectionsCount ?? 0,
+            professionalDetails: profile.professionalDetails ? JSON.parse(profile.professionalDetails) : null
           })
+
+          // Check if users are connected
+          try {
+            const connections = await getAcceptedConnections(userData.id)
+            const connected = connections.some(conn => 
+              (conn.requester.id === userData.id && conn.receiver.id === userId) ||
+              (conn.receiver.id === userData.id && conn.requester.id === userId)
+            )
+            setIsConnected(connected)
+          } catch (error) {
+            console.error("Error checking connection status:", error)
+          }
+
+          // Fetch user posts
+          setPostsLoading(true)
+          try {
+            const userPosts = await getPostsByUserId(userId, userData.id)
+            setPosts(userPosts)
+          } catch (error) {
+            console.error("Error loading posts:", error)
+          } finally {
+            setPostsLoading(false)
+          }
         }
       } catch (error) {
         console.error("Error loading profile:", error)
@@ -182,6 +312,64 @@ export default function UserProfilePage() {
       toast.error("Failed to send connection request")
     } finally {
       setSendingRequest(false)
+    }
+  }
+
+  const handleEditPost = (post: PostResponse) => {
+    setEditingPost(post.id)
+    setEditContent(post.content)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingPost || !currentUser) return
+    
+    try {
+      const updated = await updatePost(editingPost, currentUser.id, editContent)
+      setPosts(posts.map(p => p.id === editingPost ? updated : p))
+      setEditingPost(null)
+      setEditContent("")
+      toast.success("Post updated successfully")
+    } catch (error) {
+      toast.error("Failed to update post")
+    }
+  }
+
+  const handleDeletePost = async () => {
+    if (!postToDelete || !currentUser) return
+    
+    try {
+      await deletePost(postToDelete, currentUser.id)
+      setPosts(posts.filter(p => p.id !== postToDelete))
+      setDeleteDialogOpen(false)
+      setPostToDelete(null)
+      toast.success("Post deleted successfully")
+    } catch (error) {
+      toast.error("Failed to delete post")
+    }
+  }
+
+  const handleToggleLike = async (postId: number) => {
+    if (!currentUser) return
+    
+    try {
+      const updated = await toggleLike(postId, currentUser.id)
+      setPosts(posts.map(p => p.id === postId ? updated : p))
+    } catch (error) {
+      toast.error("Failed to like post")
+    }
+  }
+
+  const handleAddComment = async (postId: number) => {
+    if (!currentUser || !commentText.trim()) return
+    
+    try {
+      const updated = await addComment(postId, { content: commentText, userId: currentUser.id })
+      setPosts(posts.map(p => p.id === postId ? updated : p))
+      setCommentText("")
+      setCommentingOnPost(null)
+      toast.success("Comment added")
+    } catch (error) {
+      toast.error("Failed to add comment")
     }
   }
 
@@ -262,15 +450,30 @@ export default function UserProfilePage() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center justify-center gap-3 mt-2 md:mt-0">
+                        {isConnected ? (
+                          <Button 
+                            disabled
+                            variant="outline"
+                            className="rounded-full shadow-sm border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 cursor-default"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Connected
+                          </Button>
+                        ) : (
+                          <Button 
+                            onClick={handleSendConnectionRequest}
+                            disabled={sendingRequest}
+                            className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
+                          >
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            {sendingRequest ? "Sending..." : "Connect"}
+                          </Button>
+                        )}
                         <Button 
-                          onClick={handleSendConnectionRequest}
-                          disabled={sendingRequest}
+                          variant="outline" 
                           className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
+                          onClick={() => router.push(`/messages?userId=${profileUser.id}`)}
                         >
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          {sendingRequest ? "Sending..." : "Connect"}
-                        </Button>
-                        <Button variant="outline" className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95">
                           <MessageCircle className="w-4 h-4 mr-2" />
                           Message
                         </Button>
@@ -346,77 +549,309 @@ export default function UserProfilePage() {
             {/* Right Content */}
             <section className="lg:col-span-2 space-y-8">
               <FadeInUp delay={0.2}>
-                <div className="w-full space-y-8">
-                  {/* Education Grid */}
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { label: "University", value: profileUser.university, icon: GraduationCap },
-                        { label: "Major", value: profileUser.major, icon: BookOpen },
-                        { label: "Year", value: profileUser.year, icon: Calendar },
-                        { label: "GPA", value: profileUser.gpa, icon: Award },
-                      ].map((stat, i) => (
-                        <Card key={i} className="border border-gray-100 dark:border-border bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
-                          <CardContent className="p-5 flex flex-col items-center text-center gap-3">
-                            <div className="p-2 rounded-full bg-gray-50 dark:bg-muted text-muted-foreground">
-                              <stat.icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">{stat.label}</div>
-                              <div className="font-bold text-foreground text-sm mt-1 line-clamp-2">{stat.value}</div>
-                            </div>
+                <Tabs defaultValue="timeline" className="w-full">
+                  <TabsList className="w-full justify-start mb-6">
+                    <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                    <TabsTrigger value="about">About</TabsTrigger>
+                  </TabsList>
+
+                  {/* Timeline Tab - User's Posts */}
+                  <TabsContent value="timeline">
+                    <div className="space-y-4">
+                      {postsLoading ? (
+                        <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card p-8 text-center">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                        </Card>
+                      ) : posts.length === 0 ? (
+                        <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card p-8 text-center">
+                          <p className="text-muted-foreground">No posts yet.</p>
+                        </Card>
+                      ) : (
+                        posts.map((post) => {
+                          const isOwn = currentUser?.id === post.user.id
+                          return (
+                            <Card key={post.id} className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                              <CardHeader className="p-4 pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex gap-3">
+                                    <Link href={`/profile/${post.user.id}`}>
+                                      <Avatar className="w-10 h-10 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                                        <AvatarImage src={getImageUrl(post.user.profileImageUrl)} />
+                                        <AvatarFallback>{post.user.name.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                    </Link>
+                                    <div>
+                                      <Link href={`/profile/${post.user.id}`}>
+                                        <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">
+                                          {post.user.name}
+                                        </h3>
+                                      </Link>
+                                      <p className="text-xs text-muted-foreground line-clamp-1">
+                                        {post.user.profession}
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                                        {new Date(post.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {isOwn && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <MoreVertical className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditPost(post)}>
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          variant="destructive"
+                                          onClick={() => {
+                                            setPostToDelete(post.id)
+                                            setDeleteDialogOpen(true)
+                                          }}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              </CardHeader>
+                              <CardContent className="p-4 pt-2">
+                                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-3">
+                                  {post.content}
+                                </p>
+
+                                {post.imageUrl && (
+                                  <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-muted border border-border mb-3">
+                                    <Image
+                                      src={getImageUrl(post.imageUrl)}
+                                      alt="Post content"
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`gap-2 hover:bg-red-500/10 transition-all active:scale-95 ${
+                                      post.likedByCurrentUser
+                                        ? "text-red-500 hover:text-red-600"
+                                        : "text-muted-foreground"
+                                    }`}
+                                    onClick={() => handleToggleLike(post.id)}
+                                  >
+                                    <Heart
+                                      className={`w-4 h-4 transition-transform ${
+                                        post.likedByCurrentUser
+                                          ? "fill-current scale-110"
+                                          : ""
+                                      }`}
+                                    />
+                                    <span className="text-xs font-medium">
+                                      {post.likesCount || "Like"}
+                                    </span>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-2 text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 transition-all active:scale-95"
+                                    onClick={() =>
+                                      setCommentingOnPost(
+                                        commentingOnPost === post.id ? null : post.id
+                                      )
+                                    }
+                                  >
+                                    <MessageSquare className="w-4 h-4" />
+                                    <span className="text-xs font-medium">
+                                      {post.commentsCount || "Comment"}
+                                    </span>
+                                  </Button>
+                                </div>
+
+                                {post.comments.length > 0 && (
+                                  <div className="bg-muted/50 rounded-xl p-3 mt-3 space-y-3 border border-border">
+                                    {post.comments.map((c) => (
+                                      <div key={c.id} className="flex gap-2 text-sm">
+                                        <Avatar className="w-6 h-6 mt-1">
+                                          <AvatarImage src={getImageUrl(c.user.profileImageUrl)} />
+                                          <AvatarFallback className="text-[10px]">
+                                            {c.user.name.charAt(0)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="bg-card p-2 px-3 rounded-lg shadow-sm border border-border flex-1">
+                                          <span className="font-semibold text-card-foreground text-xs block mb-0.5">
+                                            {c.user.name}
+                                          </span>
+                                          <span className="text-foreground">
+                                            {c.content}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {commentingOnPost === post.id && (
+                                  <div className="flex gap-2 mt-3 animate-in fade-in slide-in-from-top-2">
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarImage src={currentUser.avatar} />
+                                    </Avatar>
+                                    <div className="flex-1 flex gap-2">
+                                      <Textarea
+                                        value={commentText}
+                                        onChange={(e) => setCommentText(e.target.value)}
+                                        placeholder="Add a comment..."
+                                        className="min-h-[40px] h-[40px] py-2 resize-none text-sm bg-card border-border text-foreground"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddComment(post.id)}
+                                        className="h-[40px]"
+                                      >
+                                        Post
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* About Tab - Dynamic Professional Details */}
+                  <TabsContent value="about">
+                    <div className="w-full space-y-8">
+                      {/* Professional Information Grid - Dynamic based on profession */}
+                      <div>
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-2xl font-bold text-foreground">
+                            {profileUser.profession === 'student' ? 'Education' : 'Professional Information'}
+                          </h3>
+                          <Badge variant="outline" className="capitalize">
+                            {profileUser.profession}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {getProfessionFields(profileUser.profession, profileUser).map((stat, i) => (
+                            <Card key={i} className="group border border-gray-200 dark:border-border bg-gradient-to-br from-white to-gray-50/50 dark:from-card dark:to-card/50 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                              <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                                <div className="p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+                                  <stat.icon className="w-6 h-6" />
+                                </div>
+                                <div className="w-full">
+                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{stat.label}</div>
+                                  <div className="font-bold text-foreground text-base leading-tight break-words">{stat.value}</div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Achievements */}
+                      {profileUser.achievements && profileUser.achievements.length > 0 && (
+                        <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                          <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
+                            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
+                              <Award className="w-5 h-5 text-yellow-500" /> 
+                              Achievements & Certifications
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-4">
+                            <StaggerContainer stagger={0.1} className="grid gap-3">
+                              {profileUser.achievements.map((achievement, index) => (
+                                <StaggerItem key={index}>
+                                  <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50 dark:bg-muted/20 border border-gray-100/50 dark:border-border/40">
+                                    <div className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                                    <span className="text-sm font-medium text-foreground">{achievement}</span>
+                                  </div>
+                                </StaggerItem>
+                              ))}
+                            </StaggerContainer>
                           </CardContent>
                         </Card>
-                      ))}
+                      )}
+
+                      {/* Interests */}
+                      <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
+                        <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
+                          <CardTitle className="text-lg font-semibold text-foreground">Interests</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="flex flex-wrap gap-2">
+                            {profileUser.interests.map((interest, i) => (
+                              <Badge key={i} variant="outline" className="border-gray-200 dark:border-border text-foreground hover:bg-gray-50 dark:hover:bg-muted font-normal px-3 py-1">
+                                {interest}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </div>
-
-                  {/* Achievements */}
-                  {profileUser.achievements && profileUser.achievements.length > 0 && (
-                    <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                      <CardHeader className="border-b border-gray-50/50 dark:border-border/50 pb-4">
-                        <CardTitle className="text-lg flex items-center gap-2 text-foreground">
-                          <Award className="w-5 h-5 text-yellow-500" /> 
-                          Achievements & Certifications
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <StaggerContainer stagger={0.1} className="grid gap-3">
-                          {profileUser.achievements.map((achievement, index) => (
-                            <StaggerItem key={index}>
-                              <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50/50 dark:bg-muted/20 border border-gray-100/50 dark:border-border/40">
-                                <div className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-                                <span className="text-sm font-medium text-foreground">{achievement}</span>
-                              </div>
-                            </StaggerItem>
-                          ))}
-                        </StaggerContainer>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Interests - keeping this as it's useful info */}
-                  <Card className="border border-gray-100 dark:border-border shadow-sm bg-white dark:bg-card">
-                    <CardHeader className="pb-3 border-b border-gray-50/50 dark:border-border/50">
-                      <CardTitle className="text-lg font-semibold text-foreground">Interests</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                      <div className="flex flex-wrap gap-2">
-                        {profileUser.interests.map((interest, i) => (
-                          <Badge key={i} variant="outline" className="border-gray-200 dark:border-border text-foreground hover:bg-gray-50 dark:hover:bg-muted font-normal px-3 py-1">
-                            {interest}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                  </TabsContent>
+                </Tabs>
               </FadeInUp>
             </section>
 
           </div>
         </main>
+
+        {/* Edit Post Dialog */}
+        <Dialog open={editingPost !== null} onOpenChange={(open) => !open && setEditingPost(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Post</DialogTitle>
+              <DialogDescription>
+                Make changes to your post below.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="What's on your mind?"
+              className="min-h-[120px] resize-none"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingPost(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Post</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this post? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeletePost}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageTransition>
   )

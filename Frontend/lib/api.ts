@@ -76,6 +76,7 @@ export interface UserProfileDetailResponse {
     profileImageUrl?: string | null;
     coverImageUrl?: string | null;
     phoneNumber?: string | null;
+    professionalDetails?: string | null; // JSON string for dynamic professional info
     academicInfo: AcademicInfo | null;
     skills: Skill[];
     interests: Interest[];
@@ -363,6 +364,23 @@ export const getPostsByProfession = async (profession: string, userId: number): 
     const response = await fetch(`${BASE}/posts/by-profession?profession=${encodeURIComponent(profession)}&userId=${userId}`);
     if (response.status === 204) return [];
     if (!response.ok) throw new Error('Failed to fetch posts');
+    return await response.json();
+};
+
+export const getPostsByUserId = async (userId: number, currentUserId: number): Promise<PostResponse[]> => {
+    const response = await fetch(`${BASE}/posts/user/${userId}?currentUserId=${currentUserId}`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch user posts');
+    return await response.json();
+};
+
+export const updatePost = async (postId: number, userId: number, content: string): Promise<PostResponse> => {
+    const response = await fetch(`${BASE}/posts/${postId}?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    });
+    if (!response.ok) throw new Error('Failed to update post');
     return await response.json();
 };
 
