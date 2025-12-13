@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import toast from "react-hot-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getUserProfile, getUnreadMessageCount, sendConnectionRequest, getPostsByUserId, updatePost, deletePost, toggleLike, addComment, type PostResponse } from "@/lib/api"
+import { getUserProfile, getUnreadMessageCount, sendConnectionRequest, getPostsByUserId, updatePost, deletePost, toggleLike, addComment, getAcceptedConnections, type PostResponse } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -48,7 +48,8 @@ import {
   MessageSquare,
   Briefcase,
   Building,
-  Clock
+  Clock,
+  Check
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -166,7 +167,7 @@ const getProfessionFields = (profession: string, profileUser: UserProfile) => {
   }
   
   // For all other professions, dynamically build fields from professionalDetails
-  const fields = []
+  const fields: { label: string; value: string; icon: any }[] = []
   
   if (profileUser.professionalDetails && typeof profileUser.professionalDetails === 'object') {
     // Convert professionalDetails object to array of field objects
@@ -212,6 +213,7 @@ export default function UserProfilePage() {
   const [postToDelete, setPostToDelete] = useState<number | null>(null)
   const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null)
   const [commentText, setCommentText] = useState("")
+  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -264,6 +266,18 @@ export default function UserProfilePage() {
             connections: profile.connectionsCount ?? 0,
             professionalDetails: profile.professionalDetails ? JSON.parse(profile.professionalDetails) : null
           })
+
+          // Check if users are connected
+          try {
+            const connections = await getAcceptedConnections(userData.id)
+            const connected = connections.some(conn => 
+              (conn.requester.id === userData.id && conn.receiver.id === userId) ||
+              (conn.receiver.id === userData.id && conn.requester.id === userId)
+            )
+            setIsConnected(connected)
+          } catch (error) {
+            console.error("Error checking connection status:", error)
+          }
 
           // Fetch user posts
           setPostsLoading(true)
@@ -436,14 +450,25 @@ export default function UserProfilePage() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center justify-center gap-3 mt-2 md:mt-0">
-                        <Button 
-                          onClick={handleSendConnectionRequest}
-                          disabled={sendingRequest}
-                          className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
-                        >
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          {sendingRequest ? "Sending..." : "Connect"}
-                        </Button>
+                        {isConnected ? (
+                          <Button 
+                            disabled
+                            variant="outline"
+                            className="rounded-full shadow-sm border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 cursor-default"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Connected
+                          </Button>
+                        ) : (
+                          <Button 
+                            onClick={handleSendConnectionRequest}
+                            disabled={sendingRequest}
+                            className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
+                          >
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            {sendingRequest ? "Sending..." : "Connect"}
+                          </Button>
+                        )}
                         <Button variant="outline" className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95">
                           <MessageCircle className="w-4 h-4 mr-2" />
                           Message

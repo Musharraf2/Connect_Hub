@@ -225,7 +225,7 @@ const getProfessionFields = (profession: string, currentUser: CurrentUser) => {
   }
   
   // For all other professions, dynamically build fields from professionalDetails
-  const fields = []
+  const fields: { label: string; value: string; icon: any }[] = []
   
   if (currentUser.professionalDetails && typeof currentUser.professionalDetails === 'object') {
     // Convert professionalDetails object to array of field objects
@@ -470,9 +470,6 @@ export default function ProfilePage() {
                                 <Link href="/profile/edit">
                                     <Edit3 className="w-4 h-4 mr-2" /> Edit Profile
                                 </Link>
-                            </Button>
-                            <Button className="rounded-full shadow-sm bg-gray-900 hover:bg-gray-800 dark:bg-primary dark:hover:bg-primary/90 text-white dark:text-primary-foreground hover:shadow-md transition-all hover:scale-105 active:scale-95">
-                                Share Profile
                             </Button>
                         </div>
                     </div>
