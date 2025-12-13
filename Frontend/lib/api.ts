@@ -374,8 +374,10 @@ export const getPostsByUserId = async (userId: number, currentUserId: number): P
 };
 
 export const updatePost = async (postId: number, userId: number, content: string): Promise<PostResponse> => {
-    const response = await fetch(`${BASE}/posts/${postId}?userId=${userId}&content=${encodeURIComponent(content)}`, {
-        method: 'PUT'
+    const response = await fetch(`${BASE}/posts/${postId}?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
     });
     if (!response.ok) throw new Error('Failed to update post');
     return await response.json();

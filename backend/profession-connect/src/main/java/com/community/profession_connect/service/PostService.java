@@ -120,7 +120,7 @@ public class PostService {
 
         // Security check: Enforce strict ownership
         if (!post.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Forbidden: You can only delete your own posts");
+            throw new SecurityException("Forbidden: You can only delete your own posts");
         }
 
         postRepository.delete(post);
@@ -140,7 +140,7 @@ public class PostService {
 
         // Security check: Enforce strict ownership
         if (!post.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Forbidden: You can only edit your own posts");
+            throw new SecurityException("Forbidden: You can only edit your own posts");
         }
 
         post.setContent(newContent);

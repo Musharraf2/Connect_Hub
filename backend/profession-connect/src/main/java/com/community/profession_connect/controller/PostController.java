@@ -60,9 +60,9 @@ public class PostController {
     public ResponseEntity<PostResponse> updatePost(
         @PathVariable Long postId,
         @RequestParam Long userId,
-        @RequestParam String content
+        @RequestBody PostRequest request
     ) {
-        PostResponse response = postService.updatePost(postId, userId, content);
+        PostResponse response = postService.updatePost(postId, userId, request.getContent());
         // Broadcast update to all subscribers
         messagingTemplate.convertAndSend("/topic/posts/" + response.getUser().getProfession() + "/update", response);
         return ResponseEntity.ok(response);
