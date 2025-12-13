@@ -114,4 +114,19 @@ public class PostController {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
         }
     }
+
+    @PostMapping("/{postId}/report")
+    public ResponseEntity<Map<String, String>> reportPost(
+            @PathVariable Long postId,
+            @RequestParam Long userId,
+            @RequestParam String reason) {
+        try {
+            String message = postService.reportPost(postId, userId, reason);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", message);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to report post: " + e.getMessage()));
+        }
+    }
 }

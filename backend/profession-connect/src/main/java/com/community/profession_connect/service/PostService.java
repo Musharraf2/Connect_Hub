@@ -10,10 +10,12 @@ import com.community.profession_connect.model.AiNote;
 import com.community.profession_connect.model.Comment;
 import com.community.profession_connect.model.Post;
 import com.community.profession_connect.model.PostLike;
+import com.community.profession_connect.model.PostReport;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.repository.AiNoteRepository;
 import com.community.profession_connect.repository.CommentRepository;
 import com.community.profession_connect.repository.PostLikeRepository;
+import com.community.profession_connect.repository.PostReportRepository;
 import com.community.profession_connect.repository.PostRepository;
 import com.community.profession_connect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,9 @@ public class PostService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private PostReportRepository postReportRepository;
 
     // ------------------- CREATE POST -------------------
 
@@ -191,6 +196,38 @@ public class PostService {
         return comments.stream()
                 .map(this::convertToCommentResponse)
                 .collect(Collectors.toList());
+    }
+
+    // ------------------- REPORT POST -------------------
+
+    @Transactional
+    public String reportPost(Long postId, Long userId, String reason) {
+        Objects.requireNonNull(postId, "Post ID must not be null");
+        Objects.requireNonNull(userId, "User ID must not be null");
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Save the report
+        PostReport report = new PostReport();
+        report.setPost(post);
+        report.setUser(user);
+        report.setReason(reason);
+        postReportRepository.save(report);
+
+        // Count total reports for this post
+        long reportCount = postReportRepository.countByPostId(postId);
+
+        // Auto-delete if report count reaches 10
+        if (reportCount >= 10) {
+            postRepository.deleteById(postId);
+            return "Post reported and deleted due to multiple reports";
+        }
+
+        return "Post reported successfully";
     }
 
     // ------------------- MAPPING: Post -> PostResponse -------------------
