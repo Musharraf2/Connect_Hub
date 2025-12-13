@@ -20,6 +20,7 @@ import {
   Image as ImageIcon,
   Smile,
   Loader2,
+  Flag,
 } from "lucide-react";
 
 // Components
@@ -37,6 +38,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { FadeInUp, StaggerContainer } from "@/components/animations";
 import {
   PostSkeleton,
@@ -65,6 +68,7 @@ import {
   UserProfileResponse,
   getUnreadMessageCount,
   getUnreadCount,
+  reportPost,
 } from "@/lib/api";
 
 // Cropping
@@ -192,6 +196,13 @@ export default function HomePage() {
   const [commentText, setCommentText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [localSentRequests, setLocalSentRequests] = useState<number[]>([]); // For instant UI updates on connect
+
+  // Report State
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [postToReport, setPostToReport] = useState<number | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // Cropping
   const [isCroppingDialogOpen, setIsCroppingDialogOpen] = useState(false);
@@ -536,6 +547,51 @@ export default function HomePage() {
     }
   };
 
+  const handleReportPost = async (postId: number) => {
+    setPostToReport(postId);
+    setReportReason("");
+    setCustomReason("");
+    setReportDialogOpen(true);
+  };
+
+  const submitReport = async () => {
+    if (!postToReport) return;
+    
+    const sVal = sessionStorage.getItem("user");
+    if (!sVal) return;
+    const user: LoginResponse = JSON.parse(sVal);
+    
+    const finalReason = reportReason === "Other" ? customReason : reportReason;
+    
+    if (!finalReason || !finalReason.trim()) {
+      toast.error("Please select or provide a reason for reporting");
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      const response = await reportPost(postToReport, user.id, finalReason.trim());
+      
+      if (response.message.includes("already reported")) {
+        toast.error("You have already reported this post");
+      } else if (response.message.includes("deleted")) {
+        toast.success("Post has been removed due to multiple reports");
+        await fetchPosts(user.profession, user.id);
+      } else {
+        toast.success("Post reported. Thank you for keeping the community safe.");
+      }
+      
+      setReportDialogOpen(false);
+      setPostToReport(null);
+      setReportReason("");
+      setCustomReason("");
+    } catch (e) {
+      toast.error("Failed to report post");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
 
 const handleWebSocketMessage = useCallback(
     (topic: string, message: unknown) => {
@@ -742,19 +798,32 @@ const handleWebSocketMessage = useCallback(
                               </p>
                             </div>
                           </div>
-                          {isOwn && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                              onClick={() => {
-                                setPostToDelete(post.id);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex gap-1">
+                            {!isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-orange-500"
+                                onClick={() => handleReportPost(post.id)}
+                                title="Report this post"
+                              >
+                                <Flag className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                onClick={() => {
+                                  setPostToDelete(post.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="p-4 pt-2">
@@ -1174,6 +1243,111 @@ const handleWebSocketMessage = useCallback(
             </Button>
             <Button variant="destructive" onClick={handleDeletePost}>
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Post Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-card-foreground flex items-center gap-2">
+              <Flag className="w-5 h-5 text-orange-500" />
+              Report Post
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Help us understand what's wrong with this post. Your report is anonymous.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <RadioGroup value={reportReason} onValueChange={setReportReason}>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Spam" id="spam" />
+                  <Label htmlFor="spam" className="flex-1 cursor-pointer text-sm">
+                    Spam or misleading
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Harassment" id="harassment" />
+                  <Label htmlFor="harassment" className="flex-1 cursor-pointer text-sm">
+                    Harassment or bullying
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Hate Speech" id="hate" />
+                  <Label htmlFor="hate" className="flex-1 cursor-pointer text-sm">
+                    Hate speech or discrimination
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Violence" id="violence" />
+                  <Label htmlFor="violence" className="flex-1 cursor-pointer text-sm">
+                    Violence or dangerous content
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Inappropriate Content" id="inappropriate" />
+                  <Label htmlFor="inappropriate" className="flex-1 cursor-pointer text-sm">
+                    Inappropriate or adult content
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="False Information" id="false-info" />
+                  <Label htmlFor="false-info" className="flex-1 cursor-pointer text-sm">
+                    False information
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="Other" id="other" />
+                  <Label htmlFor="other" className="flex-1 cursor-pointer text-sm">
+                    Other
+                  </Label>
+                </div>
+              </div>
+            </RadioGroup>
+
+            {reportReason === "Other" && (
+              <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+                <Label htmlFor="custom-reason" className="text-sm text-muted-foreground mb-2 block">
+                  Please specify your reason
+                </Label>
+                <Textarea
+                  id="custom-reason"
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder="Describe the issue..."
+                  className="min-h-[80px] resize-none bg-card border-border text-foreground"
+                  maxLength={200}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {customReason.length}/200 characters
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReportDialogOpen(false);
+                setReportReason("");
+                setCustomReason("");
+              }}
+              disabled={isSubmittingReport}
+              className="text-foreground border-border"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitReport}
+              disabled={isSubmittingReport || !reportReason || (reportReason === "Other" && !customReason.trim())}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              {isSubmittingReport ? "Submitting..." : "Submit Report"}
             </Button>
           </DialogFooter>
         </DialogContent>
