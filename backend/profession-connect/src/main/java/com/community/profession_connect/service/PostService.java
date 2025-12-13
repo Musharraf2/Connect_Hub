@@ -97,6 +97,16 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
+    // ------------------- FETCH POSTS BY USER ID -------------------
+
+    public List<PostResponse> getPostsByUserId(Long userId, Long currentUserId) {
+        List<Post> posts = postRepository
+                .findByUserIdAndDeletedFalseOrderByCreatedAtDesc(userId);
+        return posts.stream()
+                .map(post -> convertToPostResponse(post, currentUserId))
+                .collect(Collectors.toList());
+    }
+
 
     // ------------------- DELETE POST -------------------
 
@@ -108,12 +118,35 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found"));
 
+        // Security check: Enforce strict ownership
         if (!post.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized: You can only delete your own posts");
+            throw new RuntimeException("Forbidden: You can only delete your own posts");
         }
 
         postRepository.delete(post);
         return "Post deleted successfully";
+    }
+
+    // ------------------- UPDATE POST -------------------
+
+    @Transactional
+    public PostResponse updatePost(Long postId, Long userId, String newContent) {
+        Objects.requireNonNull(postId, "Post ID must not be null");
+        Objects.requireNonNull(userId, "User ID must not be null");
+        Objects.requireNonNull(newContent, "Content must not be null");
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        // Security check: Enforce strict ownership
+        if (!post.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Forbidden: You can only edit your own posts");
+        }
+
+        post.setContent(newContent);
+        post = postRepository.save(post);
+
+        return convertToPostResponse(post, userId);
     }
 
     // ------------------- LIKE / UNLIKE -------------------
