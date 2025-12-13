@@ -388,6 +388,14 @@ export const addComment = async (postId: number, commentData: CommentRequest): P
     return await response.json();
 };
 
+export const reportPost = async (postId: number, userId: number, reason: string): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE}/posts/${postId}/report?userId=${userId}&reason=${encodeURIComponent(reason)}`, {
+        method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to report post');
+    return await response.json();
+};
+
 
 // --- NOTIFICATIONS ---
 
