@@ -76,6 +76,7 @@ export interface UserProfileDetailResponse {
     profileImageUrl?: string | null;
     coverImageUrl?: string | null;
     phoneNumber?: string | null;
+    professionalDetails?: string | null; // JSON string for dynamic professional info
     academicInfo: AcademicInfo | null;
     skills: Skill[];
     interests: Interest[];

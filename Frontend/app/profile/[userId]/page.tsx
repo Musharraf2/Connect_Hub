@@ -45,7 +45,10 @@ import {
   Edit,
   Trash2,
   Heart,
-  MessageSquare
+  MessageSquare,
+  Briefcase,
+  Building,
+  Clock
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -104,6 +107,7 @@ type UserProfile = {
   interests: string[]
   achievements: string[]
   connections: number
+  professionalDetails?: any // Parsed JSON object for profession-specific fields
 }
 
 type CurrentUser = {
@@ -119,6 +123,51 @@ const getImageUrl = (url: string | null | undefined) => {
   if (!url) return "/placeholder.svg"
   if (url.startsWith("http")) return url
   return `http://localhost:8080${url}`
+}
+
+// Helper function to get profession-specific fields
+const getProfessionFields = (profession: string, profileUser: UserProfile) => {
+  const professionLower = profession.toLowerCase()
+  
+  switch (professionLower) {
+    case 'doctor':
+      return [
+        { label: "Hospital/Clinic", value: profileUser.professionalDetails?.hospital || "N/A", icon: Building },
+        { label: "Specialization", value: profileUser.professionalDetails?.specialization || "N/A", icon: Stethoscope },
+        { label: "Years of Experience", value: profileUser.professionalDetails?.experience || "N/A", icon: Clock },
+        { label: "License Number", value: profileUser.professionalDetails?.licenseNumber || "N/A", icon: Award },
+      ]
+    case 'teacher':
+      return [
+        { label: "School/Institution", value: profileUser.professionalDetails?.school || "N/A", icon: Building },
+        { label: "Subject/Grade", value: profileUser.professionalDetails?.subject || "N/A", icon: BookOpen },
+        { label: "Years of Experience", value: profileUser.professionalDetails?.experience || "N/A", icon: Clock },
+        { label: "Certification", value: profileUser.professionalDetails?.certification || "N/A", icon: Award },
+      ]
+    case 'musician':
+      return [
+        { label: "Instrument/Voice", value: profileUser.professionalDetails?.instrument || "N/A", icon: Music },
+        { label: "Genre", value: profileUser.professionalDetails?.genre || "N/A", icon: Music },
+        { label: "Years of Experience", value: profileUser.professionalDetails?.experience || "N/A", icon: Clock },
+        { label: "Awards", value: profileUser.professionalDetails?.awards || "N/A", icon: Award },
+      ]
+    case 'dancer':
+      return [
+        { label: "Dance Style", value: profileUser.professionalDetails?.danceStyle || "N/A", icon: Zap },
+        { label: "Studio/Company", value: profileUser.professionalDetails?.studio || "N/A", icon: Building },
+        { label: "Years of Experience", value: profileUser.professionalDetails?.experience || "N/A", icon: Clock },
+        { label: "Awards", value: profileUser.professionalDetails?.awards || "N/A", icon: Award },
+      ]
+    case 'student':
+    default:
+      // For students, show academic info
+      return [
+        { label: "University", value: profileUser.university, icon: GraduationCap },
+        { label: "Major", value: profileUser.major, icon: BookOpen },
+        { label: "Year", value: profileUser.year, icon: Calendar },
+        { label: "GPA", value: profileUser.gpa, icon: Award },
+      ]
+  }
 }
 
 export default function UserProfilePage() {
@@ -187,7 +236,8 @@ export default function UserProfilePage() {
             skills: profile.skills.map(s => s.skill),
             interests: profile.interests.map(i => i.interest),
             achievements: profile.achievements ?? [],
-            connections: profile.connectionsCount ?? 0
+            connections: profile.connectionsCount ?? 0,
+            professionalDetails: profile.professionalDetails ? JSON.parse(profile.professionalDetails) : null
           })
 
           // Fetch user posts
@@ -628,16 +678,13 @@ export default function UserProfilePage() {
                   {/* About Tab - Dynamic Professional Details */}
                   <TabsContent value="about">
                     <div className="w-full space-y-8">
-                      {/* Education Grid */}
+                      {/* Professional Information Grid - Dynamic based on profession */}
                       <div>
-                        <h3 className="text-lg font-bold text-foreground mb-4">Education</h3>
+                        <h3 className="text-lg font-bold text-foreground mb-4">
+                          {profileUser.profession === 'student' ? 'Education' : 'Professional Information'}
+                        </h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {[
-                            { label: "University", value: profileUser.university, icon: GraduationCap },
-                            { label: "Major", value: profileUser.major, icon: BookOpen },
-                            { label: "Year", value: profileUser.year, icon: Calendar },
-                            { label: "GPA", value: profileUser.gpa, icon: Award },
-                          ].map((stat, i) => (
+                          {getProfessionFields(profileUser.profession, profileUser).map((stat, i) => (
                             <Card key={i} className="border border-gray-100 dark:border-border bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
                               <CardContent className="p-5 flex flex-col items-center text-center gap-3">
                                 <div className="p-2 rounded-full bg-gray-50 dark:bg-muted text-muted-foreground">
