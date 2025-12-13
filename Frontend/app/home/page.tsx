@@ -20,6 +20,7 @@ import {
   Image as ImageIcon,
   Smile,
   Loader2,
+  Flag,
 } from "lucide-react";
 
 // Components
@@ -65,6 +66,7 @@ import {
   UserProfileResponse,
   getUnreadMessageCount,
   getUnreadCount,
+  reportPost,
 } from "@/lib/api";
 
 // Cropping
@@ -536,6 +538,30 @@ export default function HomePage() {
     }
   };
 
+  const handleReportPost = async (postId: number) => {
+    const sVal = sessionStorage.getItem("user");
+    if (!sVal) return;
+    const user: LoginResponse = JSON.parse(sVal);
+    
+    const reason = prompt("Please provide a reason for reporting this post:");
+    if (!reason || !reason.trim()) {
+      toast.error("Report canceled - no reason provided");
+      return;
+    }
+
+    try {
+      const response = await reportPost(postId, user.id, reason.trim());
+      toast.success("Post reported. Thank you for keeping the community safe.");
+      
+      // If the post was auto-deleted, refresh the feed
+      if (response.message.includes("deleted")) {
+        await fetchPosts(user.profession, user.id);
+      }
+    } catch (e) {
+      toast.error("Failed to report post");
+    }
+  };
+
 
 const handleWebSocketMessage = useCallback(
     (topic: string, message: unknown) => {
@@ -742,19 +768,32 @@ const handleWebSocketMessage = useCallback(
                               </p>
                             </div>
                           </div>
-                          {isOwn && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                              onClick={() => {
-                                setPostToDelete(post.id);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex gap-1">
+                            {!isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-orange-500"
+                                onClick={() => handleReportPost(post.id)}
+                                title="Report this post"
+                              >
+                                <Flag className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {isOwn && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                onClick={() => {
+                                  setPostToDelete(post.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="p-4 pt-2">
