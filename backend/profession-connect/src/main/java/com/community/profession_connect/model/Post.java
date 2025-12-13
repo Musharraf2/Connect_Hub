@@ -60,6 +60,11 @@ public class Post {
     @EqualsAndHashCode.Exclude
     private List<Comment> comments;
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<PostReport> reports;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
