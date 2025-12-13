@@ -469,7 +469,11 @@ export default function UserProfilePage() {
                             {sendingRequest ? "Sending..." : "Connect"}
                           </Button>
                         )}
-                        <Button variant="outline" className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95">
+                        <Button 
+                          variant="outline" 
+                          className="rounded-full shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95"
+                          onClick={() => router.push(`/messages?userId=${profileUser.id}`)}
+                        >
                           <MessageCircle className="w-4 h-4 mr-2" />
                           Message
                         </Button>
