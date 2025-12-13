@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -210,6 +211,12 @@ public class PostService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if user has already reported this post
+        Optional<PostReport> existingReport = postReportRepository.findByPostIdAndUserId(postId, userId);
+        if (existingReport.isPresent()) {
+            return "You have already reported this post";
+        }
 
         // Save the report
         PostReport report = new PostReport();
