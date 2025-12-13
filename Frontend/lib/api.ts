@@ -366,6 +366,21 @@ export const getPostsByProfession = async (profession: string, userId: number): 
     return await response.json();
 };
 
+export const getPostsByUserId = async (userId: number, currentUserId: number): Promise<PostResponse[]> => {
+    const response = await fetch(`${BASE}/posts/user/${userId}?currentUserId=${currentUserId}`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch user posts');
+    return await response.json();
+};
+
+export const updatePost = async (postId: number, userId: number, content: string): Promise<PostResponse> => {
+    const response = await fetch(`${BASE}/posts/${postId}?userId=${userId}&content=${encodeURIComponent(content)}`, {
+        method: 'PUT'
+    });
+    if (!response.ok) throw new Error('Failed to update post');
+    return await response.json();
+};
+
 export const deletePost = async (postId: number, userId: number): Promise<string> => {
     const response = await fetch(`${BASE}/posts/${postId}?userId=${userId}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Failed to delete post');
