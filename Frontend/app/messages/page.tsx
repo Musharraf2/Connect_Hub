@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
@@ -67,6 +67,7 @@ const parseMessageContent = (content: string): { text: string; imageUrl: string 
 
 export default function MessagesPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
     const [conversations, setConversations] = useState<ConversationResponse[]>([]);
     const [selectedConversation, setSelectedConversation] = useState<ConversationResponse | null>(null);
@@ -212,6 +213,19 @@ export default function MessagesPage() {
             }
         };
     }, [currentUser?.id]);
+
+    // Auto-select conversation when userId parameter is present
+    useEffect(() => {
+        const userId = searchParams.get('userId');
+        if (userId && conversations.length > 0 && currentUser?.id) {
+            const targetUserId = parseInt(userId);
+            const targetConversation = conversations.find(c => c.userId === targetUserId);
+            
+            if (targetConversation) {
+                loadConversation(targetConversation);
+            }
+        }
+    }, [searchParams, conversations]);
 
     const loadConversations = async (userId: number) => {
         console.log('[Messages] Loading conversations for user:', userId);

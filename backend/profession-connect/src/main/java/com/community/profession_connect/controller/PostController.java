@@ -47,6 +47,27 @@ public class PostController {
         return ResponseEntity.ok(posts);
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<PostResponse>> getPostsByUserId(
+        @PathVariable Long userId,
+        @RequestParam Long currentUserId
+    ) {
+        List<PostResponse> posts = postService.getPostsByUserId(userId, currentUserId);
+        return ResponseEntity.ok(posts);
+    }
+
+    @PutMapping("/{postId}")
+    public ResponseEntity<PostResponse> updatePost(
+        @PathVariable Long postId,
+        @RequestParam Long userId,
+        @RequestBody PostRequest request
+    ) {
+        PostResponse response = postService.updatePost(postId, userId, request.getContent());
+        // Broadcast update to all subscribers
+        messagingTemplate.convertAndSend("/topic/posts/" + response.getUser().getProfession() + "/update", response);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{postId}")
     public ResponseEntity<String> deletePost(
         @PathVariable Long postId,
