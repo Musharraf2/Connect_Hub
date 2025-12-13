@@ -184,49 +184,74 @@ const getImageUrl = (url: string | null | undefined) => {
     return `http://localhost:8080${url}`;
 };
 
-// Helper function to get profession-specific fields
+// Icon mapping for common field types
+const getIconForField = (fieldKey: string) => {
+  const key = fieldKey.toLowerCase()
+  if (key.includes('hospital') || key.includes('clinic') || key.includes('company') || key.includes('organization') || key.includes('institution') || key.includes('school') || key.includes('studio')) return Building
+  if (key.includes('experience') || key.includes('years')) return Clock
+  if (key.includes('specialization') || key.includes('specialty') || key.includes('subject') || key.includes('genre') || key.includes('style') || key.includes('type')) return Briefcase
+  if (key.includes('license') || key.includes('certification') || key.includes('award') || key.includes('achievement')) return Award
+  if (key.includes('university') || key.includes('college') || key.includes('education')) return GraduationCap
+  if (key.includes('major') || key.includes('degree') || key.includes('course')) return BookOpen
+  if (key.includes('year') || key.includes('date')) return Calendar
+  if (key.includes('skill') || key.includes('expertise')) return Zap
+  if (key.includes('location') || key.includes('address')) return MapPin
+  if (key.includes('phone') || key.includes('contact')) return Phone
+  if (key.includes('email')) return Mail
+  return Briefcase // Default icon
+}
+
+// Format field label for display (convert camelCase/snake_case to Title Case)
+const formatFieldLabel = (key: string) => {
+  return key
+    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+    .trim()
+}
+
+// Helper function to get profession-specific fields dynamically
 const getProfessionFields = (profession: string, currentUser: CurrentUser) => {
   const professionLower = profession.toLowerCase()
   
-  switch (professionLower) {
-    case 'doctor':
-      return [
-        { label: "Hospital/Clinic", value: currentUser.professionalDetails?.hospital || "N/A", icon: Building },
-        { label: "Specialization", value: currentUser.professionalDetails?.specialization || "N/A", icon: Stethoscope },
-        { label: "Years of Experience", value: currentUser.professionalDetails?.experience || "N/A", icon: Clock },
-        { label: "License Number", value: currentUser.professionalDetails?.licenseNumber || "N/A", icon: Award },
-      ]
-    case 'teacher':
-      return [
-        { label: "School/Institution", value: currentUser.professionalDetails?.school || "N/A", icon: Building },
-        { label: "Subject/Grade", value: currentUser.professionalDetails?.subject || "N/A", icon: BookOpen },
-        { label: "Years of Experience", value: currentUser.professionalDetails?.experience || "N/A", icon: Clock },
-        { label: "Certification", value: currentUser.professionalDetails?.certification || "N/A", icon: Award },
-      ]
-    case 'musician':
-      return [
-        { label: "Instrument/Voice", value: currentUser.professionalDetails?.instrument || "N/A", icon: Music },
-        { label: "Genre", value: currentUser.professionalDetails?.genre || "N/A", icon: Music },
-        { label: "Years of Experience", value: currentUser.professionalDetails?.experience || "N/A", icon: Clock },
-        { label: "Awards", value: currentUser.professionalDetails?.awards || "N/A", icon: Award },
-      ]
-    case 'dancer':
-      return [
-        { label: "Dance Style", value: currentUser.professionalDetails?.danceStyle || "N/A", icon: Zap },
-        { label: "Studio/Company", value: currentUser.professionalDetails?.studio || "N/A", icon: Building },
-        { label: "Years of Experience", value: currentUser.professionalDetails?.experience || "N/A", icon: Clock },
-        { label: "Awards", value: currentUser.professionalDetails?.awards || "N/A", icon: Award },
-      ]
-    case 'student':
-    default:
-      // For students, show academic info
-      return [
-        { label: "University", value: currentUser.university, icon: GraduationCap },
-        { label: "Major", value: currentUser.major, icon: BookOpen },
-        { label: "Year", value: currentUser.year, icon: Calendar },
-        { label: "GPA", value: currentUser.gpa, icon: Award },
-      ]
+  // For students, always show academic info
+  if (professionLower === 'student') {
+    return [
+      { label: "University", value: currentUser.university, icon: GraduationCap },
+      { label: "Major", value: currentUser.major, icon: BookOpen },
+      { label: "Year", value: currentUser.year, icon: Calendar },
+      { label: "GPA", value: currentUser.gpa, icon: Award },
+    ]
   }
+  
+  // For all other professions, dynamically build fields from professionalDetails
+  const fields = []
+  
+  if (currentUser.professionalDetails && typeof currentUser.professionalDetails === 'object') {
+    // Convert professionalDetails object to array of field objects
+    Object.entries(currentUser.professionalDetails).forEach(([key, value]) => {
+      if (value && value !== 'N/A' && value !== '') {
+        fields.push({
+          label: formatFieldLabel(key),
+          value: String(value),
+          icon: getIconForField(key)
+        })
+      }
+    })
+  }
+  
+  // If no professional details, show generic placeholder fields
+  if (fields.length === 0) {
+    return [
+      { label: "Organization", value: "N/A", icon: Building },
+      { label: "Specialization", value: "N/A", icon: Briefcase },
+      { label: "Experience", value: "N/A", icon: Clock },
+      { label: "Certification", value: "N/A", icon: Award },
+    ]
+  }
+  
+  // Limit to 4 most important fields for clean UI
+  return fields.slice(0, 4)
 }
 
 export default function ProfilePage() {
@@ -701,19 +726,24 @@ export default function ProfilePage() {
                   <div className="w-full space-y-8">
                     {/* Professional Information Grid - Dynamic based on profession */}
                     <div>
-                      <h3 className="text-lg font-bold text-foreground mb-4">
-                        {currentUser.profession === 'student' ? 'Education' : 'Professional Information'}
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl font-bold text-foreground">
+                          {currentUser.profession === 'student' ? 'Education' : 'Professional Information'}
+                        </h3>
+                        <Badge variant="outline" className="capitalize">
+                          {currentUser.profession}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {getProfessionFields(currentUser.profession, currentUser).map((stat, i) => (
-                          <Card key={i} className="border border-gray-100 dark:border-border bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="p-5 flex flex-col items-center text-center gap-3">
-                              <div className="p-2 rounded-full bg-gray-50 dark:bg-muted text-muted-foreground">
-                                <stat.icon className="w-5 h-5" />
+                          <Card key={i} className="group border border-gray-200 dark:border-border bg-gradient-to-br from-white to-gray-50/50 dark:from-card dark:to-card/50 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                            <CardContent className="p-6 flex flex-col items-center text-center gap-4">
+                              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+                                <stat.icon className="w-6 h-6" />
                               </div>
-                              <div>
-                                <div className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">{stat.label}</div>
-                                <div className="font-bold text-foreground text-sm mt-1 line-clamp-2">{stat.value}</div>
+                              <div className="w-full">
+                                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{stat.label}</div>
+                                <div className="font-bold text-foreground text-base leading-tight break-words">{stat.value}</div>
                               </div>
                             </CardContent>
                           </Card>
