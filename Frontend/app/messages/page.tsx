@@ -158,8 +158,9 @@ export default function MessagesPage() {
 
             // Subscribe to read receipts
             client.subscribe(`/queue/read/${currentUser.id}`, (message) => {
-                const otherUserId = parseInt(message.body);
-                console.log("[WebSocket] Messages read by user:", otherUserId);
+                const readNotification = JSON.parse(message.body);
+                const otherUserId = readNotification.receiverId;
+                console.log("[WebSocket] Messages read by user:", otherUserId, "at", new Date(readNotification.timestamp));
                 
                 // Update messages to mark as read
                 setMessages((prev) =>
@@ -193,9 +194,17 @@ export default function MessagesPage() {
 
             // Subscribe to online status updates
             client.subscribe(`/topic/online-status`, (message) => {
-                console.log("[WebSocket] Online status update:", message.body);
-                // Reload conversations to update online status
-                loadConversations(currentUser.id!);
+                const statusUpdate = JSON.parse(message.body);
+                console.log("[WebSocket] Online status update:", statusUpdate);
+                
+                // Update conversations to reflect online status
+                setConversations((prev) =>
+                    prev.map((conv) =>
+                        conv.userId === statusUpdate.userId
+                            ? { ...conv, isOnline: statusUpdate.status === "ONLINE" }
+                            : conv
+                    )
+                );
             });
         };
 
