@@ -79,6 +79,31 @@ const parseMessageContent = (content: string): { text: string; imageUrl: string 
     return { text: content, imageUrl: null };
 };
 
+// Helper function to format last message preview for conversation list
+const formatLastMessagePreview = (content: string): string => {
+    if (!content) return "No messages yet";
+    
+    // Check for [IMAGE] pattern
+    const imageRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
+    const imageMatch = content.match(imageRegex);
+    
+    if (imageMatch) {
+        const text = content.replace(imageRegex, '').trim();
+        return text ? text : "📷 Image";
+    }
+    
+    // Check for old pattern [SHARED_POST_IMAGE]
+    const sharedImageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
+    const sharedMatch = content.match(sharedImageRegex);
+    
+    if (sharedMatch) {
+        const text = content.replace(sharedImageRegex, '').trim();
+        return text ? text : "📷 Image";
+    }
+    
+    return content;
+};
+
 export default function MessagesPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -484,7 +509,7 @@ export default function MessagesPage() {
                                                     </div>
                                                     <div className="flex justify-between items-center mt-1">
                                                         <p className="text-sm text-muted-foreground truncate">
-                                                            {conversation.lastMessage || "No messages yet"}
+                                                            {formatLastMessagePreview(conversation.lastMessage)}
                                                         </p>
                                                         {conversation.unreadCount > 0 && (
                                                             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground ml-2">
