@@ -650,7 +650,7 @@ const handleWebSocketMessage = useCallback(
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Header user={currentUser} />
 
-      <main className="container mx-auto grid lg:grid-cols-4 gap-6 py-8 px-4">
+      <main className="container mx-auto grid lg:grid-cols-4 gap-6 py-8 px-4 pb-24 md:pb-8">
         {/* Left Sidebar - User Profile */}
         <aside className="hidden lg:block lg:col-span-1">
           <div className="sticky top-24 space-y-6">

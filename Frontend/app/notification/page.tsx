@@ -252,7 +252,7 @@ export default function NotificationsPage() {
         <div className="min-h-screen bg-background">
             <Header user={currentUser} />
 
-            <main className="container mx-auto max-w-3xl py-8 px-4">
+            <main className="container mx-auto max-w-3xl py-8 px-4 pb-24 md:pb-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h1 className="font-serif text-3xl font-bold">Notifications</h1>

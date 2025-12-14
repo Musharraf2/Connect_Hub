@@ -159,6 +159,21 @@ export function Header({ user }: HeaderProps) {
 
                 {/* Right Side: Controls & Profile */}
                 <div className="flex items-center gap-2">
+                    {/* Mobile Message Icon - Only visible on mobile */}
+                    {user && (
+                        <Link 
+                            href="/messages" 
+                            className="md:hidden relative flex items-center justify-center h-10 w-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                        >
+                            <MessageCircle className="h-5 w-5" />
+                            {user.unreadMessageCount && user.unreadMessageCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-gradient-to-br from-destructive to-destructive/80 text-[10px] font-bold text-white shadow-sm">
+                                    {user.unreadMessageCount > 99 ? '99+' : user.unreadMessageCount}
+                                </span>
+                            )}
+                        </Link>
+                    )}
+
                     {/* Theme Toggle */}
                     <Button
                         variant="ghost"
@@ -182,10 +197,10 @@ export function Header({ user }: HeaderProps) {
                                 <span className="hidden md:inline">{user.community}</span>
                             </Badge>
 
-                            {/* User Dropdown */}
+                            {/* User Dropdown - Hidden on mobile */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="flex items-center gap-2 pl-1.5 pr-3 h-auto rounded-full hover:bg-accent transition-all">
+                                    <Button variant="ghost" className="hidden md:flex items-center gap-2 pl-1.5 pr-3 h-auto rounded-full hover:bg-accent transition-all">
                                         <Avatar className="w-9 h-9 border-2 border-primary/20 shadow-sm">
                                             <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                                             <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-xs font-semibold">
@@ -240,6 +255,90 @@ export function Header({ user }: HeaderProps) {
                     )}
                 </div>
             </div>
+
+            {/* Mobile Bottom Navigation - Only visible on mobile */}
+            {user && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/40 shadow-lg supports-[backdrop-filter]:bg-background/80">
+                    <div className="container mx-auto px-4 h-16 flex items-center justify-around">
+                        {/* My Community */}
+                        <Link 
+                            href="/my-community"
+                            className={cn(
+                                "flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out min-w-[60px]",
+                                pathname === "/my-community"
+                                    ? "text-primary" 
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Home className={cn("w-5 h-5", pathname === "/my-community" && "fill-current")} />
+                            <span className="text-[10px] font-medium">Community</span>
+                        </Link>
+
+                        {/* Notifications */}
+                        <Link 
+                            href="/notification"
+                            className={cn(
+                                "relative flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out min-w-[60px]",
+                                pathname === "/notification"
+                                    ? "text-primary" 
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <div className="relative">
+                                <Bell className={cn("w-5 h-5", pathname === "/notification" && "fill-current")} />
+                                {user.unreadNotificationCount && user.unreadNotificationCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-gradient-to-br from-destructive to-destructive/80 text-[10px] font-bold text-white shadow-sm">
+                                        {user.unreadNotificationCount > 99 ? '99+' : user.unreadNotificationCount}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-[10px] font-medium">Notifications</span>
+                        </Link>
+
+                        {/* Profile Dropdown */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out text-muted-foreground hover:text-foreground min-w-[60px]">
+                                    <Avatar className="w-6 h-6 border-2 border-primary/20 shadow-sm">
+                                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                                        <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-[10px] font-semibold">
+                                            {user.name.slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-[10px] font-medium">Profile</span>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64 p-2 shadow-lg mb-2">
+                                <DropdownMenuLabel className="font-normal p-3">
+                                    <div className="flex flex-col space-y-1.5">
+                                        <p className="text-sm font-semibold leading-none">{user.name}</p>
+                                        <p className="text-xs leading-none text-muted-foreground capitalize flex items-center gap-1.5">
+                                            <CommunityIcon className="w-3 h-3" />
+                                            {user.community} Account
+                                        </p>
+                                    </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild className="cursor-pointer focus:bg-accent rounded-md">
+                                    <Link href="/profile" className="flex items-center gap-2.5 p-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            <User className="w-4 h-4 text-primary" />
+                                        </div>
+                                        <span className="font-medium">My Profile</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer rounded-md p-2.5" onClick={handleSignOut}>
+                                    <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center mr-2.5">
+                                        <LogOut className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-medium">Sign Out</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+            )}
         </header>
     )
 }

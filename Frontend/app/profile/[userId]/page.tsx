@@ -386,7 +386,7 @@ export default function UserProfilePage() {
       <div className="min-h-screen bg-gray-50 dark:bg-background transition-colors duration-300">
         <Header user={currentUser} />
 
-        <main className="container mx-auto px-4 py-8 max-w-6xl">
+        <main className="container mx-auto px-4 py-8 pb-24 md:pb-8 max-w-6xl">
           
           {/* Back Button */}
           <div className="mb-6">

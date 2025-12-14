@@ -457,7 +457,7 @@ export default function MessagesPage() {
         <div className="min-h-screen bg-background text-foreground">
             <Header user={{ ...currentUser, unreadMessageCount: unreadCount }} />
 
-            <div className="container mx-auto px-4 py-6 h-[calc(100vh-5rem)]">
+            <div className="container mx-auto px-4 py-6 pb-24 md:pb-6 h-[calc(100vh-5rem)] md:h-[calc(100vh-5rem)]">
                 <div className="flex h-full gap-4">
                     {/* Left Panel - Conversations */}
                     <div className="w-full md:w-80 lg:w-96 bg-card border border-border rounded-lg flex flex-col">

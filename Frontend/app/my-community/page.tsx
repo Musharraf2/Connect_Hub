@@ -349,7 +349,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-background transition-colors duration-300">
         <Header user={{...currentUser, pendingRequests: pendingRequests.length}} />
 
-        <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4">
+        <main className="container mx-auto grid lg:grid-cols-3 gap-8 py-8 px-4 pb-24 md:pb-8">
           
           {/* Left Sidebar */}
         <aside className="hidden lg:block lg:col-span-1">
