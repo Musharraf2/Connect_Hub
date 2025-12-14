@@ -115,7 +115,7 @@ export function Header({ user }: HeaderProps) {
                         <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
                             <Users className="w-5 h-5 text-white" />
                         </div>
-                        <span className="hidden sm:inline text-xl font-bold tracking-tight text-gradient">
+                        <span className="text-xl font-bold tracking-tight text-gradient">
                             ConnectHub
                         </span>
                     </Link>
