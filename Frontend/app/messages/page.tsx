@@ -158,21 +158,25 @@ export default function MessagesPage() {
 
             // Subscribe to read receipts
             client.subscribe(`/queue/read/${currentUser.id}`, (message) => {
-                const readNotification = JSON.parse(message.body);
-                const otherUserId = readNotification.receiverId;
-                console.log("[WebSocket] Messages read by user:", otherUserId, "at", new Date(readNotification.timestamp));
-                
-                // Update messages to mark as read
-                setMessages((prev) =>
-                    prev.map((msg) =>
-                        msg.senderId === currentUser.id && msg.receiverId === otherUserId
-                            ? { ...msg, isRead: true }
-                            : msg
-                    )
-                );
-                
-                // Reload conversations to update unread counts
-                loadConversations(currentUser.id!);
+                try {
+                    const readNotification = JSON.parse(message.body);
+                    const otherUserId = readNotification.receiverId;
+                    console.log("[WebSocket] Messages read by user:", otherUserId, "at", new Date(readNotification.timestamp));
+                    
+                    // Update messages to mark as read
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.senderId === currentUser.id && msg.receiverId === otherUserId
+                                ? { ...msg, isRead: true }
+                                : msg
+                        )
+                    );
+                    
+                    // Reload conversations to update unread counts
+                    loadConversations(currentUser.id!);
+                } catch (error) {
+                    console.error("[WebSocket] Failed to parse read notification:", error);
+                }
             });
 
             // Subscribe to message deletion events
@@ -194,17 +198,24 @@ export default function MessagesPage() {
 
             // Subscribe to online status updates
             client.subscribe(`/topic/online-status`, (message) => {
-                const statusUpdate = JSON.parse(message.body);
-                console.log("[WebSocket] Online status update:", statusUpdate);
-                
-                // Update conversations to reflect online status
-                setConversations((prev) =>
-                    prev.map((conv) =>
-                        conv.userId === statusUpdate.userId
-                            ? { ...conv, isOnline: statusUpdate.status === "ONLINE" }
-                            : conv
-                    )
-                );
+                try {
+                    const statusUpdate = JSON.parse(message.body);
+                    console.log("[WebSocket] Online status update:", statusUpdate);
+                    
+                    // Validate the status update structure
+                    if (statusUpdate.userId && statusUpdate.status) {
+                        // Update conversations to reflect online status
+                        setConversations((prev) =>
+                            prev.map((conv) =>
+                                conv.userId === statusUpdate.userId
+                                    ? { ...conv, isOnline: statusUpdate.status === "ONLINE" }
+                                    : conv
+                            )
+                        );
+                    }
+                } catch (error) {
+                    console.error("[WebSocket] Failed to parse online status update:", error);
+                }
             });
         };
 
