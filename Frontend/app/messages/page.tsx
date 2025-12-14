@@ -7,7 +7,7 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Trash2, Check, CheckCheck, Smile, Paperclip, Loader2 } from "lucide-react";
+import { Send, Search, Trash2, Check, CheckCheck, Smile, Paperclip, Loader2, ArrowLeft } from "lucide-react";
 
 // Emoji Picker
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -39,6 +39,9 @@ import {
     MessageResponse,
     LoginResponse,
 } from "@/lib/api";
+
+// Utils
+import { cn } from "@/lib/utils";
 
 interface CurrentUser {
     id?: number;
@@ -457,10 +460,13 @@ export default function MessagesPage() {
         <div className="min-h-screen bg-background text-foreground">
             <Header user={{ ...currentUser, unreadMessageCount: unreadCount }} />
 
-            <div className="container mx-auto px-4 py-6 h-[calc(100vh-5rem)]">
-                <div className="flex h-full gap-4">
+            <div className="md:container md:mx-auto md:px-4 md:py-6 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)]">
+                <div className="flex h-full md:gap-4">
                     {/* Left Panel - Conversations */}
-                    <div className="w-full md:w-80 lg:w-96 bg-card border border-border rounded-lg flex flex-col">
+                    <div className={cn(
+                        "w-full md:w-80 lg:w-96 bg-card md:border border-border md:rounded-lg flex flex-col",
+                        selectedConversation ? "hidden md:flex" : "flex"
+                    )}>
                         <div className="p-4 border-b border-border">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -527,10 +533,24 @@ export default function MessagesPage() {
                     </div>
 
                     {/* Right Panel - Chat */}
-                    <div className="flex-1 bg-card border border-border rounded-lg flex flex-col">
+                    <div className={cn(
+                        "flex-1 bg-card md:border border-border md:rounded-lg flex flex-col",
+                        !selectedConversation ? "hidden md:flex" : "flex"
+                    )}>
                         {selectedConversation ? (
                             <>
                                 <div className="p-4 border-b border-border flex items-center gap-3">
+                                    {/* Back Button (Mobile Only) */}
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setSelectedConversation(null)}
+                                        className="md:hidden h-10 w-10 shrink-0"
+                                        aria-label="Back to conversations"
+                                    >
+                                        <ArrowLeft className="w-5 h-5" />
+                                    </Button>
+                                    
                                     <div className="relative">
                                         <Avatar className="w-10 h-10">
                                             <AvatarImage src={getImageUrl(selectedConversation.userProfileImageUrl)} />
