@@ -546,6 +546,7 @@ export default function MessagesPage() {
                                         size="icon"
                                         onClick={() => setSelectedConversation(null)}
                                         className="md:hidden h-10 w-10 shrink-0"
+                                        aria-label="Back to conversations"
                                     >
                                         <ArrowLeft className="w-5 h-5" />
                                     </Button>
