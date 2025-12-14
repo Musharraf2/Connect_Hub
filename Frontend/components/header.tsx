@@ -258,11 +258,12 @@ export function Header({ user }: HeaderProps) {
 
             {/* Mobile Bottom Navigation - Only visible on mobile */}
             {user && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/40 shadow-lg supports-[backdrop-filter]:bg-background/80">
+                <nav aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/40 shadow-lg supports-[backdrop-filter]:bg-background/80">
                     <div className="container mx-auto px-4 h-16 flex items-center justify-around">
                         {/* My Community */}
                         <Link 
                             href="/my-community"
+                            aria-current={pathname === "/my-community" ? "page" : undefined}
                             className={cn(
                                 "flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out min-w-[60px]",
                                 pathname === "/my-community"
@@ -277,6 +278,7 @@ export function Header({ user }: HeaderProps) {
                         {/* Notifications */}
                         <Link 
                             href="/notification"
+                            aria-current={pathname === "/notification" ? "page" : undefined}
                             className={cn(
                                 "relative flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out min-w-[60px]",
                                 pathname === "/notification"
@@ -298,7 +300,10 @@ export function Header({ user }: HeaderProps) {
                         {/* Profile Dropdown */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out text-muted-foreground hover:text-foreground min-w-[60px]">
+                                <button 
+                                    aria-label="Open profile menu"
+                                    className="flex flex-col items-center justify-center gap-1 py-2 px-4 rounded-lg transition-all duration-200 ease-in-out text-muted-foreground hover:text-foreground min-w-[60px]"
+                                >
                                     <Avatar className="w-6 h-6 border-2 border-primary/20 shadow-sm">
                                         <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                                         <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white text-[10px] font-semibold">
@@ -337,7 +342,7 @@ export function Header({ user }: HeaderProps) {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
-                </div>
+                </nav>
             )}
         </header>
     )
