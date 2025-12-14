@@ -336,9 +336,14 @@ export default function MessagesPage() {
         if (!file || !selectedConversation || !currentUser?.id) return;
 
         // Validate file is an image (both MIME type and extension)
-        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        // Safely extract file extension
+        const lastDotIndex = file.name.lastIndexOf('.');
+        const fileExtension = lastDotIndex !== -1 
+            ? file.name.toLowerCase().substring(lastDotIndex) 
+            : '';
         
         if (!validImageTypes.includes(file.type) || !validExtensions.includes(fileExtension)) {
             toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');

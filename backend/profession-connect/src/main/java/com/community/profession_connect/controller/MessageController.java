@@ -122,6 +122,17 @@ public class MessageController {
     @PostMapping("/image")
     public ResponseEntity<Map<String, String>> uploadMessageImage(@RequestParam("file") MultipartFile file) {
         try {
+            // Validate file is not empty
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
+            }
+
+            // Validate file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
+            }
+
             // Upload image to Cloudinary in the "message-images" folder
             String imageUrl = fileStorageService.storeFile(file, "message-images");
             
