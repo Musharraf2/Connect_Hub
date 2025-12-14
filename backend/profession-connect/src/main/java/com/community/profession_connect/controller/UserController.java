@@ -7,6 +7,7 @@ import com.community.profession_connect.dto.UserProfileDetailResponse; // <-- IM
 import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.FileStorageService;
+import com.community.profession_connect.service.OnlineUserService;
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -24,11 +26,13 @@ public class UserController {
 
     private final UserService userService;
     private final FileStorageService fileStorageService;
+    private final OnlineUserService onlineUserService;
 
     @Autowired
-    public UserController(UserService userService, FileStorageService fileStorageService) {
+    public UserController(UserService userService, FileStorageService fileStorageService, OnlineUserService onlineUserService) {
         this.userService = userService;
         this.fileStorageService = fileStorageService;
+        this.onlineUserService = onlineUserService;
     }
 
     @PostMapping("/register")
@@ -136,5 +140,11 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload cover image: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/online-status")
+    public ResponseEntity<Set<Long>> getOnlineUsers() {
+        Set<Long> onlineUsers = onlineUserService.getOnlineUsers();
+        return ResponseEntity.ok(onlineUsers);
     }
 }

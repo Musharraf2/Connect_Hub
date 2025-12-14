@@ -12,6 +12,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -74,7 +75,11 @@ public class MessageController {
         messageService.markMessagesAsRead(receiverId, senderId);
         
         // Notify sender that messages were read
-        messagingTemplate.convertAndSend("/queue/read/" + senderId, receiverId);
+        Map<String, Object> readNotification = Map.of(
+            "receiverId", receiverId,
+            "timestamp", System.currentTimeMillis()
+        );
+        messagingTemplate.convertAndSend("/queue/read/" + senderId, readNotification);
         
         return ResponseEntity.ok().build();
     }

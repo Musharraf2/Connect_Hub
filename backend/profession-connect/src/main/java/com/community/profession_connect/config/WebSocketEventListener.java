@@ -42,7 +42,7 @@ public class WebSocketEventListener {
                     
                     // Broadcast online status change
                     messagingTemplate.convertAndSend("/topic/online-status", 
-                        String.valueOf(userId));
+                        Map.of("userId", userId, "status", "ONLINE"));
                 }
             }
         }
@@ -65,7 +65,7 @@ public class WebSocketEventListener {
             
             // Broadcast online status change
             messagingTemplate.convertAndSend("/topic/online-status", 
-                String.valueOf(userId));
+                Map.of("userId", userId, "status", "ONLINE"));
         }
     }
 
@@ -84,7 +84,7 @@ public class WebSocketEventListener {
             
             // Broadcast offline status change
             messagingTemplate.convertAndSend("/topic/online-status", 
-                String.valueOf(userId));
+                Map.of("userId", userId, "status", "OFFLINE"));
         }
     }
 }
