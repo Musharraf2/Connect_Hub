@@ -7,10 +7,9 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Circle, Trash2, Check, CheckCheck } from "lucide-react";
+import { Send, Search, Trash2, Check, CheckCheck } from "lucide-react";
 
 // Components
-//le kar dia
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,7 +81,10 @@ export default function MessagesPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
 
-    // Scroll to bottom of messages
+    // Online Users State
+    const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
+
+    // Scroll to bottom
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -91,7 +93,20 @@ export default function MessagesPage() {
         scrollToBottom();
     }, [messages]);
 
-    // Initialize user and load conversations
+    // Fetch Online Status API
+    const fetchOnlineStatus = async () => {
+        try {
+            const response = await fetch("http://localhost:8080/api/users/online-status");
+            if (response.ok) {
+                const data = await response.json();
+                setOnlineUsers(new Set(data));
+            }
+        } catch (error) {
+            console.error("Failed to fetch online status", error);
+        }
+    };
+
+    // Initialize User & Polling
     useEffect(() => {
         const userDataString = sessionStorage.getItem("user");
         if (!userDataString) {
@@ -110,20 +125,28 @@ export default function MessagesPage() {
             });
 
             loadConversations(user.id);
+            
+            // 1. Initial Fetch
+            fetchOnlineStatus();
+
+            // 2. Poll every 5 seconds (Backup mechanism)
+            const interval = setInterval(fetchOnlineStatus, 5000);
+            return () => clearInterval(interval);
+
         } catch (error) {
             sessionStorage.removeItem("user");
             router.push("/login");
         }
     }, [router]);
 
-    // Setup WebSocket connection
+    // Setup WebSocket
     useEffect(() => {
         if (!currentUser?.id) return;
 
         const client = new Client({
             webSocketFactory: () => new SockJS(`http://localhost:8080/ws?userId=${currentUser.id}`),
             debug: (str) => {
-                console.log("STOMP: " + str);
+                // console.log("STOMP: " + str);
             },
             reconnectDelay: 5000,
             heartbeatIncoming: 4000,
@@ -133,119 +156,94 @@ export default function MessagesPage() {
         client.onConnect = () => {
             console.log("WebSocket Connected");
 
-            // Subscribe to personal message queue
+            // 1. Listen for Incoming Messages
             client.subscribe(`/queue/messages/${currentUser.id}`, (message) => {
                 const newMessage: MessageResponse = JSON.parse(message.body);
-                console.log("[WebSocket] Received message:", newMessage);
                 
-                // Update messages if conversation is selected
                 const currentConversation = selectedConversationRef.current;
                 if (currentConversation && 
                     (newMessage.senderId === currentConversation.userId || 
                      newMessage.receiverId === currentConversation.userId)) {
-                    console.log("[WebSocket] Adding message to conversation");
+                    
                     setMessages((prev) => [...prev, newMessage]);
                     
-                    // Mark as read if sender is the selected conversation
+                    // Mark as read immediately if chat is open
                     if (newMessage.senderId === currentConversation.userId) {
                         markMessagesAsRead(currentUser.id!, currentConversation.userId);
                     }
                 }
                 
-                // Reload conversations to update last message and order
                 loadConversations(currentUser.id!);
             });
 
-            // Subscribe to read receipts
+            // 2. Listen for Read Receipts (Blue Ticks)
             client.subscribe(`/queue/read/${currentUser.id}`, (message) => {
-                const otherUserId = parseInt(message.body);
-                console.log("[WebSocket] Messages read by user:", otherUserId);
+                const body = JSON.parse(message.body);
+                const readerId = typeof body === 'number' ? body : body.readerId;
                 
-                // Update messages to mark as read
                 setMessages((prev) =>
                     prev.map((msg) =>
-                        msg.senderId === currentUser.id && msg.receiverId === otherUserId
+                        msg.senderId === currentUser.id && msg.receiverId === readerId
                             ? { ...msg, isRead: true }
                             : msg
                     )
                 );
-                
-                // Reload conversations to update unread counts
                 loadConversations(currentUser.id!);
             });
 
-            // Subscribe to message deletion events
+            // 3. Listen for Deletions
             client.subscribe(`/queue/delete/${currentUser.id}`, (message) => {
                 const deletedMessageId = parseInt(message.body);
-                console.log("[WebSocket] Message deleted, ID:", deletedMessageId);
-                console.log("[WebSocket] Current messages count before delete:", messages.length);
-                
-                // Remove message from local state
-                setMessages((prev) => {
-                    const filtered = prev.filter((msg) => msg.id !== deletedMessageId);
-                    console.log("[WebSocket] Messages count after filter:", filtered.length);
-                    return filtered;
-                });
-                
-                // Reload conversations to update last message
+                setMessages((prev) => prev.filter((msg) => msg.id !== deletedMessageId));
                 loadConversations(currentUser.id!);
             });
 
-            // Subscribe to online status updates
+            // 4. Listen for Online Status Updates
             client.subscribe(`/topic/online-status`, (message) => {
-                console.log("[WebSocket] Online status update:", message.body);
-                // Reload conversations to update online status
-                loadConversations(currentUser.id!);
-            });
-        };
+                try {
+                    const body = JSON.parse(message.body);
+                    let userId: number;
+                    let status: string = 'ONLINE';
 
-        client.onStompError = (frame) => {
-            console.error("Broker error: " + frame.headers["message"]);
-            console.error("Details: " + frame.body);
+                    if (typeof body === 'object' && body !== null) {
+                        userId = Number(body.userId);
+                        status = body.status;
+                    } else {
+                        userId = Number(body);
+                    }
+
+                    setOnlineUsers(prev => {
+                        const newSet = new Set(prev);
+                        if (status === 'ONLINE') {
+                            newSet.add(userId);
+                        } else {
+                            newSet.delete(userId);
+                        }
+                        return newSet;
+                    });
+                } catch (e) {
+                    console.error("Error parsing online status", e);
+                }
+            });
         };
 
         client.activate();
         setStompClient(client);
 
         return () => {
-            if (client.active) {
-                client.deactivate();
-            }
+            if (client.active) client.deactivate();
         };
     }, [currentUser?.id]);
 
-    // Auto-select conversation when userId parameter is present
-    useEffect(() => {
-        const userId = searchParams.get('userId');
-        if (userId && conversations.length > 0 && currentUser?.id) {
-            const targetUserId = parseInt(userId);
-            const targetConversation = conversations.find(c => c.userId === targetUserId);
-            
-            if (targetConversation) {
-                loadConversation(targetConversation);
-            }
-        }
-    }, [searchParams, conversations]);
-
+    // Load Conversation Logic
     const loadConversations = async (userId: number) => {
-        console.log('[Messages] Loading conversations for user:', userId);
         try {
             const convos = await getConversations(userId);
-            console.log('[Messages] Conversations loaded:', convos.length, 'conversations');
-            console.log('[Messages] Conversations data:', convos);
             setConversations(convos);
-            
-            // Calculate total unread count
             const totalUnread = convos.reduce((sum, c) => sum + c.unreadCount, 0);
             setUnreadCount(totalUnread);
-            
-            if (convos.length === 0) {
-                console.warn('[Messages] No conversations found. User may have no connections.');
-                toast("No conversations yet. Connect with others on the Dashboard to start messaging.");
-            }
         } catch (error) {
-            console.error("[Messages] Failed to load conversations:", error);
-            toast.error("Unable to load conversations. Please check that the backend is running on port 8080.");
+            console.error("Failed to load conversations:", error);
         } finally {
             setLoading(false);
         }
@@ -255,16 +253,12 @@ export default function MessagesPage() {
         if (!currentUser?.id) return;
         
         setSelectedConversation(conversation);
-        selectedConversationRef.current = conversation; // Update ref for WebSocket handler
+        selectedConversationRef.current = conversation;
         
         try {
             const msgs = await getConversation(currentUser.id, conversation.userId);
             setMessages(msgs);
-            
-            // Mark messages as read
             await markMessagesAsRead(currentUser.id, conversation.userId);
-            
-            // Reload conversations to update unread counts
             loadConversations(currentUser.id);
         } catch (error) {
             console.error("Failed to load conversation:", error);
@@ -281,16 +275,9 @@ export default function MessagesPage() {
                 receiverId: selectedConversation.userId,
                 content: messageInput.trim(),
             };
-
-            console.log("[Send] Sending message:", messageRequest);
-            
-            // Send via REST API (which also sends via WebSocket)
-            const response = await sendMessage(messageRequest);
-            console.log("[Send] Message sent, response:", response);
-            
+            await sendMessage(messageRequest);
             setMessageInput("");
         } catch (error) {
-            console.error("[Send] Failed to send message:", error);
             toast.error("Failed to send message");
         }
     };
@@ -302,23 +289,14 @@ export default function MessagesPage() {
 
     const confirmDeleteMessage = async () => {
         if (!messageToDelete || !currentUser?.id) return;
-
         try {
             await deleteMessage(messageToDelete, currentUser.id);
-            
-            // Remove message from local state
             setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
-            
-            // Reload conversations to update last message
-            if (selectedConversation) {
-                loadConversations(currentUser.id);
-            }
-            
+            if (selectedConversation) loadConversations(currentUser.id);
             setDeleteDialogOpen(false);
             setMessageToDelete(null);
             toast.success("Message deleted");
         } catch (error) {
-            console.error("Failed to delete message:", error);
             toast.error("Failed to delete message");
         }
     };
@@ -341,28 +319,18 @@ export default function MessagesPage() {
         const diff = now.getTime() - date.getTime();
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         
-        if (days === 0) {
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (days === 1) {
-            return "Yesterday";
-        } else if (days < 7) {
-            return date.toLocaleDateString([], { weekday: 'short' });
-        } else {
-            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        }
+        if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (days === 1) return "Yesterday";
+        if (days < 7) return date.toLocaleDateString([], { weekday: 'short' });
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     };
 
     const formatMessageTime = (timestamp: string) => {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     if (loading || !currentUser) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                Loading...
-            </div>
-        );
+        return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
     }
 
     return (
@@ -371,9 +339,8 @@ export default function MessagesPage() {
 
             <div className="container mx-auto px-4 py-6 h-[calc(100vh-5rem)]">
                 <div className="flex h-full gap-4">
-                    {/* Left Panel - Conversations List */}
+                    {/* Left Panel - Conversations */}
                     <div className="w-full md:w-80 lg:w-96 bg-card border border-border rounded-lg flex flex-col">
-                        {/* Search Header */}
                         <div className="p-4 border-b border-border">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -387,21 +354,10 @@ export default function MessagesPage() {
                             </div>
                         </div>
 
-                        {/* Conversations List */}
                         <div className="flex-1 overflow-y-auto">
                             {filteredConversations.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">
-                                    <p className="font-medium">No conversations available</p>
-                                    <p className="text-sm mt-2">
-                                        {conversations.length === 0 
-                                            ? "Connect with other users to start messaging!"
-                                            : "No matches found for your search."}
-                                    </p>
-                                    {conversations.length === 0 && (
-                                        <p className="text-xs mt-2 text-muted-foreground/70">
-                                            Go to Dashboard to connect with users in your community.
-                                        </p>
-                                    )}
+                                    <p className="font-medium">No conversations found</p>
                                 </div>
                             ) : (
                                 <div className="divide-y divide-border">
@@ -410,30 +366,23 @@ export default function MessagesPage() {
                                             key={conversation.userId}
                                             onClick={() => loadConversation(conversation)}
                                             className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
-                                                selectedConversation?.userId === conversation.userId
-                                                    ? "bg-muted"
-                                                    : ""
+                                                selectedConversation?.userId === conversation.userId ? "bg-muted" : ""
                                             }`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
                                                     <Avatar className="w-12 h-12">
-                                                        <AvatarImage
-                                                            src={getImageUrl(conversation.userProfileImageUrl)}
-                                                        />
-                                                        <AvatarFallback>
-                                                            {conversation.userName.charAt(0)}
-                                                        </AvatarFallback>
+                                                        <AvatarImage src={getImageUrl(conversation.userProfileImageUrl)} />
+                                                        <AvatarFallback>{conversation.userName.charAt(0)}</AvatarFallback>
                                                     </Avatar>
-                                                    {conversation.isOnline && (
-                                                        <Circle className="absolute bottom-0 right-0 w-3 h-3 fill-green-500 text-green-500" />
+                                                    {/* GREEN DOT INDICATOR */}
+                                                    {onlineUsers.has(conversation.userId) && (
+                                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full shadow-sm"></span>
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-baseline">
-                                                        <h3 className="font-semibold text-sm truncate">
-                                                            {conversation.userName}
-                                                        </h3>
+                                                        <h3 className="font-semibold text-sm truncate">{conversation.userName}</h3>
                                                         <span className="text-xs text-muted-foreground ml-2">
                                                             {formatTime(conversation.lastMessageTime)}
                                                         </span>
@@ -461,86 +410,55 @@ export default function MessagesPage() {
                     <div className="flex-1 bg-card border border-border rounded-lg flex flex-col">
                         {selectedConversation ? (
                             <>
-                                {/* Chat Header */}
                                 <div className="p-4 border-b border-border flex items-center gap-3">
-                                    <Avatar className="w-10 h-10">
-                                        <AvatarImage
-                                            src={getImageUrl(selectedConversation.userProfileImageUrl)}
-                                        />
-                                        <AvatarFallback>
-                                            {selectedConversation.userName.charAt(0)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <div className="relative">
+                                        <Avatar className="w-10 h-10">
+                                            <AvatarImage src={getImageUrl(selectedConversation.userProfileImageUrl)} />
+                                            <AvatarFallback>{selectedConversation.userName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        {/* Header Green Dot */}
+                                        {onlineUsers.has(selectedConversation.userId) && (
+                                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-card rounded-full"></span>
+                                        )}
+                                    </div>
                                     <div>
                                         <h2 className="font-semibold">{selectedConversation.userName}</h2>
+                                        {/* Status Text */}
                                         <p className="text-xs text-muted-foreground">
-                                            {selectedConversation.isOnline ? "Online" : "Offline"}
+                                            {onlineUsers.has(selectedConversation.userId) ? "Online" : "Offline"}
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Messages Area */}
                                 <div className="flex-1 p-4 overflow-y-auto">
                                     <div className="space-y-4">
                                         {messages.map((message) => {
                                             const isSent = message.senderId === currentUser.id;
                                             const { text, imageUrl } = parseMessageContent(message.content);
-                                            
                                             return (
-                                                <div
-                                                    key={message.id}
-                                                    className={`flex ${isSent ? "justify-end" : "justify-start"} group`}
-                                                >
-                                                    <div
-                                                        className={`max-w-[70%] rounded-lg px-4 py-2 relative ${
-                                                            isSent
-                                                                ? "bg-primary text-primary-foreground"
-                                                                : "bg-muted"
-                                                        }`}
-                                                    >
-                                                        {/* Delete button for sent messages */}
+                                                <div key={message.id} className={`flex ${isSent ? "justify-end" : "justify-start"} group`}>
+                                                    <div className={`max-w-[70%] rounded-lg px-4 py-2 relative ${isSent ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                                                         {isSent && (
-                                                            <button
-                                                                onClick={() => handleDeleteMessage(message.id)}
-                                                                className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
-                                                                title="Delete message"
-                                                            >
+                                                            <button onClick={() => handleDeleteMessage(message.id)} className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded">
                                                                 <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
                                                             </button>
                                                         )}
-                                                        
-                                                        <p className="text-sm whitespace-pre-wrap break-words">
-                                                            {text}
-                                                        </p>
+                                                        <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
                                                         {imageUrl && (
                                                             <div className="mt-2 rounded-md overflow-hidden border border-border">
-                                                                <img 
-                                                                    src={imageUrl} 
-                                                                    alt="Shared post" 
-                                                                    className="w-full max-w-xs object-cover"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = 'none';
-                                                                    }}
-                                                                />
+                                                                <img src={imageUrl} alt="Shared" className="w-full max-w-xs object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                                             </div>
                                                         )}
                                                         <div className="flex items-center justify-between mt-1 gap-2">
-                                                            <p
-                                                                className={`text-xs ${
-                                                                    isSent
-                                                                        ? "text-primary-foreground/70"
-                                                                        : "text-muted-foreground"
-                                                                }`}
-                                                            >
+                                                            <p className={`text-xs ${isSent ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                                                                 {formatMessageTime(message.timestamp)}
                                                             </p>
-                                                            {/* Read indicator for sent messages */}
                                                             {isSent && (
                                                                 <div className="flex items-center">
                                                                     {message.isRead ? (
-                                                                        <CheckCheck className="w-3 h-3 text-blue-500" title="Seen" />
+                                                                        <CheckCheck className="w-3 h-3 text-blue-300" />
                                                                     ) : (
-                                                                        <Check className="w-3 h-3 text-primary-foreground/50" title="Sent" />
+                                                                        <Check className="w-3 h-3 text-primary-foreground/50" />
                                                                     )}
                                                                 </div>
                                                             )}
@@ -553,7 +471,6 @@ export default function MessagesPage() {
                                     </div>
                                 </div>
 
-                                {/* Message Input */}
                                 <div className="p-4 border-t border-border">
                                     <div className="flex gap-2">
                                         <Textarea
@@ -564,12 +481,7 @@ export default function MessagesPage() {
                                             className="resize-none min-h-[44px] max-h-[120px]"
                                             rows={1}
                                         />
-                                        <Button
-                                            onClick={handleSendMessage}
-                                            disabled={!messageInput.trim()}
-                                            size="icon"
-                                            className="h-11 w-11 shrink-0"
-                                        >
+                                        <Button onClick={handleSendMessage} disabled={!messageInput.trim()} size="icon" className="h-11 w-11 shrink-0">
                                             <Send className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -579,7 +491,6 @@ export default function MessagesPage() {
                             <div className="flex-1 flex items-center justify-center text-center">
                                 <div className="text-muted-foreground">
                                     <p className="text-lg font-medium">Select a conversation</p>
-                                    <p className="text-sm mt-2">Choose a contact to start messaging</p>
                                 </div>
                             </div>
                         )}
@@ -587,29 +498,15 @@ export default function MessagesPage() {
                 </div>
             </div>
 
-            {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent className="sm:max-w-md bg-card border-border">
                     <DialogHeader>
-                        <DialogTitle className="text-card-foreground">Delete Message?</DialogTitle>
-                        <DialogDescription className="text-muted-foreground">
-                            Are you sure you want to delete this message? This action cannot be undone.
-                        </DialogDescription>
+                        <DialogTitle>Delete Message?</DialogTitle>
+                        <DialogDescription>This action cannot be undone.</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="flex gap-2 sm:justify-end">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setDeleteDialogOpen(false);
-                                setMessageToDelete(null);
-                            }}
-                            className="text-foreground border-border"
-                        >
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={confirmDeleteMessage}>
-                            Delete
-                        </Button>
+                        <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setMessageToDelete(null); }}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDeleteMessage}>Delete</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -1,5 +1,5 @@
 "use client"
-//hiii
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -37,6 +37,9 @@ import {
   getUnreadMessageCount,
   getUnreadCount
 } from "@/lib/api"
+// <--- 1. IMPORT WEBSOCKET HOOK
+import { useWebSocket } from "@/hooks/useWebSocket" 
+import axios from "axios" // Ensure axios is installed or use fetch
 
 // --- LOCAL TYPE EXTENSIONS ---
 type UserWithImage = UserProfileResponse & { profileImageUrl?: string | null };
@@ -85,10 +88,23 @@ export default function DashboardPage() {
   const [connections, setConnections] = useState<ExtendedConnection[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
 
+  // <--- 2. ADD ONLINE USERS STATE
+  const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set()) 
+
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter()
+
+  // <--- 3. FETCH INITIAL ONLINE USERS
+  const fetchOnlineUsers = async () => {
+    try {
+      const res = await axios.get<number[]>('http://localhost:8080/api/users/online-status');
+      setOnlineUsers(new Set(res.data));
+    } catch (error) {
+      console.error("Failed to fetch online users", error);
+    }
+  }
 
   useEffect(() => {
     const userDataString = sessionStorage.getItem('user');
@@ -134,7 +150,8 @@ export default function DashboardPage() {
             fetchAcceptedConnections(userId),
             fetchUsersByProfession(userProfession),
             fetchUnreadMessageCount(userId),
-            fetchUnreadNotificationCount(userId)
+            fetchUnreadNotificationCount(userId),
+            fetchOnlineUsers() // <--- Fetch initial online list
           ]);
           
         } catch (err) {
@@ -148,6 +165,28 @@ export default function DashboardPage() {
       loadInitialData(user.id, user.profession);
     }
   }, [router]);
+
+  // <--- 4. WEBSOCKET LISTENER FOR ONLINE STATUS
+  useWebSocket({
+    url: 'http://localhost:8080/ws',
+    userId: currentUser?.id,
+    topics: ['/topic/online-status'],
+    enabled: !!currentUser?.id,
+    onMessage: (topic, message) => {
+      if (topic === '/topic/online-status') {
+        const { userId, status } = message;
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev);
+          if (status === 'ONLINE') {
+            newSet.add(Number(userId));
+          } else {
+            newSet.delete(Number(userId));
+          }
+          return newSet;
+        });
+      }
+    }
+  });
 
   const fetchUsersByProfession = async (profession: string) => {
     setIsLoadingMembers(true);
@@ -324,12 +363,16 @@ export default function DashboardPage() {
                   </div>
                   <CardContent className="p-6 pt-0 relative">
                       <div className="flex justify-center -mt-12 mb-4">
-                          <Avatar className="w-24 h-24 border-4 border-card shadow-sm">
-                              <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
-                              <AvatarFallback className="text-xl bg-muted">
-                                  {profileData.name.split(" ").map((n) => n[0]).join("")}
-                              </AvatarFallback>
-                          </Avatar>
+                          <div className="relative"> {/* <--- WRAPPER FOR GREEN DOT */}
+                            <Avatar className="w-24 h-24 border-4 border-card shadow-sm">
+                                <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={profileData.name} />
+                                <AvatarFallback className="text-xl bg-muted">
+                                    {profileData.name.split(" ").map((n) => n[0]).join("")}
+                                </AvatarFallback>
+                            </Avatar>
+                            {/* USER'S OWN ONLINE STATUS (Always Green/Online) */}
+                            <span className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-card rounded-full shadow-sm"></span>
+                          </div>
                       </div>
 
                       <div className="text-center mb-6">
@@ -391,7 +434,7 @@ export default function DashboardPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Discover Tab - REDESIGNED COMPACT CARDS */}
+              {/* Discover Tab */}
               <TabsContent value="discover" className="space-y-6">
                 <div className="relative group">
                   <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -419,21 +462,24 @@ export default function DashboardPage() {
                   <StaggerContainer stagger={0.05} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredMembers.map((member) => {
                       const connectionStatus = getConnectionStatus(member.id);
+                      const isOnline = onlineUsers.has(member.id); // <--- CHECK STATUS
+
                       return (
                         <StaggerItem key={member.id}>
                           <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/50 bg-card overflow-hidden">
-                            
-                            {/* UPDATED CARD CONTENT: Flex container for horizontal alignment */}
                             <CardContent className="p-4 flex items-center justify-between gap-4">
-                              
-                              {/* Left Side: Avatar & Name */}
                               <Link href={`/profile/${member.id}`} className="flex items-center gap-3 flex-1 min-w-0 group/link">
-                                <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0 cursor-pointer">
-                                  <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
-                                  <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
-                                    {member.name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <div className="relative"> {/* <--- WRAPPER FOR GREEN DOT */}
+                                    <Avatar className="w-12 h-12 border border-border group-hover:border-primary/30 transition-colors shrink-0 cursor-pointer">
+                                        <AvatarImage src={getImageUrl(member.profileImageUrl)} alt={member.name} className="object-cover"/>
+                                        <AvatarFallback className="bg-primary/5 text-primary text-sm font-medium">
+                                            {member.name.charAt(0)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {isOnline && ( // <--- RENDER GREEN DOT IF ONLINE
+                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full"></span>
+                                    )}
+                                </div>
 
                                 <div className="flex-1 min-w-0">
                                   <h3 className="font-semibold text-foreground text-sm truncate group-hover/link:underline">{member.name}</h3>
@@ -444,7 +490,6 @@ export default function DashboardPage() {
                                 </div>
                               </Link>
 
-                              {/* Right Side: Action Button (Parallel to User Info) */}
                               <div className="shrink-0">
                                 {connectionStatus.status === 'none' && (
                                   <Button 
@@ -496,16 +541,23 @@ export default function DashboardPage() {
                     <StaggerContainer stagger={0.1} className="space-y-4">
                     {pendingRequests.map((request) => {
                         const requesterName = request.requester?.name || "Unknown User";
+                        const isOnline = onlineUsers.has(request.requester.id); // <--- CHECK ONLINE STATUS
+
                         return (
                         <StaggerItem key={request.id}>
                             <Card className="border border-border shadow-sm hover:shadow-md transition-all duration-200 bg-card">
                             <CardContent className="p-4 sm:p-5">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex items-center space-x-4">
-                                    <Avatar className="w-12 h-12 border border-border">
-                                    <AvatarImage src={getImageUrl(request.requester?.profileImageUrl)} alt={requesterName} />
-                                    <AvatarFallback>{requesterName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
+                                    <div className="relative"> {/* <--- WRAPPER */}
+                                        <Avatar className="w-12 h-12 border border-border">
+                                            <AvatarImage src={getImageUrl(request.requester?.profileImageUrl)} alt={requesterName} />
+                                            <AvatarFallback>{requesterName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        {isOnline && ( // <--- GREEN DOT
+                                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full"></span>
+                                        )}
+                                    </div>
                                     <div>
                                     <h3 className="font-semibold text-foreground">{requesterName}</h3>
                                     <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -562,24 +614,29 @@ export default function DashboardPage() {
                         : connection.requester;
                         
                         const otherUserName = otherUser?.name || "Unknown User";
+                        const isOnline = onlineUsers.has(otherUser.id); // <--- CHECK ONLINE STATUS
                         
                         return (
                         <StaggerItem key={connection.id}>
                             <Card className="group hover:shadow-md transition-all duration-300 border-border hover:border-primary/30 bg-card">
                             <CardContent className="p-4 flex items-center gap-4">
                                 <Link href={`/profile/${otherUser?.id}`} className="flex items-center gap-4 flex-1 min-w-0 group/link">
-                                    <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20 cursor-pointer">
-                                        <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
-                                        <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
-                                            {otherUserName.charAt(0)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <div className="relative"> {/* <--- WRAPPER */}
+                                        <Avatar className="w-12 h-12 border border-border group-hover:border-primary/20 cursor-pointer">
+                                            <AvatarImage src={getImageUrl(otherUser?.profileImageUrl)} alt={otherUserName} />
+                                            <AvatarFallback className="bg-secondary/10 text-secondary-foreground">
+                                                {otherUserName.charAt(0)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        {isOnline && ( // <--- GREEN DOT
+                                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full"></span>
+                                        )}
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-semibold text-foreground truncate text-sm group-hover/link:underline">{otherUserName}</h3>
                                         <p className="text-xs text-muted-foreground truncate">{otherUser?.profession || "N/A"}</p>
                                     </div>
                                 </Link>
-                                {/* Message Icon Button Removed Here */}
                             </CardContent>
                             </Card>
                         </StaggerItem>

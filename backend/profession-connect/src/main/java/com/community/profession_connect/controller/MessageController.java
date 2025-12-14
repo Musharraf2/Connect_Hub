@@ -11,7 +11,9 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap; // <--- NEW IMPORT
 import java.util.List;
+import java.util.Map;     // <--- NEW IMPORT
 
 @RestController
 @RequestMapping("/api/messages")
@@ -28,13 +30,13 @@ public class MessageController {
     @PostMapping("/send")
     public ResponseEntity<MessageResponse> sendMessage(@RequestBody MessageRequest request) {
         MessageResponse response = messageService.sendMessage(request);
-        
+
         // Send via WebSocket to the receiver
         messagingTemplate.convertAndSend("/queue/messages/" + request.getReceiverId(), response);
-        
+
         // Also send back to sender for confirmation
         messagingTemplate.convertAndSend("/queue/messages/" + request.getSenderId(), response);
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -42,10 +44,10 @@ public class MessageController {
     @MessageMapping("/chat.send")
     public void sendMessageViaWebSocket(@Payload MessageRequest request) {
         MessageResponse response = messageService.sendMessage(request);
-        
+
         // Send to receiver
         messagingTemplate.convertAndSend("/queue/messages/" + request.getReceiverId(), response);
-        
+
         // Send to sender
         messagingTemplate.convertAndSend("/queue/messages/" + request.getSenderId(), response);
     }
@@ -66,18 +68,28 @@ public class MessageController {
         return ResponseEntity.ok(conversations);
     }
 
-    // Mark messages as read
+    // --------------------------------------------------------------------------------
+    // <--- UPDATED METHOD: Send a rich object (Map) instead of just Long ID
+    // --------------------------------------------------------------------------------
     @PutMapping("/mark-read")
     public ResponseEntity<Void> markMessagesAsRead(
             @RequestParam Long receiverId,
             @RequestParam Long senderId) {
+
+        // 1. Update the database state
         messageService.markMessagesAsRead(receiverId, senderId);
-        
-        // Notify sender that messages were read
-        messagingTemplate.convertAndSend("/queue/read/" + senderId, receiverId);
-        
+
+        // 2. Create a proper Read Receipt object
+        Map<String, Object> readReceipt = new HashMap<>();
+        readReceipt.put("readerId", receiverId);
+        readReceipt.put("timestamp", java.time.LocalDateTime.now().toString());
+
+        // 3. Notify sender that messages were read (Send the Map, not just ID)
+        messagingTemplate.convertAndSend("/queue/read/" + senderId, readReceipt);
+
         return ResponseEntity.ok().build();
     }
+    // --------------------------------------------------------------------------------
 
     // Get unread message count
     @GetMapping("/unread-count/{userId}")
@@ -92,11 +104,11 @@ public class MessageController {
             @PathVariable Long messageId,
             @RequestParam Long userId) {
         Long receiverId = messageService.deleteMessage(messageId, userId);
-        
+
         // Notify both sender and receiver via WebSocket
         messagingTemplate.convertAndSend("/queue/delete/" + userId, messageId);
         messagingTemplate.convertAndSend("/queue/delete/" + receiverId, messageId);
-        
+
         return ResponseEntity.ok("Message deleted successfully");
     }
 }

@@ -3,10 +3,11 @@ package com.community.profession_connect.controller;
 import com.community.profession_connect.dto.LoginRequest;
 import com.community.profession_connect.dto.LoginResponse;
 import com.community.profession_connect.dto.RegistrationRequest;
-import com.community.profession_connect.dto.UserProfileDetailResponse; // <-- IMPORT THIS
+import com.community.profession_connect.dto.UserProfileDetailResponse;
 import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.FileStorageService;
+import com.community.profession_connect.service.OnlineUserService; // <--- 1. NEW IMPORT
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set; // <--- 2. NEW IMPORT
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -24,12 +26,25 @@ public class UserController {
 
     private final UserService userService;
     private final FileStorageService fileStorageService;
+    private final OnlineUserService onlineUserService; // <--- 3. NEW FIELD
 
     @Autowired
-    public UserController(UserService userService, FileStorageService fileStorageService) {
+    public UserController(UserService userService,
+                          FileStorageService fileStorageService,
+                          OnlineUserService onlineUserService) { // <--- 4. UPDATE CONSTRUCTOR
         this.userService = userService;
         this.fileStorageService = fileStorageService;
+        this.onlineUserService = onlineUserService;      // <--- 5. ASSIGN SERVICE
     }
+
+    // --------------------------------------------------------------------------------
+    // <--- 6. ADD THIS NEW ENDPOINT FOR ONLINE STATUS
+    // --------------------------------------------------------------------------------
+    @GetMapping("/online-status")
+    public ResponseEntity<Set<Long>> getOnlineUsers() {
+        return ResponseEntity.ok(onlineUserService.getOnlineUsers());
+    }
+    // --------------------------------------------------------------------------------
 
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@RequestBody RegistrationRequest request) {
@@ -58,9 +73,8 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<UserProfileDetailResponse> getUserProfile(@PathVariable Long userId) { // <-- Use new DTO
+    public ResponseEntity<UserProfileDetailResponse> getUserProfile(@PathVariable Long userId) {
         try {
-            // This now returns our new DTO
             UserProfileDetailResponse profile = userService.getUserById(userId);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException e) {
@@ -83,21 +97,16 @@ public class UserController {
             @PathVariable Long userId,
             @RequestParam("file") MultipartFile file) {
         try {
-            // Validate file
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
             }
 
-            // Check file type
             String contentType = file.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
                 return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
             }
 
-            // Store file
             String filePath = fileStorageService.storeFile(file, "profile-images");
-
-            // Update user profile
             User user = userService.updateProfileImage(userId, filePath);
 
             Map<String, String> response = new HashMap<>();
@@ -113,21 +122,16 @@ public class UserController {
             @PathVariable Long userId,
             @RequestParam("file") MultipartFile file) {
         try {
-            // Validate file
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
             }
 
-            // Check file type
             String contentType = file.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
                 return ResponseEntity.badRequest().body(Map.of("error", "File must be an image"));
             }
 
-            // Store file
             String filePath = fileStorageService.storeFile(file, "cover-images");
-
-            // Update user cover image
             User user = userService.updateCoverImage(userId, filePath);
 
             Map<String, String> response = new HashMap<>();
