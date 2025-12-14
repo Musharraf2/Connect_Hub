@@ -36,7 +36,17 @@ public class AiNoteService {
                       "category": "sexually explicit | hate speech | misinformation | safe | other",
                       "note": "short disclaimer to show under the post"
                     }
+                    Important: Posts with images but minimal text are usually safe content sharing. Only flag if explicitly harmful.
                     """;
+
+            // Build post content description including image info
+            StringBuilder postDescription = new StringBuilder("Post content:\\n\"");
+            postDescription.append(post.getContent() != null ? post.getContent() : "");
+            postDescription.append("\"");
+            
+            if (post.getImageUrl() != null && !post.getImageUrl().isEmpty()) {
+                postDescription.append("\\n[Post includes an image attachment]");
+            }
 
             String body = """
                     {
@@ -49,7 +59,7 @@ public class AiNoteService {
                     }
                     """.formatted(
                     objectMapper.writeValueAsString(systemPrompt),
-                    objectMapper.writeValueAsString("Post content:\\n\"" + post.getContent() + "\"")
+                    objectMapper.writeValueAsString(postDescription.toString())
             );
 
             String apiResponse = openAIClient.callApi(body);
