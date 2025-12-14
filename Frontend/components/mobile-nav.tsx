@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Users, MessageSquare, Bell, User } from "lucide-react"
+import { Users, MessageSquare, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function MobileNav() {
@@ -46,12 +46,6 @@ export function MobileNav() {
             href: "/notification",
             icon: Bell,
             badge: user?.unreadNotificationCount || 0
-        },
-        {
-            name: "Profile",
-            href: "/profile",
-            icon: User,
-            badge: 0
         }
     ]
 
