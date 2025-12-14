@@ -11,7 +11,6 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
-import jakarta.servlet.http.HttpSession;
 import java.util.Map;
 
 @Configuration
@@ -27,16 +26,18 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:3000")
+                .setAllowedOrigins("http://localhost:3000", "http://127.0.0.1:3000")
                 .addInterceptors(new HandshakeInterceptor() {
                     @Override
                     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                                    WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
                         if (request instanceof ServletServerHttpRequest) {
                             ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
+                            // 1. Capture userId from URL query params
                             String userId = servletRequest.getServletRequest().getParameter("userId");
                             if (userId != null) {
                                 attributes.put("userId", Long.parseLong(userId));
+                                System.out.println("[WebSocketConfig] Handshake for User ID: " + userId);
                             }
                         }
                         return true;
