@@ -44,7 +44,7 @@ class MessageControllerTest {
         ResponseEntity<Void> response = messageController.markMessagesAsRead(receiverId, senderId);
 
         // Assert
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         verify(messageService, times(1)).markMessagesAsRead(receiverId, senderId);
         
         // Verify WebSocket notification was sent

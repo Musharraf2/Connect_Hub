@@ -45,7 +45,7 @@ class UserControllerTest {
 
         // Assert
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(expectedOnlineUsers, response.getBody());
         verify(onlineUserService, times(1)).getOnlineUsers();
@@ -62,7 +62,7 @@ class UserControllerTest {
 
         // Assert
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isEmpty());
         verify(onlineUserService, times(1)).getOnlineUsers();
