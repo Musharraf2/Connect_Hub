@@ -333,21 +333,14 @@ public class PostService {
         post.setImageUrl(imageUrl);
         
         // If post was previously soft-deleted (likely due to empty content during initial AI check),
-        // restore it now that it has an image attachment
+        // restore it now that it has an image attachment.
+        // We don't re-analyze here to avoid race conditions with the initial AI analysis.
+        // The initial analysis will see the image if it runs after this update.
         if (post.isDeleted()) {
             post.setDeleted(false);
         }
         
         postRepository.save(post);
-        
-        // Re-analyze the post with the image context
-        new Thread(() -> {
-            try {
-                aiNoteService.analyzePost(postId);
-            } catch (Exception e) {
-                System.out.println("[AI] Re-analysis after image upload failed: " + e.getMessage());
-            }
-        }).start();
     }
 
     // ------------------- MAPPING: Comment -> CommentResponse -------------------
