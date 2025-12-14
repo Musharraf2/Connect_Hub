@@ -331,7 +331,23 @@ public class PostService {
                 .orElseThrow(() -> new RuntimeException("Post not found"));
 
         post.setImageUrl(imageUrl);
+        
+        // If post was previously soft-deleted (likely due to empty content during initial AI check),
+        // restore it now that it has an image attachment
+        if (post.isDeleted()) {
+            post.setDeleted(false);
+        }
+        
         postRepository.save(post);
+        
+        // Re-analyze the post with the image context
+        new Thread(() -> {
+            try {
+                aiNoteService.analyzePost(postId);
+            } catch (Exception e) {
+                System.out.println("[AI] Re-analysis after image upload failed: " + e.getMessage());
+            }
+        }).start();
     }
 
     // ------------------- MAPPING: Comment -> CommentResponse -------------------
