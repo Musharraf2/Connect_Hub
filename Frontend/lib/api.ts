@@ -545,3 +545,19 @@ export const deleteMessage = async (messageId: number, userId: number): Promise<
     });
     if (!response.ok) throw new Error('Failed to delete message');
 };
+
+export const uploadMessageImage = async (file: File): Promise<{ imageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${BASE}/messages/image`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to upload message image: ${errorText}`);
+    }
+    return await response.json();
+};

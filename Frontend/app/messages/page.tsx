@@ -7,7 +7,10 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Trash2, Check, CheckCheck } from "lucide-react";
+import { Send, Search, Trash2, Check, CheckCheck, Smile, Paperclip, Loader2 } from "lucide-react";
+
+// Emoji Picker
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -31,6 +34,7 @@ import {
     sendMessage,
     markMessagesAsRead,
     deleteMessage,
+    uploadMessageImage,
     ConversationResponse,
     MessageResponse,
     LoginResponse,
@@ -52,16 +56,52 @@ const getImageUrl = (url: string | null | undefined) => {
 
 // Helper function to parse message content and extract image URLs
 const parseMessageContent = (content: string): { text: string; imageUrl: string | null } => {
-    const imageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
-    const match = content.match(imageRegex);
+    // Check for [IMAGE]url[/IMAGE] pattern
+    const imageRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
+    const imageMatch = content.match(imageRegex);
     
-    if (match) {
-        const imageUrl = match[1];
+    if (imageMatch) {
+        const imageUrl = imageMatch[1];
         const text = content.replace(imageRegex, '').trim();
         return { text, imageUrl };
     }
     
+    // Also check for old pattern [SHARED_POST_IMAGE]
+    const sharedImageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
+    const sharedMatch = content.match(sharedImageRegex);
+    
+    if (sharedMatch) {
+        const imageUrl = sharedMatch[1];
+        const text = content.replace(sharedImageRegex, '').trim();
+        return { text, imageUrl };
+    }
+    
     return { text: content, imageUrl: null };
+};
+
+// Helper function to format last message preview for conversation list
+const formatLastMessagePreview = (content: string): string => {
+    if (!content) return "No messages yet";
+    
+    // Check for [IMAGE] pattern
+    const imageRegex = /\[IMAGE\](.*?)\[\/IMAGE\]/;
+    const imageMatch = content.match(imageRegex);
+    
+    if (imageMatch) {
+        const text = content.replace(imageRegex, '').trim();
+        return text ? text : "📷 Image";
+    }
+    
+    // Check for old pattern [SHARED_POST_IMAGE]
+    const sharedImageRegex = /\[SHARED_POST_IMAGE\](.*?)\[\/SHARED_POST_IMAGE\]/;
+    const sharedMatch = content.match(sharedImageRegex);
+    
+    if (sharedMatch) {
+        const text = content.replace(sharedImageRegex, '').trim();
+        return text ? text : "📷 Image";
+    }
+    
+    return content;
 };
 
 export default function MessagesPage() {
@@ -81,6 +121,14 @@ export default function MessagesPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [messageToDelete, setMessageToDelete] = useState<number | null>(null);
 
+    // Emoji Picker State
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+    // Image Upload State
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     // Online Users State
     const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
 
@@ -92,6 +140,23 @@ export default function MessagesPage() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Close emoji picker when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+                setShowEmojiPicker(false);
+            }
+        };
+
+        if (showEmojiPicker) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showEmojiPicker]);
 
     // Fetch Online Status API
     const fetchOnlineStatus = async () => {
@@ -277,8 +342,63 @@ export default function MessagesPage() {
             };
             await sendMessage(messageRequest);
             setMessageInput("");
+            setShowEmojiPicker(false); // Close emoji picker when sending
         } catch (error) {
             toast.error("Failed to send message");
+        }
+    };
+
+    const handleEmojiClick = (emojiData: EmojiClickData) => {
+        setMessageInput((prev) => prev + emojiData.emoji);
+    };
+
+    const handleImageButtonClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !selectedConversation || !currentUser?.id) return;
+
+        // Validate file is an image (both MIME type and extension)
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        
+        // Safely extract file extension
+        const lastDotIndex = file.name.lastIndexOf('.');
+        const fileExtension = lastDotIndex !== -1 
+            ? file.name.toLowerCase().substring(lastDotIndex) 
+            : '';
+        
+        if (!validImageTypes.includes(file.type) || !validExtensions.includes(fileExtension)) {
+            toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+            return;
+        }
+
+        setUploadingImage(true);
+        try {
+            // Upload image using API function
+            const data = await uploadMessageImage(file);
+            const imageUrl = data.imageUrl;
+
+            // Send message with image URL in [IMAGE] format
+            const messageRequest = {
+                senderId: currentUser.id,
+                receiverId: selectedConversation.userId,
+                content: `[IMAGE]${imageUrl}[/IMAGE]`,
+            };
+            await sendMessage(messageRequest);
+            
+            toast.success('Image sent');
+        } catch (error) {
+            console.error('Image upload failed:', error instanceof Error ? error.message : 'Unknown error');
+            toast.error('Failed to send image');
+        } finally {
+            setUploadingImage(false);
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 
@@ -389,7 +509,7 @@ export default function MessagesPage() {
                                                     </div>
                                                     <div className="flex justify-between items-center mt-1">
                                                         <p className="text-sm text-muted-foreground truncate">
-                                                            {conversation.lastMessage || "No messages yet"}
+                                                            {formatLastMessagePreview(conversation.lastMessage)}
                                                         </p>
                                                         {conversation.unreadCount > 0 && (
                                                             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground ml-2">
@@ -430,35 +550,44 @@ export default function MessagesPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex-1 p-4 overflow-y-auto">
-                                    <div className="space-y-4">
-                                        {messages.map((message) => {
+                                <div className="flex-1 p-4 overflow-y-auto bg-muted/20">
+                                    <div className="space-y-3">
+                                        {messages.map((message, index) => {
                                             const isSent = message.senderId === currentUser.id;
                                             const { text, imageUrl } = parseMessageContent(message.content);
+                                            
+                                            // Check if next message is from same sender for grouping
+                                            const nextMessage = messages[index + 1];
+                                            const isGrouped = nextMessage && nextMessage.senderId === message.senderId;
+                                            
                                             return (
-                                                <div key={message.id} className={`flex ${isSent ? "justify-end" : "justify-start"} group`}>
-                                                    <div className={`max-w-[70%] rounded-lg px-4 py-2 relative ${isSent ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                                <div key={message.id} className={`flex ${isSent ? "justify-end" : "justify-start"} group ${isGrouped ? 'mb-1' : 'mb-3'}`}>
+                                                    <div className={`max-w-[70%] rounded-lg px-4 py-2 relative shadow-sm ${
+                                                        isSent 
+                                                            ? "bg-gradient-to-br from-primary to-primary/80 text-white rounded-tr-none" 
+                                                            : "bg-muted/50 text-foreground rounded-tl-none"
+                                                    }`}>
                                                         {isSent && (
                                                             <button onClick={() => handleDeleteMessage(message.id)} className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded">
                                                                 <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
                                                             </button>
                                                         )}
-                                                        <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
+                                                        {text && <p className="text-sm whitespace-pre-wrap break-words">{text}</p>}
                                                         {imageUrl && (
-                                                            <div className="mt-2 rounded-md overflow-hidden border border-border">
-                                                                <img src={imageUrl} alt="Shared" className="w-full max-w-xs object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                                            <div className={`${text ? 'mt-2' : ''} rounded-md overflow-hidden`}>
+                                                                <img src={imageUrl} alt="Shared" className="w-full max-w-xs object-cover rounded" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                                             </div>
                                                         )}
                                                         <div className="flex items-center justify-between mt-1 gap-2">
-                                                            <p className={`text-xs ${isSent ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                                                            <p className={`text-xs ${isSent ? "text-white/70" : "text-muted-foreground"}`}>
                                                                 {formatMessageTime(message.timestamp)}
                                                             </p>
                                                             {isSent && (
                                                                 <div className="flex items-center">
                                                                     {message.isRead ? (
-                                                                        <CheckCheck className="w-3 h-3 text-blue-300" />
+                                                                        <CheckCheck className="w-3 h-3 text-blue-200" />
                                                                     ) : (
-                                                                        <Check className="w-3 h-3 text-primary-foreground/50" />
+                                                                        <Check className="w-3 h-3 text-white/50" />
                                                                     )}
                                                                 </div>
                                                             )}
@@ -471,17 +600,75 @@ export default function MessagesPage() {
                                     </div>
                                 </div>
 
-                                <div className="p-4 border-t border-border">
-                                    <div className="flex gap-2">
+                                <div className="p-4 border-t border-border bg-card">
+                                    <div className="relative flex items-end gap-2 bg-muted/50 rounded-full px-4 py-2 shadow-sm border border-border/50">
+                                        {/* Hidden file input */}
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            className="hidden"
+                                        />
+                                        
+                                        {/* Image Upload Button */}
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={handleImageButtonClick}
+                                            disabled={uploadingImage}
+                                            className="h-9 w-9 shrink-0 rounded-full hover:bg-muted"
+                                        >
+                                            {uploadingImage ? (
+                                                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                                            ) : (
+                                                <Paperclip className="w-5 h-5 text-muted-foreground" />
+                                            )}
+                                        </Button>
+
+                                        {/* Message Input */}
                                         <Textarea
                                             value={messageInput}
                                             onChange={(e) => setMessageInput(e.target.value)}
                                             onKeyDown={handleKeyPress}
                                             placeholder="Type a message..."
-                                            className="resize-none min-h-[44px] max-h-[120px]"
+                                            className="flex-1 resize-none min-h-[36px] max-h-[120px] bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 py-2 px-0"
                                             rows={1}
                                         />
-                                        <Button onClick={handleSendMessage} disabled={!messageInput.trim()} size="icon" className="h-11 w-11 shrink-0">
+
+                                        {/* Emoji Picker Button */}
+                                        <div className="relative" ref={emojiPickerRef}>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                                className="h-9 w-9 shrink-0 rounded-full hover:bg-muted"
+                                            >
+                                                <Smile className="w-5 h-5 text-muted-foreground" />
+                                            </Button>
+                                            
+                                            {/* Emoji Picker Popover */}
+                                            {showEmojiPicker && (
+                                                <div className="absolute bottom-12 right-0 z-50">
+                                                    <EmojiPicker
+                                                        onEmojiClick={handleEmojiClick}
+                                                        autoFocusSearch={false}
+                                                        width={320}
+                                                        height={400}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Send Button */}
+                                        <Button
+                                            onClick={handleSendMessage}
+                                            disabled={!messageInput.trim() || uploadingImage}
+                                            size="icon"
+                                            className="h-9 w-9 shrink-0 rounded-full"
+                                        >
                                             <Send className="w-4 h-4" />
                                         </Button>
                                     </div>

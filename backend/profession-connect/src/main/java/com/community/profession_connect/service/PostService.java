@@ -331,6 +331,15 @@ public class PostService {
                 .orElseThrow(() -> new RuntimeException("Post not found"));
 
         post.setImageUrl(imageUrl);
+        
+        // If post was previously soft-deleted (likely due to empty content during initial AI check),
+        // restore it now that it has an image attachment.
+        // We don't re-analyze here to avoid race conditions with the initial AI analysis.
+        // The initial analysis will see the image if it runs after this update.
+        if (post.isDeleted()) {
+            post.setDeleted(false);
+        }
+        
         postRepository.save(post);
     }
 
