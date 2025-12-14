@@ -4,16 +4,19 @@ import com.community.profession_connect.dto.ConversationResponse;
 import com.community.profession_connect.dto.MessageRequest;
 import com.community.profession_connect.dto.MessageResponse;
 import com.community.profession_connect.service.MessageService;
+import com.community.profession_connect.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap; // <--- NEW IMPORT
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;     // <--- NEW IMPORT
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -25,6 +28,9 @@ public class MessageController {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     // REST endpoint to send a message
     @PostMapping("/send")
@@ -110,5 +116,22 @@ public class MessageController {
         messagingTemplate.convertAndSend("/queue/delete/" + receiverId, messageId);
 
         return ResponseEntity.ok("Message deleted successfully");
+    }
+
+    // Upload message image
+    @PostMapping("/image")
+    public ResponseEntity<Map<String, String>> uploadMessageImage(@RequestParam("file") MultipartFile file) {
+        try {
+            // Upload image to Cloudinary in the "message-images" folder
+            String imageUrl = fileStorageService.storeFile(file, "message-images");
+            
+            // Return the secure URL
+            Map<String, String> response = new HashMap<>();
+            response.put("imageUrl", imageUrl);
+            
+            return ResponseEntity.ok(response);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
+        }
     }
 }
