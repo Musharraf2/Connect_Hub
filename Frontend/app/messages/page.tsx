@@ -7,7 +7,7 @@ import SockJS from "sockjs-client";
 import toast from "react-hot-toast";
 
 // Icons
-import { Send, Search, Trash2, Check, CheckCheck, Smile, Paperclip } from "lucide-react";
+import { Send, Search, Trash2, Check, CheckCheck, Smile, Paperclip, Loader2 } from "lucide-react";
 
 // Emoji Picker
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
@@ -34,6 +34,7 @@ import {
     sendMessage,
     markMessagesAsRead,
     deleteMessage,
+    uploadMessageImage,
     ConversationResponse,
     MessageResponse,
     LoginResponse,
@@ -334,28 +335,20 @@ export default function MessagesPage() {
         const file = e.target.files?.[0];
         if (!file || !selectedConversation || !currentUser?.id) return;
 
-        // Validate file is an image
-        if (!file.type.startsWith('image/')) {
-            toast.error('Please select an image file');
+        // Validate file is an image (both MIME type and extension)
+        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!validImageTypes.includes(file.type) || !validExtensions.includes(fileExtension)) {
+            toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
             return;
         }
 
         setUploadingImage(true);
         try {
-            // Upload image to backend
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch('http://localhost:8080/api/messages/image', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to upload image');
-            }
-
-            const data = await response.json();
+            // Upload image using API function
+            const data = await uploadMessageImage(file);
             const imageUrl = data.imageUrl;
 
             // Send message with image URL in [IMAGE] format
@@ -368,7 +361,7 @@ export default function MessagesPage() {
             
             toast.success('Image sent');
         } catch (error) {
-            console.error('Image upload error:', error);
+            console.error('Image upload failed:', error instanceof Error ? error.message : 'Unknown error');
             toast.error('Failed to send image');
         } finally {
             setUploadingImage(false);
@@ -597,7 +590,11 @@ export default function MessagesPage() {
                                             disabled={uploadingImage}
                                             className="h-9 w-9 shrink-0 rounded-full hover:bg-muted"
                                         >
-                                            <Paperclip className={`w-5 h-5 text-muted-foreground ${uploadingImage ? 'animate-spin' : ''}`} />
+                                            {uploadingImage ? (
+                                                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                                            ) : (
+                                                <Paperclip className="w-5 h-5 text-muted-foreground" />
+                                            )}
                                         </Button>
 
                                         {/* Message Input */}
