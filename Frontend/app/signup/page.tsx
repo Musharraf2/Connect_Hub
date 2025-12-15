@@ -3,14 +3,14 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-hot-toast"
-import { signupUser } from "@/lib/api";
+import { signupUser, verifyEmail } from "@/lib/api";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Combobox } from "@/components/ui/combobox"
 // We no longer need RadioGroup or the community icons
-import { ArrowLeft, Users, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Users, Eye, EyeOff, Mail, Check } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
@@ -51,12 +51,17 @@ const PROFESSIONS = [
     label: profession
 }))
 
+type Step = 'REGISTER' | 'VERIFY';
+
 export default function SignupPage() {
-    // We no longer need 'step' or 'selectedCommunity'
     const router = useRouter()
+    const [step, setStep] = useState<Step>('REGISTER')
     const [profession, setProfession] = useState<string>("")
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+    const [registeredEmail, setRegisteredEmail] = useState<string>("")
+    const [otp, setOtp] = useState<string>("")
+    const [isVerifying, setIsVerifying] = useState(false)
 
     return (
         <div className="min-h-screen flex">
@@ -107,13 +112,20 @@ export default function SignupPage() {
                         <Card className="border-2 shadow-xl">
                             <CardHeader>
                                 <CardTitle className="text-3xl font-serif text-center">
-                                    <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Create</span> Your Account
+                                    {step === 'REGISTER' ? (
+                                        <><span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Create</span> Your Account</>
+                                    ) : (
+                                        <><span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Verify</span> Your Email</>
+                                    )}
                                 </CardTitle>
                                 <CardDescription className="text-center">
-                                    Join your professional community
+                                    {step === 'REGISTER' ? 'Join your professional community' : 'Enter the code sent to your email'}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                {step === 'REGISTER' ? (
+                                    // STEP 1: Registration Form
+                                    <>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="firstName">First Name</Label>
@@ -233,9 +245,10 @@ export default function SignupPage() {
 
                                             const responseMessage = await signupUser(userData);
 
-                                            if (responseMessage.includes("successfully")) {
-                                                toast.success("Account created successfully!");
-                                                router.push('/login');
+                                            if (responseMessage === "OTP_SENT") {
+                                                toast.success("Registration successful! Check your email for the verification code.");
+                                                setRegisteredEmail(email);
+                                                setStep('VERIFY');
                                             } else {
                                                 toast.error(responseMessage);
                                             }
@@ -253,6 +266,96 @@ export default function SignupPage() {
                                         Sign in here
                                     </Link>
                                 </div>
+                                    </>
+                                ) : (
+                                    // STEP 2: Email Verification
+                                    <>
+                                        <div className="text-center space-y-2 mb-4">
+                                            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                                                <Mail className="w-8 h-8 text-primary" />
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">
+                                                We've sent a 6-digit verification code to:
+                                            </p>
+                                            <p className="font-semibold text-foreground">{registeredEmail}</p>
+                                            <p className="text-xs text-muted-foreground mt-2">
+                                                Check your email (and spam folder) for the code
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="otp">Verification Code</Label>
+                                            <Input
+                                                id="otp"
+                                                type="text"
+                                                placeholder="Enter 6-digit code"
+                                                maxLength={6}
+                                                value={otp}
+                                                onChange={(e) => {
+                                                    const value = e.target.value.replace(/\D/g, '');
+                                                    setOtp(value);
+                                                }}
+                                                className="bg-input text-center text-2xl tracking-widest"
+                                            />
+                                        </div>
+
+                                        <Button
+                                            className="w-full"
+                                            size="lg"
+                                            onClick={async () => {
+                                                try {
+                                                    if (!otp || otp.length !== 6) {
+                                                        toast.error("Please enter the 6-digit verification code");
+                                                        return;
+                                                    }
+
+                                                    setIsVerifying(true);
+                                                    const response = await verifyEmail(registeredEmail, otp);
+
+                                                    if (response.message) {
+                                                        toast.success("Email verified successfully! You can now log in.");
+                                                        router.push('/login');
+                                                    }
+                                                } catch (err: any) {
+                                                    console.error("Verification failed:", err);
+                                                    toast.error(err.message || "Verification failed! Please try again.");
+                                                } finally {
+                                                    setIsVerifying(false);
+                                                }
+                                            }}
+                                            disabled={isVerifying || otp.length !== 6}
+                                        >
+                                            {isVerifying ? (
+                                                <>
+                                                    <span className="mr-2">Verifying...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Check className="w-5 h-5 mr-2" />
+                                                    Verify Email
+                                                </>
+                                            )}
+                                        </Button>
+
+                                        <div className="text-center space-y-2">
+                                            <p className="text-sm text-muted-foreground">
+                                                Didn't receive the code?
+                                            </p>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setStep('REGISTER');
+                                                    setOtp('');
+                                                    toast.info("Please register again to receive a new code");
+                                                }}
+                                                className="text-primary hover:text-primary/80"
+                                            >
+                                                Back to Registration
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
                             </CardContent>
                         </Card>
                     </motion.div>

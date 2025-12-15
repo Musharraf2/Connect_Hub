@@ -200,6 +200,22 @@ export const signupUser = async (userData: RegistrationRequestType) => {
     return response.text();
 };
 
+export const verifyEmail = async (email: string, otp: string): Promise<{ message?: string; error?: string }> => {
+    const response = await fetch(`${BASE}/users/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || 'Email verification failed');
+    }
+    
+    return data;
+};
+
 export const loginUser = async (loginData: LoginRequestType): Promise<LoginResponse> => {
     const response = await fetch(`${BASE}/users/login`, {
         method: 'POST',
@@ -208,6 +224,10 @@ export const loginUser = async (loginData: LoginRequestType): Promise<LoginRespo
     });
 
     if (!response.ok) {
+        if (response.status === 403) {
+            // Email not verified error
+            throw new Error('Email not verified. Please check your email for the verification code.');
+        }
         if (response.status === 400) {
             throw new Error('Wrong credentials');
         }
