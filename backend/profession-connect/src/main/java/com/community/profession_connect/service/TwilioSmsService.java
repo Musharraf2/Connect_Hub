@@ -35,20 +35,52 @@ public class TwilioSmsService {
     private boolean twilioEnabled;
 
     private boolean initialized = false;
+    private boolean initializationAttempted = false;
 
     /**
      * Initialize Twilio client
      */
-    private void initializeTwilio() {
-        if (!initialized && twilioEnabled && accountSid != null && !accountSid.isEmpty()) {
-            try {
-                Twilio.init(accountSid, authToken);
-                initialized = true;
-                System.out.println("✅ Twilio SMS Service initialized successfully");
-            } catch (Exception e) {
-                System.err.println("❌ Failed to initialize Twilio: " + e.getMessage());
-                System.err.println("Falling back to console-only mode");
-            }
+    private synchronized void initializeTwilio() {
+        // Only attempt initialization once
+        if (initializationAttempted) {
+            return;
+        }
+        initializationAttempted = true;
+        
+        if (!twilioEnabled) {
+            System.out.println("ℹ️  Twilio is disabled (twilio.enabled=false)");
+            return;
+        }
+        
+        if (accountSid == null || accountSid.isEmpty()) {
+            System.out.println("⚠️  Twilio Account SID not configured");
+            twilioEnabled = false;
+            return;
+        }
+        
+        if (authToken == null || authToken.isEmpty()) {
+            System.out.println("⚠️  Twilio Auth Token not configured");
+            twilioEnabled = false;
+            return;
+        }
+        
+        if (twilioPhoneNumber == null || twilioPhoneNumber.isEmpty()) {
+            System.out.println("⚠️  Twilio Phone Number not configured");
+            twilioEnabled = false;
+            return;
+        }
+        
+        try {
+            Twilio.init(accountSid, authToken);
+            initialized = true;
+            System.out.println("✅ Twilio SMS Service initialized successfully");
+        } catch (Exception e) {
+            System.err.println("❌ Failed to initialize Twilio: " + e.getMessage());
+            System.err.println("Stack trace: ");
+            e.printStackTrace();
+            System.err.println("Falling back to console-only mode");
+            twilioEnabled = false; // Disable Twilio on initialization failure
+            initialized = false;
         }
     }
 
@@ -95,7 +127,10 @@ public class TwilioSmsService {
             return true;
         } catch (Exception e) {
             System.err.println("❌ Failed to send SMS via Twilio: " + e.getMessage());
+            System.err.println("Stack trace:");
+            e.printStackTrace();
             System.err.println("⚠️  Falling back to console-only mode. Check console for OTP.");
+            twilioEnabled = false; // Disable Twilio after failure
             return true; // Return true so verification still works
         }
     }

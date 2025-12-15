@@ -33,29 +33,35 @@ public class PhoneVerificationService {
      * Initiate phone verification by generating and storing OTP
      */
     public Map<String, String> initiateVerification(Long userId, String phoneNumber) {
-        // Validate phone number format (simple regex for international format)
-        if (!isValidPhoneNumber(phoneNumber)) {
-            throw new RuntimeException("Invalid phone number format. Use format: +1234567890");
+        try {
+            // Validate phone number format (simple regex for international format)
+            if (!isValidPhoneNumber(phoneNumber)) {
+                throw new RuntimeException("Invalid phone number format. Use format: +1234567890");
+            }
+
+            // Generate 6-digit OTP
+            String otp = generateOTP();
+            
+            // Store OTP with expiration time
+            LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(OTP_EXPIRATION_MINUTES);
+            otpStorage.put(userId, new OTPData(otp, phoneNumber, expirationTime));
+
+            // Send OTP via Twilio (will fall back to console if not configured)
+            boolean smsSent = twilioSmsService.sendOtp(phoneNumber, otp);
+
+            Map<String, String> response = new HashMap<>();
+            if (smsSent) {
+                response.put("message", "OTP sent successfully to " + maskPhoneNumber(phoneNumber));
+            } else {
+                response.put("message", "OTP generated. Check console for code (SMS not configured).");
+            }
+            response.put("expiresIn", OTP_EXPIRATION_MINUTES + " minutes");
+            return response;
+        } catch (Exception e) {
+            System.err.println("Error in initiateVerification: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to initiate verification: " + e.getMessage());
         }
-
-        // Generate 6-digit OTP
-        String otp = generateOTP();
-        
-        // Store OTP with expiration time
-        LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(OTP_EXPIRATION_MINUTES);
-        otpStorage.put(userId, new OTPData(otp, phoneNumber, expirationTime));
-
-        // Send OTP via Twilio (will fall back to console if not configured)
-        boolean smsSent = twilioSmsService.sendOtp(phoneNumber, otp);
-
-        Map<String, String> response = new HashMap<>();
-        if (smsSent) {
-            response.put("message", "OTP sent successfully to " + maskPhoneNumber(phoneNumber));
-        } else {
-            response.put("message", "OTP generated. Check console for code (SMS not configured).");
-        }
-        response.put("expiresIn", OTP_EXPIRATION_MINUTES + " minutes");
-        return response;
     }
 
     /**

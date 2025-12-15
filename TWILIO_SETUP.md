@@ -141,31 +141,55 @@ In both cases, OTP codes will be printed to the **console** instead of sent via 
 
 ## 🐛 Troubleshooting
 
+### Getting "500 Internal Server Error" when clicking Verify?
+
+This is usually caused by missing or incorrect Twilio configuration. The system will now gracefully fall back to console-only mode.
+
+**Quick Fix:**
+1. **For Development (No SMS)**: Set `twilio.enabled=false` in `application.properties`
+   ```properties
+   twilio.enabled=false
+   ```
+2. **Restart your backend application**
+3. OTP will be printed to the console - look for:
+   ```
+   ===========================================
+   Sending OTP 123456 to +12025551234
+   ===========================================
+   ```
+
+**For Production (Real SMS)**: Follow the full setup guide above to configure Twilio properly.
+
 ### SMS Not Sending?
 
 1. **Check console logs** for errors:
    - "✅ Twilio SMS Service initialized successfully" = Good!
    - "❌ Failed to initialize Twilio" = Check credentials
+   - "⚠️  Twilio not configured" = Set twilio.enabled=false for dev mode
 
 2. **Verify credentials**:
    - Account SID starts with "AC"
    - Phone number includes country code (+15551234567)
    - Auth token is correct (no spaces)
+   - All credentials are set (not empty)
 
 3. **Check Twilio Console**:
    - Go to "Monitor" → "Logs" → "Errors" to see detailed error messages
    - Verify your phone number is SMS-enabled
+   - Check if you have remaining credit
 
 4. **Trial Account Restrictions**:
    - You can only send to **verified phone numbers**
    - Go to "Phone Numbers" → "Verified Caller IDs" to add numbers
+   - Each phone must be verified before receiving SMS
 
 ### Still Getting Console OTP?
 
 If configured correctly but still seeing console OTP:
 - Check `twilio.enabled=true` is set
-- Verify all 3 credentials are present
+- Verify all 3 credentials are present (not empty)
 - Check application logs for initialization messages
+- Look for any error stack traces in console
 
 ### Error: "Unable to create record"
 
@@ -174,6 +198,22 @@ This means your phone number isn't verified in trial mode:
 2. Navigate to "Phone Numbers" → "Verified Caller IDs"
 3. Click "Add a new Caller ID"
 4. Follow verification steps
+
+### Error: "Authenticate"
+
+Invalid credentials:
+1. Double-check Account SID (starts with "AC")
+2. Verify Auth Token is correct
+3. No extra spaces or quotes in properties file
+4. Try regenerating Auth Token in Twilio Console
+
+### Backend Won't Start
+
+If Spring Boot fails to start after adding Twilio:
+1. Check pom.xml includes Twilio dependency (version 9.14.1)
+2. Run `mvn clean install`
+3. Check for dependency conflicts
+4. Set `twilio.enabled=false` as temporary fix
 
 ## 📚 Additional Resources
 
