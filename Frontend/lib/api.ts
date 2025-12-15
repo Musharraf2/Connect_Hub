@@ -76,6 +76,8 @@ export interface UserProfileDetailResponse {
     profileImageUrl?: string | null;
     coverImageUrl?: string | null;
     phoneNumber?: string | null;
+    phoneVerified?: boolean;
+    isPhonePublic?: boolean;
     professionalDetails?: string | null; // JSON string for dynamic professional info
     academicInfo: AcademicInfo | null;
     skills: Skill[];
@@ -672,4 +674,45 @@ export const deleteJobPost = async (id: number, userId: number): Promise<string>
         throw new Error(errorText || 'Failed to delete job post');
     }
     return await response.text();
+};
+
+// --- PHONE VERIFICATION ---
+
+export const initiatePhoneVerification = async (userId: number, phoneNumber: string): Promise<{ message: string; expiresIn: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/phone/verify-init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send OTP');
+    }
+    return await response.json();
+};
+
+export const confirmPhoneVerification = async (userId: number, otp: string, phoneNumber: string): Promise<{ message: string; phoneNumber: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/phone/verify-confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp, phoneNumber }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Verification failed');
+    }
+    return await response.json();
+};
+
+export const updatePhonePrivacy = async (userId: number, isPhonePublic: boolean): Promise<{ message: string; isPhonePublic: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/privacy`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPhonePublic }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update privacy');
+    }
+    return await response.json();
 };
