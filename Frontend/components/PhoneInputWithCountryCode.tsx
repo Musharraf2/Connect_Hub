@@ -92,7 +92,10 @@ export function PhoneInputWithCountryCode({
   }, [currentPhone]);
 
   const fullPhoneNumber = countryCode + phoneNumber;
-  const hasChanged = fullPhoneNumber !== currentPhone;
+  // Handle both cases: currentPhone might be null/undefined or an empty string
+  const normalizedCurrentPhone = currentPhone || "";
+  const normalizedFullPhone = fullPhoneNumber || "";
+  const hasChanged = normalizedFullPhone !== normalizedCurrentPhone;
   const isCurrentlyVerified = isVerified && !hasChanged;
 
   const handleVerifyClick = async () => {
