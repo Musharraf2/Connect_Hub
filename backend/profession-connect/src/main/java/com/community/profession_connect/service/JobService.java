@@ -15,11 +15,13 @@ import java.util.stream.Collectors;
 @Service
 public class JobService {
 
-    @Autowired
-    private JobPostRepository jobPostRepository;
+    private final JobPostRepository jobPostRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    public JobService(JobPostRepository jobPostRepository, UserRepository userRepository) {
+        this.jobPostRepository = jobPostRepository;
+        this.userRepository = userRepository;
+    }
 
     public JobPostResponse createJobPost(JobPostRequest request) {
         User user = userRepository.findById(request.getPostedBy())
