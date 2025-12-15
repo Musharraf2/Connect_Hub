@@ -106,12 +106,24 @@ public class UserController {
         try {
             String phoneNumber = request.get("phoneNumber");
             if (phoneNumber == null || phoneNumber.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Phone number is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Phone number is required");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             Map<String, String> response = phoneVerificationService.initiateVerification(userId, phoneNumber);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            System.err.println("Error in initiatePhoneVerification endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("Unexpected error in initiatePhoneVerification endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "An unexpected error occurred: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
@@ -124,16 +136,30 @@ public class UserController {
             String phoneNumber = request.get("phoneNumber");
             
             if (otp == null || otp.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "OTP is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "OTP is required");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             if (phoneNumber == null || phoneNumber.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Phone number is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Phone number is required");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
             Map<String, String> response = phoneVerificationService.completeVerification(userId, otp, phoneNumber);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            System.err.println("Error in confirmPhoneVerification endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("Unexpected error in confirmPhoneVerification endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "An unexpected error occurred: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
@@ -144,13 +170,25 @@ public class UserController {
         try {
             Boolean isPhonePublic = request.get("isPhonePublic");
             if (isPhonePublic == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "isPhonePublic is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "isPhonePublic is required");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
             Map<String, String> response = phoneVerificationService.updatePhonePrivacy(userId, isPhonePublic);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            System.err.println("Error in updatePhonePrivacy endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("Unexpected error in updatePhonePrivacy endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "An unexpected error occurred: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 

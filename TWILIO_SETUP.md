@@ -2,6 +2,33 @@
 
 This guide explains how to set up **real SMS sending** using Twilio for phone number verification.
 
+## ⚡ Having Issues? Quick Solutions
+
+### Getting "500 Internal Server Error" When Clicking Verify?
+
+**IMMEDIATE FIX (Development Mode - No SMS):**
+
+1. Open `backend/profession-connect/src/main/resources/application.properties`
+2. Add this single line:
+   ```properties
+   twilio.enabled=false
+   ```
+3. Restart your Spring Boot backend
+4. OTP will appear in the backend console (no error!)
+
+**Look for OTP in console output:**
+```
+===========================================
+Sending OTP 123456 to +12025551234
+===========================================
+```
+
+**WHY THIS HAPPENS:** The error occurs when Twilio credentials aren't configured or are incorrect. Setting `twilio.enabled=false` tells the system to use console-only mode (development mode), which works perfectly without any SMS service.
+
+**For Real SMS:** Follow the complete setup guide below.
+
+---
+
 ## 🚀 Quick Start
 
 ### Step 1: Sign Up for Twilio
