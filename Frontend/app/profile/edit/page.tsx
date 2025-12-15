@@ -35,7 +35,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { ImageUpload } from "@/components/image-upload"
-import { PhoneInputSection } from "@/components/PhoneInputSection"
+import { PhoneInputWithCountryCode } from "@/components/PhoneInputWithCountryCode"
 import { PrivacyToggle } from "@/components/PrivacyToggle"
 import ReactCrop, {
     type Crop,
@@ -524,7 +524,7 @@ const handleSave = async () => {
 
                                     {/* Phone Verification Section */}
                                     <div className="space-y-4">
-                                        <PhoneInputSection
+                                        <PhoneInputWithCountryCode
                                             userId={user.id}
                                             currentPhone={user.phoneNumber}
                                             isVerified={user.phoneVerified}

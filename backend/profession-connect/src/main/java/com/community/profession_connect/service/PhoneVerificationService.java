@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PhoneVerificationService {
 
     private final UserRepository userRepository;
+    private final TwilioSmsService twilioSmsService;
     
     // Store OTP with userId as key, value is OTP data (otp code, phone number, expiration time)
     // NOTE: In-memory storage for development. For production, use Redis with automatic expiration:
@@ -23,8 +24,9 @@ public class PhoneVerificationService {
     // OTP expires after 5 minutes
     private static final int OTP_EXPIRATION_MINUTES = 5;
 
-    public PhoneVerificationService(UserRepository userRepository) {
+    public PhoneVerificationService(UserRepository userRepository, TwilioSmsService twilioSmsService) {
         this.userRepository = userRepository;
+        this.twilioSmsService = twilioSmsService;
     }
 
     /**
@@ -43,13 +45,15 @@ public class PhoneVerificationService {
         LocalDateTime expirationTime = LocalDateTime.now().plusMinutes(OTP_EXPIRATION_MINUTES);
         otpStorage.put(userId, new OTPData(otp, phoneNumber, expirationTime));
 
-        // Mock send (in production, use SMS service like Twilio)
-        System.out.println("===========================================");
-        System.out.println("Sending OTP " + otp + " to " + phoneNumber);
-        System.out.println("===========================================");
+        // Send OTP via Twilio (will fall back to console if not configured)
+        boolean smsSent = twilioSmsService.sendOtp(phoneNumber, otp);
 
         Map<String, String> response = new HashMap<>();
-        response.put("message", "OTP sent successfully to " + maskPhoneNumber(phoneNumber));
+        if (smsSent) {
+            response.put("message", "OTP sent successfully to " + maskPhoneNumber(phoneNumber));
+        } else {
+            response.put("message", "OTP generated. Check console for code (SMS not configured).");
+        }
         response.put("expiresIn", OTP_EXPIRATION_MINUTES + " minutes");
         return response;
     }
