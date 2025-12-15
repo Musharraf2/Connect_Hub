@@ -53,6 +53,9 @@ public class UserService {
     @Autowired
     private ConnectionRepository connectionRepository;
 
+    @Autowired
+    private EmailVerificationService emailVerificationService;
+
     public String registerUser(RegistrationRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return "User already exists!";
@@ -62,14 +65,25 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setPassword(request.getPassword()); // (later you should hash this!)
         user.setProfession(request.getProfession());
+        // User is created with isEmailVerified = false (set in @PrePersist)
         userRepository.save(user);
-        return "User registered successfully!";
+        
+        // Generate OTP for email verification
+        emailVerificationService.generateOtp(user.getEmail());
+        
+        return "OTP_SENT";
     }
 
     public LoginResponse loginUser(LoginRequest request) {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
+            
+            // Check if email is verified before allowing login
+            if (user.getIsEmailVerified() == null || !user.getIsEmailVerified()) {
+                throw new RuntimeException("Email not verified. Please check your email for the verification code.");
+            }
+            
             if (user.getPassword().equals(request.getPassword())) {
                 return new LoginResponse(user.getId(), user.getName(), user.getEmail(), user.getProfession());
             }
@@ -84,7 +98,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 1. Update basic User info
+        // 1. Update basic User info (excluding phoneNumber which requires verification)
         if (updateRequest.getName() != null) {
             user.setName(updateRequest.getName());
         }
@@ -94,9 +108,7 @@ public class UserService {
         if (updateRequest.getAboutMe() != null) {
             user.setAboutMe(updateRequest.getAboutMe());
         }
-        if (updateRequest.getPhoneNumber() != null) {
-            user.setPhoneNumber(updateRequest.getPhoneNumber());
-        }
+        // phoneNumber is NOT updated here - must use verification endpoints
         if (updateRequest.getCoverImageUrl() != null) {
             user.setCoverImageUrl(updateRequest.getCoverImageUrl());
         }
@@ -163,19 +175,24 @@ public class UserService {
         return userRepository.findByProfession(profession);
     }
 
-    // This method now returns the complete profile DTO
+    // This method now returns the complete profile DTO with privacy controls
     public UserProfileDetailResponse getUserById(Long id) {
-        Objects.requireNonNull(id, "User ID must not be null");
+        return getUserById(id, null);
+    }
+
+    // Overloaded method with requester ID for privacy checks
+    public UserProfileDetailResponse getUserById(Long targetUserId, Long requesterId) {
+        Objects.requireNonNull(targetUserId, "User ID must not be null");
 
         // 1. Fetch the User
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + targetUserId));
 
         // 2. Fetch all related data
-        AcademicInfo academicInfo = academicInfoRepository.findByUserId(id).orElse(null);
-        List<Skill> skills = skillRepository.findAllByUserId(id);
-        List<Interest> interests = interestRepository.findAllByUserId(id);
-        List<Achievement> achievementsEntities = achievementRepository.findByUserId(id);
+        AcademicInfo academicInfo = academicInfoRepository.findByUserId(targetUserId).orElse(null);
+        List<Skill> skills = skillRepository.findAllByUserId(targetUserId);
+        List<Interest> interests = interestRepository.findAllByUserId(targetUserId);
+        List<Achievement> achievementsEntities = achievementRepository.findByUserId(targetUserId);
         List<String> achievements = achievementsEntities.stream()
                 .map(Achievement::getAchievement)
                 .toList();
@@ -188,8 +205,21 @@ public class UserService {
                 user, ConnectionStatus.PENDING
         );
 
-        // 4. Build and return the new complete DTO
-        return UserProfileDetailResponse.from(user, academicInfo, skills, interests, achievements, connectionsCount, pendingRequestsCount);
+        // 4. Build the DTO
+        UserProfileDetailResponse response = UserProfileDetailResponse.from(
+            user, academicInfo, skills, interests, achievements, connectionsCount, pendingRequestsCount
+        );
+
+        // 5. Apply privacy controls for phone number
+        boolean isOwnProfile = requesterId != null && requesterId.equals(targetUserId);
+        boolean isPhonePublic = user.getIsPhonePublic() != null && user.getIsPhonePublic();
+        
+        if (!isOwnProfile && !isPhonePublic) {
+            // Hide phone number if not own profile and not public
+            response.setPhoneNumber(null);
+        }
+
+        return response;
     }
 
     public User updateProfileImage(Long userId, String profileImageUrl) {

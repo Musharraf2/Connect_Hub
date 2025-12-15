@@ -91,6 +91,11 @@ export function Header({ user }: HeaderProps) {
             icon: Home
         },
         {
+            name: "Jobs",
+            href: "/jobs",
+            icon: Briefcase
+        },
+        {
             name: "Messages",
             href: "/messages",
             icon: MessageCircle,
