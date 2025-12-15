@@ -561,3 +561,111 @@ export const uploadMessageImage = async (file: File): Promise<{ imageUrl: string
     }
     return await response.json();
 };
+
+// --- JOB POSTS ---
+
+export interface JobPostRequest {
+    title: string;
+    companyName: string;
+    location: string;
+    type: string;
+    description: string;
+    applyLink: string;
+    postedBy: number;
+    profession: string;
+}
+
+export interface JobPostResponse {
+    id: number;
+    title: string;
+    companyName: string;
+    location: string;
+    type: string;
+    description: string;
+    applyLink: string;
+    postedBy: {
+        id: number;
+        name: string;
+        email: string;
+        profession: string;
+        profileImageUrl?: string;
+    };
+    profession: string;
+    createdAt: string;
+}
+
+export const createJobPost = async (jobPost: JobPostRequest): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobPost),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create job post');
+    }
+    return await response.json();
+};
+
+export const getAllJobPosts = async (): Promise<JobPostResponse[]> => {
+    const response = await fetch(`${BASE}/jobs`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch job posts');
+    return await response.json();
+};
+
+export const getJobPostsByProfession = async (profession: string): Promise<JobPostResponse[]> => {
+    const response = await fetch(`${BASE}/jobs?profession=${encodeURIComponent(profession)}`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch job posts');
+    return await response.json();
+};
+
+export const getFilteredJobPosts = async (
+    profession: string,
+    type?: string,
+    location?: string
+): Promise<JobPostResponse[]> => {
+    let url = `${BASE}/jobs?profession=${encodeURIComponent(profession)}`;
+    if (type) url += `&type=${encodeURIComponent(type)}`;
+    if (location) url += `&location=${encodeURIComponent(location)}`;
+
+    const response = await fetch(url);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch filtered job posts');
+    return await response.json();
+};
+
+export const getJobPostById = async (id: number): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch job post');
+    return await response.json();
+};
+
+export const updateJobPost = async (
+    id: number,
+    userId: number,
+    jobPost: JobPostRequest
+): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs/${id}?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobPost),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update job post');
+    }
+    return await response.json();
+};
+
+export const deleteJobPost = async (id: number, userId: number): Promise<string> => {
+    const response = await fetch(`${BASE}/jobs/${id}?userId=${userId}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to delete job post');
+    }
+    return await response.text();
+};
