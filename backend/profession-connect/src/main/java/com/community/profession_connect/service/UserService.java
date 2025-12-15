@@ -53,6 +53,9 @@ public class UserService {
     @Autowired
     private ConnectionRepository connectionRepository;
 
+    @Autowired
+    private EmailVerificationService emailVerificationService;
+
     public String registerUser(RegistrationRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return "User already exists!";
@@ -62,14 +65,25 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setPassword(request.getPassword()); // (later you should hash this!)
         user.setProfession(request.getProfession());
+        // User is created with isEmailVerified = false (set in @PrePersist)
         userRepository.save(user);
-        return "User registered successfully!";
+        
+        // Generate OTP for email verification
+        emailVerificationService.generateOtp(user.getEmail());
+        
+        return "OTP_SENT";
     }
 
     public LoginResponse loginUser(LoginRequest request) {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
+            
+            // Check if email is verified before allowing login
+            if (user.getIsEmailVerified() == null || !user.getIsEmailVerified()) {
+                throw new RuntimeException("Email not verified. Please check your email for the verification code.");
+            }
+            
             if (user.getPassword().equals(request.getPassword())) {
                 return new LoginResponse(user.getId(), user.getName(), user.getEmail(), user.getProfession());
             }

@@ -29,16 +29,22 @@ public class UserController {
     private final FileStorageService fileStorageService;
     private final OnlineUserService onlineUserService;
     private final PhoneVerificationService phoneVerificationService;
+    private final com.community.profession_connect.service.EmailVerificationService emailVerificationService;
+    private final com.community.profession_connect.repository.UserRepository userRepository;
 
     @Autowired
     public UserController(UserService userService,
                           FileStorageService fileStorageService,
                           OnlineUserService onlineUserService,
-                          PhoneVerificationService phoneVerificationService) {
+                          PhoneVerificationService phoneVerificationService,
+                          com.community.profession_connect.service.EmailVerificationService emailVerificationService,
+                          com.community.profession_connect.repository.UserRepository userRepository) {
         this.userService = userService;
         this.fileStorageService = fileStorageService;
         this.onlineUserService = onlineUserService;
         this.phoneVerificationService = phoneVerificationService;
+        this.emailVerificationService = emailVerificationService;
+        this.userRepository = userRepository;
     }
 
     // --------------------------------------------------------------------------------
@@ -58,12 +64,71 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        LoginResponse response = userService.loginUser(request);
+        try {
+            LoginResponse response = userService.loginUser(request);
 
-        if (response.getName() != null) {
+            if (response.getName() != null) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+        } catch (RuntimeException e) {
+            // Handle email not verified exception
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(403).body(null);
+        }
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+            
+            Map<String, String> response = new HashMap<>();
+            
+            if (email == null || email.trim().isEmpty()) {
+                response.put("error", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            if (otp == null || otp.trim().isEmpty()) {
+                response.put("error", "OTP is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Verify OTP
+            boolean isValid = emailVerificationService.verifyOtp(email, otp);
+            
+            if (!isValid) {
+                response.put("error", "Invalid or expired OTP. Please request a new code.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Find user by email
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Update email verification status
+            user.setIsEmailVerified(true);
+            userRepository.save(user);
+            
+            response.put("message", "Email verified successfully! You can now log in.");
             return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().build();
+            
+        } catch (RuntimeException e) {
+            System.err.println("Error in verifyEmail endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            System.err.println("Unexpected error in verifyEmail endpoint: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "An unexpected error occurred: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 

@@ -32,6 +32,7 @@ public class User {
     private String phoneNumber; // Phone number
     private Boolean phoneVerified = false; // Phone number verification status (renamed from phoneVerified)
     private Boolean isPhonePublic = false; // Privacy control for phone number visibility
+    private Boolean isEmailVerified = false; // Email verification status
     
     @Column(name = "created_at")
     private LocalDateTime createdAt; // User creation timestamp
@@ -44,6 +45,7 @@ public class User {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (phoneVerified == null) phoneVerified = false;
         if (isPhonePublic == null) isPhonePublic = false;
+        if (isEmailVerified == null) isEmailVerified = false;
     }
 
     public void setName(String name) { this.name = name; }
