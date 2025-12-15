@@ -424,7 +424,6 @@ export default function JobsPage() {
                           >
                             <ExternalLink className="w-4 h-4 mr-2" />
                             {job.isLinkSafe ? "Easy Apply" : "Proceed with Caution"}
-                            Easy Apply
                           </Button>
                         </div>
                       </div>

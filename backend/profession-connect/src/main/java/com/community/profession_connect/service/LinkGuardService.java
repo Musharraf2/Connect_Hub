@@ -70,8 +70,9 @@ public class LinkGuardService {
                 return LinkSafetyStatus.UNSAFE;
             }
 
-            // If not in any list and no suspicious redirects, consider it TRUSTED
-            return LinkSafetyStatus.TRUSTED;
+            // For security, default unknown domains to UNSAFE
+            // Only trusted domains should pass through
+            return LinkSafetyStatus.UNSAFE;
 
         } catch (Exception e) {
             // If any error occurs during analysis, mark as UNSAFE for safety
