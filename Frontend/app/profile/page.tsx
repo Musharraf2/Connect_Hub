@@ -297,7 +297,7 @@ export default function ProfilePage() {
           bio: profile.aboutMe ?? "No bio yet. Click edit to tell your story.",
           avatar: getImageUrl(profile.profileImageUrl),
           coverImage: getImageUrl(profile.coverImageUrl),
-          phoneNumber: profile.phoneNumber ?? "+1 (555) 000-0000",
+          phoneNumber: profile.phoneNumber ?? "",
           
           university: profile.academicInfo?.university ?? "N/A",
           major: profile.academicInfo?.major ?? "N/A",
@@ -511,12 +511,14 @@ export default function ProfilePage() {
                             </div>
                             <span className="text-muted-foreground truncate">{currentUser.email}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-sm">
-                            <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
-                                <Phone className="w-4 h-4" />
+                        {currentUser.phoneNumber && (
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="p-2 rounded-md bg-gray-50 dark:bg-muted text-muted-foreground border border-gray-100 dark:border-border">
+                                    <Phone className="w-4 h-4" />
+                                </div>
+                                <span className="text-muted-foreground">{currentUser.phoneNumber}</span>
                             </div>
-                            <span className="text-muted-foreground">{currentUser.phoneNumber}</span>
-                        </div>
+                        )}
                     </CardContent>
                 </Card>
              </FadeInUp>

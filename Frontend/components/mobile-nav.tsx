@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Users, MessageSquare, Bell } from "lucide-react"
+import { Users, MessageSquare, Bell, Briefcase } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function MobileNav() {
@@ -33,6 +33,12 @@ export function MobileNav() {
             name: "Community",
             href: "/my-community",
             icon: Users,
+            badge: 0
+        },
+        {
+            name: "Jobs",
+            href: "/jobs",
+            icon: Briefcase,
             badge: 0
         },
         {

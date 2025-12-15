@@ -65,8 +65,12 @@ export default function LoginPage() {
             }
         } catch (err: unknown) {
             console.error("Login failed:", err);
+            // Check if it's an email verification error
+            if (err instanceof Error && err.message.includes("Email not verified")) {
+                toast.error("Please verify your email before logging in. Check your inbox for the verification code.");
+            }
             // Check if it's a credential error
-            if (err instanceof Error && err.message === 'Wrong credentials') {
+            else if (err instanceof Error && err.message === 'Wrong credentials') {
                 toast.error("Wrong credentials. Please check your email and password.");
             } else {
                 toast.error("Login failed. The server may be down.");

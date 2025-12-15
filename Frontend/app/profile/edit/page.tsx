@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import {
     LoginResponse,
     UserProfileResponse,
+    UserProfileDetailResponse,
     ProfileUpdatePayload,
     getUserProfile,
     updateProfile,
@@ -34,6 +35,8 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { ImageUpload } from "@/components/image-upload"
+import { PhoneInputWithCountryCode } from "@/components/PhoneInputWithCountryCode"
+import { PrivacyToggle } from "@/components/PrivacyToggle"
 import ReactCrop, {
     type Crop,
     centerCrop,
@@ -60,6 +63,8 @@ type EditableUser = {
     avatar?: string;
     coverImage?: string;
     phoneNumber?: string;
+    phoneVerified?: boolean;
+    isPhonePublic?: boolean;
     community: string;
     pendingRequests?: number;
 };
@@ -186,6 +191,8 @@ export default function EditProfilePage() {
                     avatar: getImageUrl(profile.profileImageUrl),
                     coverImage: getImageUrl(profile.coverImageUrl),
                     phoneNumber: profile.phoneNumber ?? "",
+                    phoneVerified: profile.phoneVerified ?? false,
+                    isPhonePublic: profile.isPhonePublic ?? false,
                     community: profile.profession ?? "",
                     pendingRequests: 0,
                 });
@@ -243,6 +250,32 @@ export default function EditProfilePage() {
         setUser({ ...user, achievements: user.achievements.filter((x) => x !== a) });
     };
 
+    // Handle phone verification completion
+    const handlePhoneVerified = async (phoneNumber: string) => {
+        if (!user) return;
+        // Refresh profile to get updated phoneVerified status
+        try {
+            const profile = await getUserProfile(user.id);
+            setUser({
+                ...user,
+                phoneNumber: profile.phoneNumber ?? "",
+                phoneVerified: profile.phoneVerified ?? false,
+            });
+            toast.success("Phone number verified successfully!");
+        } catch (err) {
+            console.error("Error refreshing profile:", err);
+        }
+    };
+
+    // Handle privacy toggle
+    const handlePrivacyToggled = (isPublic: boolean) => {
+        if (!user) return;
+        setUser({
+            ...user,
+            isPhonePublic: isPublic,
+        });
+    };
+
     // ----------- Save Logic (Sanitized) -----------
 
 const handleSave = async () => {
@@ -278,7 +311,7 @@ const handleSave = async () => {
             name: clean(user.name),
             location: clean(user.location),
             aboutMe: clean(user.aboutMe),
-            phoneNumber: clean(user.phoneNumber),
+            // phoneNumber is NOT included - must use verification endpoints
             university: clean(user.university),
             major: clean(user.major),
             year: clean(user.year),
@@ -489,15 +522,22 @@ const handleSave = async () => {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phoneNumber">Phone Number</Label>
-                                        <Input 
-                                            id="phoneNumber" 
-                                            value={user.phoneNumber} 
-                                            onChange={(e) => handleField("phoneNumber", e.target.value)} 
-                                            className="bg-gray-50 dark:bg-muted/50 border-gray-200 dark:border-border focus:bg-white dark:focus:bg-muted" 
-                                            placeholder="+1 (555) 123-4567"
+                                    {/* Phone Verification Section */}
+                                    <div className="space-y-4">
+                                        <PhoneInputWithCountryCode
+                                            userId={user.id}
+                                            currentPhone={user.phoneNumber}
+                                            isVerified={user.phoneVerified}
+                                            onVerificationComplete={handlePhoneVerified}
                                         />
+                                        
+                                        {user.phoneVerified && (
+                                            <PrivacyToggle
+                                                userId={user.id}
+                                                isPhonePublic={user.isPhonePublic}
+                                                onToggle={handlePrivacyToggled}
+                                            />
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">

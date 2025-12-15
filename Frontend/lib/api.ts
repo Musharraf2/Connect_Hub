@@ -76,6 +76,8 @@ export interface UserProfileDetailResponse {
     profileImageUrl?: string | null;
     coverImageUrl?: string | null;
     phoneNumber?: string | null;
+    phoneVerified?: boolean;
+    isPhonePublic?: boolean;
     professionalDetails?: string | null; // JSON string for dynamic professional info
     academicInfo: AcademicInfo | null;
     skills: Skill[];
@@ -198,6 +200,22 @@ export const signupUser = async (userData: RegistrationRequestType) => {
     return response.text();
 };
 
+export const verifyEmail = async (email: string, otp: string): Promise<{ message?: string; error?: string }> => {
+    const response = await fetch(`${BASE}/users/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || 'Email verification failed');
+    }
+    
+    return data;
+};
+
 export const loginUser = async (loginData: LoginRequestType): Promise<LoginResponse> => {
     const response = await fetch(`${BASE}/users/login`, {
         method: 'POST',
@@ -206,6 +224,10 @@ export const loginUser = async (loginData: LoginRequestType): Promise<LoginRespo
     });
 
     if (!response.ok) {
+        if (response.status === 403) {
+            // Email not verified error
+            throw new Error('Email not verified. Please check your email for the verification code.');
+        }
         if (response.status === 400) {
             throw new Error('Wrong credentials');
         }
@@ -558,6 +580,159 @@ export const uploadMessageImage = async (file: File): Promise<{ imageUrl: string
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to upload message image: ${errorText}`);
+    }
+    return await response.json();
+};
+
+// --- JOB POSTS ---
+
+export interface JobPostRequest {
+    title: string;
+    companyName: string;
+    location: string;
+    type: string;
+    description: string;
+    applyLink: string;
+    postedBy: number;
+    profession: string;
+}
+
+export interface JobPostResponse {
+    id: number;
+    title: string;
+    companyName: string;
+    location: string;
+    type: string;
+    description: string;
+    applyLink: string;
+    postedBy: {
+        id: number;
+        name: string;
+        email: string;
+        profession: string;
+        profileImageUrl?: string;
+    };
+    profession: string;
+    createdAt: string;
+    // Trust & Security fields
+    trustScore: number;
+    isLinkSafe: boolean;
+    status: string;
+}
+
+export const createJobPost = async (jobPost: JobPostRequest): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobPost),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create job post');
+    }
+    return await response.json();
+};
+
+export const getAllJobPosts = async (): Promise<JobPostResponse[]> => {
+    const response = await fetch(`${BASE}/jobs`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch job posts');
+    return await response.json();
+};
+
+export const getJobPostsByProfession = async (profession: string): Promise<JobPostResponse[]> => {
+    const response = await fetch(`${BASE}/jobs?profession=${encodeURIComponent(profession)}`);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch job posts');
+    return await response.json();
+};
+
+export const getFilteredJobPosts = async (
+    profession: string,
+    type?: string,
+    location?: string
+): Promise<JobPostResponse[]> => {
+    let url = `${BASE}/jobs?profession=${encodeURIComponent(profession)}`;
+    if (type) url += `&type=${encodeURIComponent(type)}`;
+    if (location) url += `&location=${encodeURIComponent(location)}`;
+
+    const response = await fetch(url);
+    if (response.status === 204) return [];
+    if (!response.ok) throw new Error('Failed to fetch filtered job posts');
+    return await response.json();
+};
+
+export const getJobPostById = async (id: number): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch job post');
+    return await response.json();
+};
+
+export const updateJobPost = async (
+    id: number,
+    userId: number,
+    jobPost: JobPostRequest
+): Promise<JobPostResponse> => {
+    const response = await fetch(`${BASE}/jobs/${id}?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobPost),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update job post');
+    }
+    return await response.json();
+};
+
+export const deleteJobPost = async (id: number, userId: number): Promise<string> => {
+    const response = await fetch(`${BASE}/jobs/${id}?userId=${userId}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to delete job post');
+    }
+    return await response.text();
+};
+
+// --- PHONE VERIFICATION ---
+
+export const initiatePhoneVerification = async (userId: number, phoneNumber: string): Promise<{ message: string; expiresIn: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/phone/verify-init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send OTP');
+    }
+    return await response.json();
+};
+
+export const confirmPhoneVerification = async (userId: number, otp: string, phoneNumber: string): Promise<{ message: string; phoneNumber: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/phone/verify-confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp, phoneNumber }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Verification failed');
+    }
+    return await response.json();
+};
+
+export const updatePhonePrivacy = async (userId: number, isPhonePublic: boolean): Promise<{ message: string; isPhonePublic: string }> => {
+    const response = await fetch(`${BASE}/users/${userId}/privacy`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPhonePublic }),
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update privacy');
     }
     return await response.json();
 };
