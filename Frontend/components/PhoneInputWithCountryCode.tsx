@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Phone, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,13 @@ export function PhoneInputWithCountryCode({
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingPhone, setPendingPhone] = useState("");
+
+  // Update state when currentPhone prop changes (e.g., after verification)
+  useEffect(() => {
+    const parsed = parsePhone(currentPhone);
+    setCountryCode(parsed.countryCode);
+    setPhoneNumber(parsed.phoneNumber);
+  }, [currentPhone]);
 
   const fullPhoneNumber = countryCode + phoneNumber;
   const hasChanged = fullPhoneNumber !== currentPhone;
