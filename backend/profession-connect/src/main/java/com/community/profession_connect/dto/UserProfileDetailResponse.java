@@ -21,6 +21,8 @@ public class UserProfileDetailResponse {
     private String profileImageUrl;
     private String coverImageUrl;
     private String phoneNumber;
+    private Boolean phoneVerified; // Phone verification status
+    private Boolean isPhonePublic; // Phone privacy setting
     private String professionalDetails; // JSON field for dynamic professional info
 
     // Related Data
@@ -46,6 +48,8 @@ public class UserProfileDetailResponse {
         dto.setProfileImageUrl(user.getProfileImageUrl());
         dto.setCoverImageUrl(user.getCoverImageUrl());
         dto.setPhoneNumber(user.getPhoneNumber());
+        dto.setPhoneVerified(user.getPhoneVerified());
+        dto.setIsPhonePublic(user.getIsPhonePublic());
         dto.setProfessionalDetails(user.getProfessionalDetails());
 
         dto.setAcademicInfo(academicInfo);

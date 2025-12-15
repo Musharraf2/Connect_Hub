@@ -7,7 +7,8 @@ import com.community.profession_connect.dto.UserProfileDetailResponse;
 import com.community.profession_connect.dto.UserProfileUpdateRequest;
 import com.community.profession_connect.model.User;
 import com.community.profession_connect.service.FileStorageService;
-import com.community.profession_connect.service.OnlineUserService; // <--- 1. NEW IMPORT
+import com.community.profession_connect.service.OnlineUserService;
+import com.community.profession_connect.service.PhoneVerificationService;
 import com.community.profession_connect.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set; // <--- 2. NEW IMPORT
+import java.util.Set;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -26,15 +27,18 @@ public class UserController {
 
     private final UserService userService;
     private final FileStorageService fileStorageService;
-    private final OnlineUserService onlineUserService; // <--- 3. NEW FIELD
+    private final OnlineUserService onlineUserService;
+    private final PhoneVerificationService phoneVerificationService;
 
     @Autowired
     public UserController(UserService userService,
                           FileStorageService fileStorageService,
-                          OnlineUserService onlineUserService) { // <--- 4. UPDATE CONSTRUCTOR
+                          OnlineUserService onlineUserService,
+                          PhoneVerificationService phoneVerificationService) {
         this.userService = userService;
         this.fileStorageService = fileStorageService;
-        this.onlineUserService = onlineUserService;      // <--- 5. ASSIGN SERVICE
+        this.onlineUserService = onlineUserService;
+        this.phoneVerificationService = phoneVerificationService;
     }
 
     // --------------------------------------------------------------------------------
@@ -73,9 +77,11 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<UserProfileDetailResponse> getUserProfile(@PathVariable Long userId) {
+    public ResponseEntity<UserProfileDetailResponse> getUserProfile(
+            @PathVariable Long userId,
+            @RequestParam(required = false) Long requesterId) {
         try {
-            UserProfileDetailResponse profile = userService.getUserById(userId);
+            UserProfileDetailResponse profile = userService.getUserById(userId, requesterId);
             return ResponseEntity.ok(profile);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -89,6 +95,62 @@ public class UserController {
             return ResponseEntity.ok(updatedUser);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    // Phone Verification Endpoints
+    @PostMapping("/{userId}/phone/verify-init")
+    public ResponseEntity<Map<String, String>> initiatePhoneVerification(
+            @PathVariable Long userId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String phoneNumber = request.get("phoneNumber");
+            if (phoneNumber == null || phoneNumber.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Phone number is required"));
+            }
+            Map<String, String> response = phoneVerificationService.initiateVerification(userId, phoneNumber);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{userId}/phone/verify-confirm")
+    public ResponseEntity<Map<String, String>> confirmPhoneVerification(
+            @PathVariable Long userId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String otp = request.get("otp");
+            String phoneNumber = request.get("phoneNumber");
+            
+            if (otp == null || otp.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "OTP is required"));
+            }
+            if (phoneNumber == null || phoneNumber.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Phone number is required"));
+            }
+            
+            Map<String, String> response = phoneVerificationService.completeVerification(userId, otp, phoneNumber);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{userId}/privacy")
+    public ResponseEntity<Map<String, String>> updatePhonePrivacy(
+            @PathVariable Long userId,
+            @RequestBody Map<String, Boolean> request) {
+        try {
+            Boolean isPhonePublic = request.get("isPhonePublic");
+            if (isPhonePublic == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "isPhonePublic is required"));
+            }
+            
+            Map<String, String> response = phoneVerificationService.updatePhonePrivacy(userId, isPhonePublic);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 

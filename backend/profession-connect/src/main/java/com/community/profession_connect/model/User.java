@@ -30,7 +30,8 @@ public class User {
     private String profileImageUrl; // URL/path to the profile image
     private String coverImageUrl; // URL/path to the cover/background image
     private String phoneNumber; // Phone number
-    private Boolean phoneVerified = false; // Phone number verification status
+    private Boolean phoneVerified = false; // Phone number verification status (renamed from phoneVerified)
+    private Boolean isPhonePublic = false; // Privacy control for phone number visibility
     
     @Column(name = "created_at")
     private LocalDateTime createdAt; // User creation timestamp
@@ -42,6 +43,7 @@ public class User {
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (phoneVerified == null) phoneVerified = false;
+        if (isPhonePublic == null) isPhonePublic = false;
     }
 
     public void setName(String name) { this.name = name; }
