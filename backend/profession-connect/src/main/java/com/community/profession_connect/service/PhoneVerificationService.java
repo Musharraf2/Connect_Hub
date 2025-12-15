@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +38,12 @@ public class PhoneVerificationService {
             // Validate phone number format (simple regex for international format)
             if (!isValidPhoneNumber(phoneNumber)) {
                 throw new RuntimeException("Invalid phone number format. Use format: +1234567890");
+            }
+
+            // Check if phone number is already verified by another user
+            Optional<User> existingUser = userRepository.findByPhoneNumber(phoneNumber);
+            if (existingUser.isPresent() && !existingUser.get().getId().equals(userId)) {
+                throw new RuntimeException("This phone number is already verified by another user. Please use a different number.");
             }
 
             // Generate 6-digit OTP
@@ -89,6 +96,13 @@ public class PhoneVerificationService {
         // Check if phone number matches
         if (!storedOTP.getPhoneNumber().equals(phoneNumber)) {
             throw new RuntimeException("Phone number mismatch. Please use the same number.");
+        }
+
+        // Double-check phone number uniqueness before saving
+        Optional<User> existingUser = userRepository.findByPhoneNumber(phoneNumber);
+        if (existingUser.isPresent() && !existingUser.get().getId().equals(userId)) {
+            otpStorage.remove(userId);
+            throw new RuntimeException("This phone number was just verified by another user. Please use a different number.");
         }
 
         // Update user with verified phone number
