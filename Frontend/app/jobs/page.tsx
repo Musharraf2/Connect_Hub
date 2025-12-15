@@ -13,12 +13,14 @@ import {
   Filter,
   X,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Header } from "@/components/header";
 import { MobileNav } from "@/components/mobile-nav";
+import { TrustBadge } from "@/components/TrustBadge";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +64,10 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Safety warning dialog state
+  const [showSafetyWarning, setShowSafetyWarning] = useState(false);
+  const [pendingApplyLink, setPendingApplyLink] = useState<string>("");
 
   // Filter states
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -200,8 +206,22 @@ export default function JobsPage() {
     }
   };
 
-  const handleEasyApply = (applyLink: string) => {
-    window.open(applyLink, "_blank");
+  const handleEasyApply = (applyLink: string, isLinkSafe: boolean) => {
+    if (isLinkSafe) {
+      window.open(applyLink, "_blank");
+    } else {
+      // Show safety warning dialog
+      setPendingApplyLink(applyLink);
+      setShowSafetyWarning(true);
+    }
+  };
+
+  const proceedWithUnsafeLink = () => {
+    if (pendingApplyLink) {
+      window.open(pendingApplyLink, "_blank");
+    }
+    setShowSafetyWarning(false);
+    setPendingApplyLink("");
   };
 
   const formatDate = (dateString: string) => {
@@ -343,8 +363,11 @@ export default function JobsPage() {
                     <div className="flex-1">
                       {/* Job Header */}
                       <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="text-xl font-semibold mb-1">{job.title}</h3>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-xl font-semibold">{job.title}</h3>
+                            <TrustBadge score={job.trustScore} />
+                          </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Building2 className="w-4 h-4" />
                             <span>{job.companyName}</span>
@@ -394,10 +417,13 @@ export default function JobsPage() {
                           )}
                           <Button
                             size="sm"
-                            onClick={() => handleEasyApply(job.applyLink)}
-                            className="bg-gradient-to-r from-primary to-secondary"
+                            onClick={() => handleEasyApply(job.applyLink, job.isLinkSafe)}
+                            className={job.isLinkSafe 
+                              ? "bg-gradient-to-r from-primary to-secondary" 
+                              : "bg-yellow-600 hover:bg-yellow-700"}
                           >
                             <ExternalLink className="w-4 h-4 mr-2" />
+                            {job.isLinkSafe ? "Easy Apply" : "Proceed with Caution"}
                             Easy Apply
                           </Button>
                         </div>
@@ -525,6 +551,54 @@ export default function JobsPage() {
               ) : (
                 "Post Job"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Safety Warning Dialog */}
+      <Dialog open={showSafetyWarning} onOpenChange={setShowSafetyWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+              <AlertTriangle className="w-5 h-5" />
+              Proceed with Caution
+            </DialogTitle>
+            <DialogDescription>
+              This job posting contains a link that may not be safe or verified. 
+              The link could redirect to an unknown or suspicious website.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <h4 className="font-semibold text-sm mb-2 text-yellow-800 dark:text-yellow-200">
+                Safety Tips:
+              </h4>
+              <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                <li>Never share personal information via messaging apps</li>
+                <li>Be cautious of shortened URLs (bit.ly, t.me, etc.)</li>
+                <li>Verify the company independently before applying</li>
+                <li>Legitimate employers rarely ask for money upfront</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSafetyWarning(false);
+                setPendingApplyLink("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={proceedWithUnsafeLink}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              I Understand - Proceed Anyway
             </Button>
           </DialogFooter>
         </DialogContent>

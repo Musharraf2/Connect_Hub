@@ -17,10 +17,15 @@ public class JobService {
 
     private final JobPostRepository jobPostRepository;
     private final UserRepository userRepository;
+    private final LinkGuardService linkGuardService;
+    private final TrustScoreService trustScoreService;
 
-    public JobService(JobPostRepository jobPostRepository, UserRepository userRepository) {
+    public JobService(JobPostRepository jobPostRepository, UserRepository userRepository,
+                      LinkGuardService linkGuardService, TrustScoreService trustScoreService) {
         this.jobPostRepository = jobPostRepository;
         this.userRepository = userRepository;
+        this.linkGuardService = linkGuardService;
+        this.trustScoreService = trustScoreService;
     }
 
     public JobPostResponse createJobPost(JobPostRequest request) {
@@ -37,6 +42,24 @@ public class JobService {
         jobPost.setPostedBy(user);
         jobPost.setProfession(request.getProfession());
 
+        // --- TRUST & SECURITY SYSTEM ---
+        
+        // Analyze link safety
+        boolean isLinkSafe = linkGuardService.isLinkSafe(request.getApplyLink());
+        jobPost.setIsLinkSafe(isLinkSafe);
+        jobPost.setExternalLink(request.getApplyLink());
+
+        // Calculate trust score
+        int trustScore = trustScoreService.calculateScore(user, jobPost);
+        jobPost.setTrustScore(trustScore);
+
+        // Flag job if trust score is low or link is unsafe
+        if (trustScore < 30 || !isLinkSafe) {
+            jobPost.setStatus("FLAGGED");
+        } else {
+            jobPost.setStatus("ACTIVE");
+        }
+
         JobPost savedJobPost = jobPostRepository.save(jobPost);
         return mapToResponse(savedJobPost);
     }
@@ -44,6 +67,7 @@ public class JobService {
     public List<JobPostResponse> getAllJobPosts() {
         return jobPostRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
+                .filter(job -> !"FLAGGED".equals(job.getStatus()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -51,6 +75,7 @@ public class JobService {
     public List<JobPostResponse> getJobPostsByProfession(String profession) {
         return jobPostRepository.findByProfessionOrderByCreatedAtDesc(profession)
                 .stream()
+                .filter(job -> !"FLAGGED".equals(job.getStatus()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -68,7 +93,9 @@ public class JobService {
             jobPosts = jobPostRepository.findByProfessionOrderByCreatedAtDesc(profession);
         }
 
+        // Filter out FLAGGED jobs (hidden from users)
         return jobPosts.stream()
+                .filter(job -> !"FLAGGED".equals(job.getStatus()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -121,6 +148,11 @@ public class JobService {
         response.setApplyLink(jobPost.getApplyLink());
         response.setProfession(jobPost.getProfession());
         response.setCreatedAt(jobPost.getCreatedAt());
+        
+        // Trust & Security fields
+        response.setTrustScore(jobPost.getTrustScore());
+        response.setIsLinkSafe(jobPost.getIsLinkSafe());
+        response.setStatus(jobPost.getStatus());
 
         User user = jobPost.getPostedBy();
         JobPostResponse.UserProfileResponse userResponse = new JobPostResponse.UserProfileResponse();

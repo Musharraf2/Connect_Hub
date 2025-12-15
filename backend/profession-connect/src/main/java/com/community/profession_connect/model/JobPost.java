@@ -41,8 +41,17 @@ public class JobPost {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // Trust & Security System fields
+    private Integer trustScore = 0; // 0-100 trust score
+    private Boolean isLinkSafe = true; // Link safety status
+    private String externalLink; // Analyzed external link
+    private String status = "ACTIVE"; // ACTIVE or FLAGGED
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (trustScore == null) trustScore = 0;
+        if (isLinkSafe == null) isLinkSafe = true;
+        if (status == null) status = "ACTIVE";
     }
 }

@@ -592,6 +592,10 @@ export interface JobPostResponse {
     };
     profession: string;
     createdAt: string;
+    // Trust & Security fields
+    trustScore: number;
+    isLinkSafe: boolean;
+    status: string;
 }
 
 export const createJobPost = async (jobPost: JobPostRequest): Promise<JobPostResponse> => {

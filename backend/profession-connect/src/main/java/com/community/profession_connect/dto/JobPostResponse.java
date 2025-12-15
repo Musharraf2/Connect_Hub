@@ -21,6 +21,11 @@ public class JobPostResponse {
     private String profession;
     private LocalDateTime createdAt;
     
+    // Trust & Security fields
+    private Integer trustScore;
+    private Boolean isLinkSafe;
+    private String status;
+    
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

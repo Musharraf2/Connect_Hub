@@ -2,6 +2,7 @@ package com.community.profession_connect.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -29,9 +30,19 @@ public class User {
     private String profileImageUrl; // URL/path to the profile image
     private String coverImageUrl; // URL/path to the cover/background image
     private String phoneNumber; // Phone number
+    private Boolean phoneVerified = false; // Phone number verification status
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt; // User creation timestamp
 
     @Column(columnDefinition = "TEXT")
     private String professionalDetails; // JSON field for dynamic professional info (e.g., specific fields for Doctors vs. Students)
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (phoneVerified == null) phoneVerified = false;
+    }
 
     public void setName(String name) { this.name = name; }
     public void setLocation(String location) { this.location = location; }
