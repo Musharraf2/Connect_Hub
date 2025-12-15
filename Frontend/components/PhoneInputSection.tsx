@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
+import { initiatePhoneVerification, confirmPhoneVerification } from "@/lib/api";
 
 interface PhoneInputSectionProps {
   userId: number;
@@ -51,18 +52,7 @@ export function PhoneInputSection({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/api/users/${userId}/phone/verify-init`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to send OTP");
-      }
-
-      const data = await response.json();
+      const data = await initiatePhoneVerification(userId, phoneNumber);
       toast.success(data.message);
       setPendingPhone(phoneNumber);
       setShowOtpModal(true);
@@ -81,18 +71,7 @@ export function PhoneInputSection({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/api/users/${userId}/phone/verify-confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otp, phoneNumber: pendingPhone }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Invalid OTP");
-      }
-
-      const data = await response.json();
+      const data = await confirmPhoneVerification(userId, otp, pendingPhone);
       toast.success(data.message);
       setShowOtpModal(false);
       setOtp("");

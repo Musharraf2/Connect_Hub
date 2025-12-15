@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
+import { updatePhonePrivacy } from "@/lib/api";
 
 interface PrivacyToggleProps {
   userId: number;
@@ -24,18 +25,7 @@ export function PrivacyToggle({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:8080/api/users/${userId}/privacy`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPhonePublic: newValue }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update privacy");
-      }
-
-      const data = await response.json();
+      const data = await updatePhonePrivacy(userId, newValue);
       setIsPublic(newValue);
       toast.success(data.message);
       

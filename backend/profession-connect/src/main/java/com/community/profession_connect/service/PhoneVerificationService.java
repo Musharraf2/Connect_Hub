@@ -16,6 +16,8 @@ public class PhoneVerificationService {
     private final UserRepository userRepository;
     
     // Store OTP with userId as key, value is OTP data (otp code, phone number, expiration time)
+    // NOTE: In-memory storage for development. For production, use Redis with automatic expiration:
+    // @Autowired private RedisTemplate<Long, OTPData> redisTemplate;
     private final Map<Long, OTPData> otpStorage = new ConcurrentHashMap<>();
     
     // OTP expires after 5 minutes
