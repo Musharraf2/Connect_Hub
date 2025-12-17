@@ -43,6 +43,17 @@ public class Post {
     /**
      * AI-generated notes (similar to Twitter Grok Notes)
      */
+    // ---------------- AI POST METADATA ----------------
+
+    @Column(name = "is_ai_post", nullable = false)
+    private Boolean aiPost = false;
+
+
+    @Column(name = "ai_category")
+    private String aiCategory; // MOTIVATION / FACT / TIP
+
+// --------------------------------------------------
+
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
@@ -71,3 +82,4 @@ public class Post {
         if (likesCount == null) likesCount = 0;
     }
 }
+
