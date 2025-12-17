@@ -8,7 +8,6 @@ import toast from "react-hot-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { PostResponse } from "@/lib/api";
 
-
 // Icons
 import {
   UserPlus,
@@ -103,12 +102,20 @@ interface ProfileData {
   bio: string;
   coverImage?: string;
 }
+type PostWithAI = PostResponse & {
+  isAiPost?: boolean;
+};
 
 // --- URL HELPER ---
 const getImageUrl = (url: string | null | undefined) => {
   if (!url) return "/placeholder.svg";
   if (url.startsWith("http")) return url;
   return `http://localhost:8080${url}`;
+};
+// --- SAFE HELPERS ---
+const getInitial = (name?: string | null): string => {
+  if (!name || typeof name !== "string") return "A";
+  return name.charAt(0).toUpperCase();
 };
 
 // ---------------- Helper Functions for Crop ----------------
@@ -177,7 +184,7 @@ export default function HomePage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [posts, setPosts] = useState<PostResponse[]>([]);
+  const [posts, setPosts] = useState<PostWithAI[]>([]);
 
   // Loading State
   const [membersLoading, setMembersLoading] = useState(true);
@@ -195,7 +202,7 @@ export default function HomePage() {
   const [commentingOnPost, setCommentingOnPost] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [localSentRequests, setLocalSentRequests] = useState<number[]>([]); // For instant UI updates on connect
+  const [localSentRequests, setLocalSentRequests] = useState<number[]>([]);
 
   // Report State
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -302,11 +309,10 @@ export default function HomePage() {
         setMembers(all.filter((m) => m.id !== cu.id));
       } else setMembers(all);
     } catch (err: unknown) {
-        console.error(err);
+      console.error(err);
     } finally {
-        setMembersLoading(false);
+      setMembersLoading(false);
     }
-
   };
 
   const fetchPendingRequests = async (userId: number) => {
@@ -403,7 +409,6 @@ export default function HomePage() {
     setPostContent((prev) => prev + emojiData.emoji);
   };
 
-  // --- POST CREATION (Auto Refresh Fix) ---
   const handleCreatePost = async () => {
     if (!postContent.trim() && !postImageFile) {
       toast.error("Add text or image");
@@ -453,7 +458,6 @@ export default function HomePage() {
     }
   };
 
-  // --- LIKES (Auto Refresh Fix) ---
   const handleToggleLike = async (postId: number) => {
     const sVal = sessionStorage.getItem("user");
     if (!sVal) return;
@@ -468,7 +472,6 @@ export default function HomePage() {
     }
   };
 
-  // --- COMMENTS (Auto Refresh Fix) ---
   const handleAddComment = async (postId: number) => {
     if (!commentText.trim()) return;
     const sVal = sessionStorage.getItem("user");
@@ -516,7 +519,6 @@ export default function HomePage() {
     return { status: "none" };
   };
 
-  // --- CONNECT (Auto Refresh Fix) ---
   const handleSendRequest = async (mid: number) => {
     const sVal = sessionStorage.getItem("user");
     if (!sVal) return;
@@ -556,13 +558,13 @@ export default function HomePage() {
 
   const submitReport = async () => {
     if (!postToReport) return;
-    
+
     const sVal = sessionStorage.getItem("user");
     if (!sVal) return;
     const user: LoginResponse = JSON.parse(sVal);
-    
+
     const finalReason = reportReason === "Other" ? customReason : reportReason;
-    
+
     if (!finalReason || !finalReason.trim()) {
       toast.error("Please select or provide a reason for reporting");
       return;
@@ -570,8 +572,12 @@ export default function HomePage() {
 
     setIsSubmittingReport(true);
     try {
-      const response = await reportPost(postToReport, user.id, finalReason.trim());
-      
+      const response = await reportPost(
+        postToReport,
+        user.id,
+        finalReason.trim()
+      );
+
       if (response.message.includes("already reported")) {
         toast.error("You have already reported this post");
       } else if (response.message.includes("deleted")) {
@@ -580,7 +586,7 @@ export default function HomePage() {
       } else {
         toast.success("Post reported. Thank you for keeping the community safe.");
       }
-      
+
       setReportDialogOpen(false);
       setPostToReport(null);
       setReportReason("");
@@ -592,36 +598,26 @@ export default function HomePage() {
     }
   };
 
-
-const handleWebSocketMessage = useCallback(
+  const handleWebSocketMessage = useCallback(
     (topic: string, message: unknown) => {
+      const postMessage = message as PostResponse;
 
-        // CAST message safely into PostResponse
-        const postMessage = message as PostResponse;
-
-        // NEW POST RECEIVED
-        if (topic.includes("/posts/") && !topic.includes("/update")) {
-            setPosts(prev => [postMessage, ...prev]);
-            toast.success("New post from your community!");
+      if (topic.includes("/posts/") && !topic.includes("/update")) {
+        setPosts((prev) => [postMessage, ...prev]);
+        toast.success("New post from your community!");
+      } else if (topic.includes("/update")) {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postMessage.id ? postMessage : p))
+        );
+      } else if (topic.includes("/connections/")) {
+        if (currentUser?.id) {
+          fetchPendingRequests(currentUser.id);
+          fetchUnreadNotificationCount(currentUser.id);
         }
-
-        // POST UPDATE (like/comment)
-        else if (topic.includes("/update")) {
-            setPosts(prev =>
-                prev.map(p => (p.id === postMessage.id ? postMessage : p))
-            );
-        }
-
-        // CONNECTION NOTIFICATIONS
-        else if (topic.includes("/connections/")) {
-            if (currentUser?.id) {
-                fetchPendingRequests(currentUser.id);
-                fetchUnreadNotificationCount(currentUser.id);
-            }
-        }
+      }
     },
     [currentUser?.id]
-);
+  );
 
   const wsTopics = currentUser?.community
     ? [
@@ -671,7 +667,7 @@ const handleWebSocketMessage = useCallback(
                     <Avatar className="w-20 h-20 border-4 border-card shadow-sm">
                       <AvatarImage src={currentUser.avatar} />
                       <AvatarFallback>
-                        {profileData.name.charAt(0)}
+                        {getInitial(profileData.name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="text-center mt-3">
@@ -733,7 +729,7 @@ const handleWebSocketMessage = useCallback(
                   <Avatar className="w-10 h-10 cursor-pointer hover:opacity-90 transition-opacity">
                     <AvatarImage src={currentUser.avatar} />
                     <AvatarFallback>
-                      {profileData.name.charAt(0)}
+                      {getInitial(profileData.name)}
                     </AvatarFallback>
                   </Avatar>
                   <button
@@ -764,7 +760,22 @@ const handleWebSocketMessage = useCallback(
             ) : (
               <StaggerContainer stagger={0.1}>
                 {posts.map((post) => {
-                  const isOwn = currentUser?.id === post.user.id;
+                  const isAiPost = Boolean(
+                    post.isAiPost ?? (post as any).is_ai_post
+                  );
+
+                  const isOwn = !isAiPost && currentUser?.id === post.user?.id;
+
+                  const displayName = isAiPost
+                    ? "ConnectHub AI"
+                    : post.user?.name || "User";
+                  const displayProfession = isAiPost
+                    ? "AI Assistant"
+                    : post.user?.profession;
+                  const profileLink = isAiPost
+                    ? "#"
+                    : `/profile/${post.user?.id}`;
+
                   return (
                     <Card
                       key={post.id}
@@ -773,28 +784,47 @@ const handleWebSocketMessage = useCallback(
                       <CardHeader className="p-4 pb-2">
                         <div className="flex items-start justify-between">
                           <div className="flex gap-3">
-                            <Link href={`/profile/${post.user.id}`}>
-                              <Avatar className="w-10 h-10 border border-border cursor-pointer hover:opacity-80 transition-opacity">
-                                <AvatarImage
-                                  src={getImageUrl(post.user.profileImageUrl)}
-                                />
-                                <AvatarFallback>
-                                  {post.user.name.charAt(0)}
+                            {isAiPost ? (
+                              <Avatar className="w-10 h-10 border border-blue-400 bg-blue-50">
+                                <AvatarFallback className="text-blue-600 font-bold">
+                                  🤖
                                 </AvatarFallback>
                               </Avatar>
-                            </Link>
-                            <div>
-                              <Link href={`/profile/${post.user.id}`}>
-                                <h3 className="font-semibold text-sm text-card-foreground hover:underline cursor-pointer">
-                                  {post.user.name}
-                                </h3>
+                            ) : (
+                              <Link href={profileLink}>
+                                <Avatar className="w-10 h-10 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                                  <AvatarImage
+                                    src={getImageUrl(post.user?.profileImageUrl)}
+                                  />
+                                  <AvatarFallback>
+                                    {getInitial(post.user?.name)}
+                                  </AvatarFallback>
+                                </Avatar>
                               </Link>
+                            )}
+
+                            <div>
+                              <Link href={profileLink}>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-sm text-card-foreground hover:underline">
+                                    {displayName}
+                                  </h3>
+
+                                  {isAiPost && (
+                                    <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-300">
+                                      🤖 AI
+                                    </span>
+                                  )}
+                                </div>
+                              </Link>
+
                               <p className="text-xs text-muted-foreground line-clamp-1">
-                                {post.user.profession}
+                                {displayProfession}
                               </p>
+
                               <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                                {new Date(post.createdAt).toLocaleDateString()} •{" "}
-                                <span className="font-medium">Global</span>
+                                {new Date(post.createdAt).toLocaleDateString()}{" "}
+                                • <span className="font-medium">Global</span>
                               </p>
                             </div>
                           </div>
@@ -831,7 +861,6 @@ const handleWebSocketMessage = useCallback(
                           {post.content}
                         </p>
 
-                        {/* 🔥 AI auto-deleted warning */}
                         {post.deleted && (
                           <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-3">
                             ⚠️ This post was removed by AI due to unsafe or
@@ -839,7 +868,6 @@ const handleWebSocketMessage = useCallback(
                           </div>
                         )}
 
-                        {/* 🔵 AI Notes (Grok-style) */}
                         {post.aiNotes && post.aiNotes.length > 0 && (
                           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-4">
                             <p className="font-semibold text-blue-700 mb-2">
@@ -929,7 +957,7 @@ const handleWebSocketMessage = useCallback(
                                     src={getImageUrl(c.user.profileImageUrl)}
                                   />
                                   <AvatarFallback className="text-[10px]">
-                                    {c.user.name.charAt(0)}
+                                    {getInitial(c.user.name)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="bg-card p-2 px-3 rounded-lg shadow-sm border border-border flex-1">
@@ -1007,7 +1035,7 @@ const handleWebSocketMessage = useCallback(
                           <Avatar className="w-9 h-9 border border-border cursor-pointer hover:opacity-80 transition-opacity">
                             <AvatarImage src={getImageUrl(m.profileImageUrl)} />
                             <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {m.name.charAt(0)}
+                              {getInitial(m.name)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
@@ -1037,8 +1065,6 @@ const handleWebSocketMessage = useCallback(
         </aside>
       </main>
 
-      {/* --- DIALOGS --- */}
-
       {/* Create Post Dialog */}
       <Dialog
         open={isPostingDialogOpen}
@@ -1062,9 +1088,7 @@ const handleWebSocketMessage = useCallback(
             <div className="flex gap-3 mb-2">
               <Avatar className="w-10 h-10">
                 <AvatarImage src={currentUser.avatar} />
-                <AvatarFallback>
-                  {profileData.name.charAt(0)}
-                </AvatarFallback>
+                <AvatarFallback>{getInitial(profileData.name)}</AvatarFallback>
               </Avatar>
               <div>
                 <h4 className="font-semibold text-sm text-card-foreground">
@@ -1257,7 +1281,8 @@ const handleWebSocketMessage = useCallback(
               Report Post
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Help us understand what's wrong with this post. Your report is anonymous.
+              Help us understand what's wrong with this post. Your report is
+              anonymous.
             </DialogDescription>
           </DialogHeader>
 
@@ -1266,43 +1291,70 @@ const handleWebSocketMessage = useCallback(
               <div className="space-y-3">
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="Spam" id="spam" />
-                  <Label htmlFor="spam" className="flex-1 cursor-pointer text-sm">
+                  <Label
+                    htmlFor="spam"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Spam or misleading
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="Harassment" id="harassment" />
-                  <Label htmlFor="harassment" className="flex-1 cursor-pointer text-sm">
+                  <Label
+                    htmlFor="harassment"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Harassment or bullying
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="Hate Speech" id="hate" />
-                  <Label htmlFor="hate" className="flex-1 cursor-pointer text-sm">
+                  <Label
+                    htmlFor="hate"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Hate speech or discrimination
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="Violence" id="violence" />
-                  <Label htmlFor="violence" className="flex-1 cursor-pointer text-sm">
+                  <Label
+                    htmlFor="violence"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Violence or dangerous content
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="Inappropriate Content" id="inappropriate" />
-                  <Label htmlFor="inappropriate" className="flex-1 cursor-pointer text-sm">
+                  <RadioGroupItem
+                    value="Inappropriate Content"
+                    id="inappropriate"
+                  />
+                  <Label
+                    htmlFor="inappropriate"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Inappropriate or adult content
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="False Information" id="false-info" />
-                  <Label htmlFor="false-info" className="flex-1 cursor-pointer text-sm">
+                  <RadioGroupItem
+                    value="False Information"
+                    id="false-info"
+                  />
+                  <Label
+                    htmlFor="false-info"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     False information
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="Other" id="other" />
-                  <Label htmlFor="other" className="flex-1 cursor-pointer text-sm">
+                  <Label
+                    htmlFor="other"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
                     Other
                   </Label>
                 </div>
@@ -1311,7 +1363,10 @@ const handleWebSocketMessage = useCallback(
 
             {reportReason === "Other" && (
               <div className="mt-3 animate-in fade-in slide-in-from-top-2">
-                <Label htmlFor="custom-reason" className="text-sm text-muted-foreground mb-2 block">
+                <Label
+                  htmlFor="custom-reason"
+                  className="text-sm text-muted-foreground mb-2 block"
+                >
                   Please specify your reason
                 </Label>
                 <Textarea
@@ -1344,7 +1399,11 @@ const handleWebSocketMessage = useCallback(
             </Button>
             <Button
               onClick={submitReport}
-              disabled={isSubmittingReport || !reportReason || (reportReason === "Other" && !customReason.trim())}
+              disabled={
+                isSubmittingReport ||
+                !reportReason ||
+                (reportReason === "Other" && !customReason.trim())
+              }
               className="bg-orange-500 hover:bg-orange-600"
             >
               {isSubmittingReport ? "Submitting..." : "Submit Report"}
